@@ -1,0 +1,27 @@
+class EnterMetastakeEvent:
+    def __init__(self, metastaking_token: str, metastaking_nonce: int, metastaking_amount: int,
+                 metastake_token: str, metastake_nonce: int, metastake_amount: int):
+        self.metastaking_tk = metastaking_token
+        self.metastaking_tk_nonce = metastaking_nonce
+        self.metastaking_tk_amount = metastaking_amount
+        self.metastake_tk = metastake_token
+        self.metastake_tk_nonce = metastake_nonce
+        self.metastake_tk_amount = metastake_amount
+
+
+class ExitMetastakeEvent:
+    def __init__(self, metastake_tk: str, amount: int, nonce: int, attributes, whole_metastake_amount: int,
+                 farm_tk_details: dict):
+        self.metastake_token = metastake_tk
+        self.amount = amount
+        self.nonce = nonce
+        self.metastake_token_attributes = attributes
+        self.whole_metastake_token_amount = whole_metastake_amount
+        self.farm_token_details = farm_tk_details
+
+
+class ClaimRewardsMetastakeEvent:
+    def __init__(self, amount: int, nonce: int, farm_tk_details: dict):
+        self.amount = amount
+        self.nonce = nonce
+        self.farm_token_details = farm_tk_details

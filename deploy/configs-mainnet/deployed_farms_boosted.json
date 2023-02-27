@@ -1,0 +1,51 @@
+[
+    {
+        "farmingToken": "EGLDMEX-0be9e5",
+        "farmToken": "EGLDMEXFL-c2521e",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqapxdp9gjxtg60mjwhle3n6h88zch9e7kkp2s8aqhkg",
+        "version": 4
+    },
+    {
+        "farmingToken": "EGLDUSDC-594e5e",
+        "farmToken": "EGLDUSDCFL-45109b",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqv0pz5z3fkz54nml6pkzzdruuf020gqzykp2sya7kkv",
+        "version": 4
+    },
+    {
+        "farmingToken": "EGLDRIDE-7bd51a",
+        "farmToken": "EGLDRIDEFL-7aac94",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqenvn0s3ldc94q2mlkaqx4arj3zfnvnmakp2sxca2h9",
+        "version": 4
+    },
+    {
+        "farmingToken": "ITHWEGLD-1adc53",
+        "farmToken": "ITHWEGLDFL-7d381f",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqrdq6zvepdxg36rey8pmluwur43q4hcx3kp2su4yltq",
+        "version": 4
+    },
+    {
+        "farmingToken": "UTKWEGLD-c960d1",
+        "farmToken": "UTKWEGLDFL-ba26d2",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgq4acurmluezvmhna8tztgcrnwh0l70a2wkp2sfh6jkp",
+        "version": 4
+    },
+    {
+        "farmingToken": "CRTWEGLD-1fac3f",
+        "farmToken": "CRTWEGLDFL-4fd518",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgquhqfknr9dg5t0xma0zcc55dm8gwv5rpkkp2sq8f40p",
+        "version": 4
+    },
+    {
+        "farmingToken": "ASHWEGLD-38545c",
+        "farmToken": "ASHWEGLDFL-9612cf",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgq6v5ta4memvrhjs4x3gqn90c3pujc77takp2sqhxm9j",
+        "version": 4
+    }
+]

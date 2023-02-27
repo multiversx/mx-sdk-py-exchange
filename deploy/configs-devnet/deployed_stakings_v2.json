@@ -1,0 +1,11 @@
+[
+    {
+        "farming_token": "WEB-5d08be",
+        "farm_token": "SWEB-d9bfe2",
+        "address": "erd1qqqqqqqqqqqqqpgqxpshvxgesuntsq8fk0735s372w2jmmcy0n4s3q9qgr",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    }
+]
