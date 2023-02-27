@@ -10,7 +10,8 @@ from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetw
 from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
 from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration, \
     MultiESDTNFTTransferBuilder
-from utils.utils_chain import Account, print_transaction_hash, print_test_step_fail, print_warning
+from utils.utils_chain import Account, print_transaction_hash
+from utils.utils_generic import print_test_step_fail, print_warning
 
 TX_CACHE: Dict[str, dict] = {}
 

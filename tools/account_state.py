@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 
 from typing import Dict, Any, Tuple, List
 
-from utils.utils_chain import print_test_step_fail, print_test_step_pass, print_warning
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_warning
 from erdpy.proxy.http_facade import do_get
 
 

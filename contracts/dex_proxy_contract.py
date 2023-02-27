@@ -7,8 +7,8 @@ from contracts.contract_identities import DEXContractInterface, ProxyContractVer
 from contracts.farm_contract import FarmContract
 from contracts.pair_contract import PairContract
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders
-from utils.utils_chain import print_transaction_hash, print_warning, print_test_step_fail, \
-    print_test_step_pass, print_test_substep
+from utils.utils_chain import print_transaction_hash
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
 from erdpy.accounts import Account, Address
 from erdpy.contracts import SmartContract, CodeMetadata
 from erdpy.proxy import ElrondProxy

@@ -7,11 +7,9 @@ from contracts.contract_identities import (
 from utils.utils_tx import (NetworkProviders,
                             prepare_contract_call_tx,
                             send_contract_call_tx)
-from utils.utils_chain import (dec_to_padded_hex, print_test_step_fail,
-                               print_test_step_pass,
-                               print_test_substep,
-                               print_transaction_hash,
-                               print_warning, string_to_hex)
+from utils.utils_chain import (dec_to_padded_hex, print_transaction_hash,
+                               string_to_hex)
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
 from erdpy.accounts import Account, Address
 from erdpy.contracts import CodeMetadata, SmartContract
 from erdpy.proxy import ElrondProxy

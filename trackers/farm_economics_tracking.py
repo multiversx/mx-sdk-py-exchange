@@ -2,8 +2,8 @@ from typing import Dict
 from utils.contract_data_fetchers import FarmContractDataFetcher, ChainDataFetcher
 from utils.utils_tx import NetworkProviders
 from erdpy.accounts import Account, Address
-from utils.utils_chain import (print_test_step_pass, print_test_step_fail, print_test_substep,
-                               DecodedTokenAttributes)
+from utils.utils_chain import (DecodedTokenAttributes)
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
                                                   ClaimRewardsFarmEvent, SetTokenBalanceEvent)
 from trackers.abstract_observer import Subscriber

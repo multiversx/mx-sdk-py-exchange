@@ -25,9 +25,10 @@ from contracts.metastaking_contract import MetaStakingContract
 from contracts.staking_contract import StakingContract
 from contracts.dex_proxy_contract import DexProxyContract
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import print_test_step_fail, print_test_step_pass, hex_to_string, print_warning
-from erdpy.accounts import Account, Address
-from utils.utils_generic import write_json_file, read_json_file
+from utils.utils_chain import hex_to_string
+from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_generic import write_json_file, read_json_file, print_test_step_fail, print_test_step_pass, \
+    print_warning
 from deploy import populate_deploy_lists
 
 

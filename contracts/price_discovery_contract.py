@@ -6,8 +6,8 @@ from contracts.contract_identities import PriceDiscoveryContractIdentity, DEXCon
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders
 from events.price_discovery_events import (DepositPDLiquidityEvent,
                                                              WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
-from utils.utils_chain import print_warning, print_transaction_hash, print_test_step_fail, \
-    print_test_step_pass, print_test_substep
+from utils.utils_chain import print_transaction_hash
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
 from erdpy.accounts import Account, Address
 from erdpy.contracts import SmartContract, CodeMetadata
 from erdpy.proxy import ElrondProxy

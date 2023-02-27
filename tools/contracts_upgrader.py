@@ -23,7 +23,8 @@ from utils.contract_retrievers import retrieve_router_by_address, retrieve_pair_
 from utils.contract_data_fetchers import RouterContractDataFetcher, PairContractDataFetcher, \
     StakingContractDataFetcher, FarmContractDataFetcher
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import base64_to_hex, print_test_step_fail
+from utils.utils_chain import base64_to_hex
+from utils.utils_generic import print_test_step_fail
 from tools import config_contracts_upgrader as config
 from erdpy.accounts import Address, Account
 from erdpy.proxy import ElrondProxy

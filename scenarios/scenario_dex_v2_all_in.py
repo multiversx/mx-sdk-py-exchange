@@ -22,8 +22,9 @@ from events.event_generators import (generate_add_initial_liquidity_event,
                                                        generateExitMetastakeEvent, generate_swap_fixed_input)
 from utils.contract_data_fetchers import PairContractDataFetcher, SimpleLockEnergyContractDataFetcher
 from utils.utils_tx import ESDTToken
-from utils.utils_chain import print_test_step_pass, print_condition_assert, nominated_amount, \
-    print_test_step_fail, TestStepConditions, get_token_details_for_address, get_all_token_nonces_details_for_account
+from utils.utils_chain import nominated_amount, \
+    get_token_details_for_address, get_all_token_nonces_details_for_account
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_condition_assert, TestStepConditions
 from arrows.stress.send_token_from_minter import main as send_token_from_minter
 from arrows.stress.send_egld_from_minter import main as send_egld_from_minter
 from arrows.stress.shared import get_shard_of_address

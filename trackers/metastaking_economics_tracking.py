@@ -1,6 +1,6 @@
 from erdpy.accounts import Address
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import print_test_step_pass
+from utils.utils_generic import print_test_step_pass
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher, ChainDataFetcher
 from events.metastake_events import (EnterMetastakeEvent,
                                                        ExitMetastakeEvent,

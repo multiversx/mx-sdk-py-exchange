@@ -10,10 +10,9 @@ from erdpy.accounts import Account, Address
 from erdpy.contracts import SmartContract, CodeMetadata
 from erdpy.proxy import ElrondProxy
 from erdpy.transactions import Transaction
-from utils.utils_chain import print_transaction_hash, print_test_step_fail, print_test_step_pass, \
-    print_test_substep
-from utils.utils_generic import get_continue_confirmation
-from utils.utils_chain import print_warning
+from utils.utils_chain import print_transaction_hash
+from utils.utils_generic import get_continue_confirmation, print_test_step_fail, print_test_step_pass, \
+    print_test_substep, print_warning
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
                                                   ClaimRewardsFarmEvent, CompoundRewardsFarmEvent,
                                                   MigratePositionFarmEvent)

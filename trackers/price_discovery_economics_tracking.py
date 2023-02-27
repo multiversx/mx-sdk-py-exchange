@@ -4,8 +4,8 @@ from utils.contract_data_fetchers import PriceDiscoveryContractDataFetcher
 from events.price_discovery_events import (DepositPDLiquidityEvent,
                                                              WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
 from contracts.contract_identities import PriceDiscoveryContractIdentity
-from utils.utils_chain import print_test_step_fail, print_test_substep, print_test_step_pass, \
-    get_all_token_nonces_details_for_account, get_token_details_for_address
+from utils.utils_chain import get_all_token_nonces_details_for_account, get_token_details_for_address
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep
 from erdpy.accounts import Address
 from erdpy.proxy import ElrondProxy
 

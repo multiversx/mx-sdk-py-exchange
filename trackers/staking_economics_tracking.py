@@ -4,7 +4,7 @@ from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
 from events.farm_events import EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent
 from utils.contract_data_fetchers import StakingContractDataFetcher, ChainDataFetcher
-from utils.utils_chain import print_test_step_pass, print_test_step_fail, print_test_substep
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep
 
 
 class StakingEconomics(Subscriber):

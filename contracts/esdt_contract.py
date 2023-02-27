@@ -1,7 +1,7 @@
 from enum import Enum
 
 from utils.utils_tx import send_contract_call_tx, prepare_contract_call_tx
-from utils.utils_chain import print_warning, print_test_step_fail
+from utils.utils_generic import print_test_step_fail, print_warning
 from erdpy.accounts import Account, Address
 from erdpy.proxy import ElrondProxy
 

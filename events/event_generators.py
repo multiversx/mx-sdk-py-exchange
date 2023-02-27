@@ -24,7 +24,8 @@ from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.results_logger import FarmEventResultLogData
 from utils.utils_chain import (prevent_spam_crash_elrond_proxy_go,
                                get_token_details_for_address, get_all_token_nonces_details_for_account,
-                               print_test_step_fail, decode_merged_attributes, dec_to_padded_hex)
+                               decode_merged_attributes, dec_to_padded_hex)
+from utils.utils_generic import print_test_step_fail
 from erdpy.accounts import Account, Address
 
 

@@ -6,8 +6,6 @@ from os import path
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, cast
 
-from enum import Enum
-
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
 
 from contracts.contract_identities import FarmContractVersion
@@ -477,71 +475,4 @@ def print_transaction_hash(hash: str, proxy: str, debug_level=True):
 
     if debug_level:
         print(explorer+"/transactions/"+hash)
-
-
-class PrintColors(Enum):
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    PASS = '\033[92m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-
-def print_color(msg, color: PrintColors):
-    print(f"{color.value}{msg}{PrintColors.ENDC.value}")
-
-
-def print_test_step_fail(msg):
-    print_color(msg, PrintColors.FAIL)
-
-
-def print_test_step_pass(msg):
-    print_color(msg, PrintColors.PASS)
-
-
-def print_test_substep(msg):
-    sub_step_print_header = " ├ "
-    print(f"{sub_step_print_header}{msg}")
-
-
-def print_warning(msg):
-    print_color(msg, PrintColors.WARNING)
-
-
-def print_condition_assert(conditions: Dict[bool, str]):
-    for condition, message in conditions.items():
-        if condition:
-            print_test_step_pass(f"PASS: {message}")
-        else:
-            print_test_step_fail(f"FAIL: {message}")
-
-
-class TestStepCondition:
-    def __init__(self, condition: bool, message: str):
-        self.condition = condition
-        self.message = message
-
-
-class TestStepConditions:
-    conditions: List[TestStepCondition]
-
-    def __init__(self):
-        self.conditions = []
-
-    def add_condition(self, condition: bool, message: str):
-        self.conditions.append(TestStepCondition(condition, message))
-
-    def assert_conditions(self):
-        for condition in self.conditions:
-            if condition.condition:
-                print_test_step_pass(f"PASS: {condition.message}")
-            else:
-                print_test_step_fail(f"FAIL: {condition.message}")
 

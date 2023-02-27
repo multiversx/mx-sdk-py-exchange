@@ -15,7 +15,7 @@ from events.event_generators import (generate_add_initial_liquidity_event,
                                                        generateClaimMetastakeRewardsEvent,
                                                        generateExitMetastakeEvent,
                                                        generateExitFarmEvent)
-from utils.utils_chain import print_test_step_pass
+from utils.utils_generic import print_test_step_pass
 from arrows.stress.send_token_from_minter import main as send_token_from_minter
 from arrows.stress.shared import get_shard_of_address
 from erdpy.accounts import Account

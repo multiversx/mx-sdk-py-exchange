@@ -3,7 +3,7 @@ from utils.utils_tx import NetworkProviders
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
 from utils.contract_data_fetchers import PairContractDataFetcher
-from utils.utils_chain import print_test_step_pass, print_test_step_fail, print_test_substep
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep
 from contracts.pair_contract import (AddLiquidityEvent,
                                                        RemoveLiquidityEvent,
                                                        SwapFixedInputEvent,
