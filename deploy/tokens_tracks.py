@@ -5,8 +5,9 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from erdpy import utils
-from erdpy.accounts import Address
+from utils import utils_generic as utils
+from utils.utils_chain import WrapperAddress as Address
+from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork
 
 
 class BunchOfTracks:
@@ -16,17 +17,17 @@ class BunchOfTracks:
         self.all_tokens: List[str] = []
         self.prefix = prefix.upper()
 
-    def put_for_account(self, address: Address, tokens: Dict[str, Any]):
+    def put_for_account(self, address: Address, tokens: List[FungibleTokenOfAccountOnNetwork]):
         for token in tokens:
-            if not token.startswith(self.prefix):
+            if not token.identifier.startswith(self.prefix):
                 continue
 
-            balance = tokens[token]["balance"]
+            balance = token.balance
 
             if token not in self.accounts_by_token:
-                self.accounts_by_token[token] = dict()
+                self.accounts_by_token[token.identifier] = dict()
 
-            self.accounts_by_token[token][address.bech32()] = balance
+            self.accounts_by_token[token.identifier][address.bech32()] = balance
 
     def put_all_tokens(self, tokens: List[str]):
         self.all_tokens = [token for token in tokens if token.startswith(self.prefix)]

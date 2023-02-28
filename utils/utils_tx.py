@@ -1,7 +1,7 @@
 import sys
 import time
 import traceback
-from typing import List, Dict
+from typing import List, Dict, Any
 
 from multiversx_sdk_core import Transaction, TokenPayment, Address
 from multiversx_sdk_network_providers import ProxyNetworkProvider, ApiNetworkProvider
@@ -11,7 +11,7 @@ from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
 from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration, \
     MultiESDTNFTTransferBuilder
 from utils.utils_chain import Account, print_transaction_hash
-from utils.utils_generic import print_test_step_fail, print_warning
+from utils.utils_generic import print_test_step_fail, print_warning, split_to_chunks, get_continue_confirmation
 
 TX_CACHE: Dict[str, dict] = {}
 
@@ -320,3 +320,28 @@ def get_deployed_address_from_event(tx_result: TransactionOnNetwork) -> str:
 
     address = deploy_event.address.bech32()
     return address
+
+
+def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkProvider,
+                           chunk_size: int, sleep: int = 0, confirm_yes: bool = False):
+    chunks = list(split_to_chunks(transactions, chunk_size))
+
+    print(f"{len(transactions)} transactions have been prepared, in {len(chunks)} chunks of size {chunk_size}")
+    get_continue_confirmation(confirm_yes)
+
+    chunk_index = 0
+    hashes = []
+    for chunk in chunks:
+        print("... chunk", chunk_index, "out of", len(chunks))
+
+        num_sent, sent_hashes = proxy.send_transactions(chunk)
+        if len(chunk) != num_sent:
+            print(f"sent {num_sent} instead of {len(chunk)}")
+
+        chunk_index += 1
+        hashes.extend(sent_hashes)
+
+        if sleep is not None:
+            time.sleep(sleep)
+
+    return hashes

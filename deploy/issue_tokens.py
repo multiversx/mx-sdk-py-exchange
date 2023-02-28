@@ -4,13 +4,12 @@ from argparse import ArgumentParser
 from typing import List
 
 import config
-from arrows.stress.esdtnft.shared import (build_token_name, build_token_ticker,
-                                          load_contracts, make_call_arg_ascii,
-                                          make_call_arg_pubkey)
-from arrows.stress.shared import BunchOfAccounts, broadcast_transactions
-from erdpy.contracts import SmartContract
-from erdpy.proxy.core import ElrondProxy
-from erdpy.transactions import Transaction
+from utils.utils_chain import (Account, build_token_name, build_token_ticker)
+from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk_core import Address, TokenPayment, Transaction
+from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
+
+from utils.utils_tx import broadcast_transactions
 
 
 def main(cli_args: List[str]):
@@ -18,7 +17,7 @@ def main(cli_args: List[str]):
 
     parser = ArgumentParser()
     parser.add_argument("--proxy", default=config.DEFAULT_PROXY)
-    parser.add_argument("--accounts", default=config.DEFAULT_OWNER)
+    parser.add_argument("--account", default=config.DEFAULT_OWNER)
     parser.add_argument("--contracts", default=config.get_default_contracts_file())
     parser.add_argument("--sleep-between-chunks", type=int, default=5)
     parser.add_argument("--chunk-size", type=int, default=400)
@@ -36,16 +35,14 @@ def main(cli_args: List[str]):
 
     args = parser.parse_args(cli_args)
 
-    proxy = ElrondProxy(args.proxy)
+    proxy = ProxyNetworkProvider(args.proxy)
     network = proxy.get_network_config()
+    builder_config = DefaultTransactionBuildersConfiguration(network.chain_id)
 
-    bunch_of_accounts = BunchOfAccounts.load_accounts_from_files([args.accounts])
-    # bunch_of_accounts.sync_nonces(proxy)
-    accounts = bunch_of_accounts.get_all() if args.from_shard is None else bunch_of_accounts.get_in_shard(int(args.from_shard))
-    account = accounts[0]  # issue tokens only for SC owner account to improve times on large number of accounts
+    account = Account(pem_file=args.account)
     account.sync_nonce(proxy)
 
-    tokens_system_contract = SmartContract(address=config.TOKENS_CONTRACT_ADDRESS)
+    tokens_system_contract = Address.from_bech32(config.TOKENS_CONTRACT_ADDRESS)
 
     supply = pow(10, args.supply_exp)
     num_decimals = args.num_decimals
@@ -55,28 +52,34 @@ def main(cli_args: List[str]):
 
     def issue_token():
         for i in range(0, args.num_tokens):
-            account = accounts[i]
             token_name, token_name_hex = build_token_name(account.address, prefix)
             token_ticker, token_ticker_hex = build_token_ticker(account.address, prefix)
-            sc_args = [token_name_hex, token_ticker_hex, supply, num_decimals]
-            tx_data = tokens_system_contract.prepare_execute_transaction_data("issue", sc_args)
-
-            gas_limit = args.gas_limit or args.base_gas_limit + 50000 + 1500 * len(tx_data)
             value = args.value
 
-            tx = Transaction()
-            tx.nonce = account.nonce
-            tx.value = value
-            tx.sender = account.address.bech32()
-            tx.receiver = tokens_system_contract.address.bech32()
-            tx.gasPrice = network.min_gas_price
-            tx.gasLimit = gas_limit
-            tx.data = tx_data
-            tx.chainID = str(network.chain_id)
-            tx.version = network.min_tx_version
-            tx.sign(account)
+            builder = ContractCallBuilder(
+                config=builder_config,
+                contract=tokens_system_contract,
+                caller=account.address,
+                function_name="issue",
+                call_arguments=[
+                    token_name,
+                    token_ticker,
+                    supply,
+                    num_decimals
+                ],
+                value=TokenPayment.egld_from_integer(value)
+            )
 
-            print("Holder account: ", account.address)
+            # calculate precise gas limit
+            tx_data = builder.build_payload()
+            gas_limit = args.gas_limit or args.base_gas_limit + 50000 + 1500 * tx_data.length()
+            builder.gas_limit = gas_limit
+
+            tx = builder.build()
+            tx.nonce = account.nonce
+            tx.signature = account.sign_transaction(tx)
+
+            print("Holder account: ", account.address.bech32())
             print("Token name: ", token_name)
             print("Token ticker: ", token_ticker)
 
@@ -87,7 +90,8 @@ def main(cli_args: List[str]):
 
     issue_token()
 
-    hashes = broadcast_transactions(transactions, proxy, args.chunk_size, sleep=args.sleep_between_chunks, confirm_yes=args.yes)
+    hashes = broadcast_transactions(transactions, proxy, args.chunk_size,
+                                    sleep=args.sleep_between_chunks, confirm_yes=args.yes)
 
     return hashes
 

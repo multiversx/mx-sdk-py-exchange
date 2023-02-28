@@ -6,10 +6,10 @@ from typing import List
 
 import config
 from deploy.tokens_tracks import BunchOfTracks
-from arrows.stress.shared import BunchOfAccounts
-from erdpy.accounts import Address
-from erdpy.errors import ProxyRequestError
-from erdpy.proxy.core import ElrondProxy
+from utils.utils_chain import BunchOfAccounts
+from utils.utils_chain import WrapperAddress as Address
+from multiversx_sdk_network_providers.errors import GenericError
+from multiversx_sdk_network_providers import ProxyNetworkProvider
 
 
 def main(cli_args: List[str]):
@@ -23,7 +23,7 @@ def main(cli_args: List[str]):
 
     args = parser.parse_args(cli_args)
 
-    proxy = ElrondProxy(args.proxy)
+    proxy = ProxyNetworkProvider(args.proxy)
     print(proxy.url)
     bunch_of_accounts = BunchOfAccounts.load_accounts_from_files([args.accounts])
     accounts = bunch_of_accounts.get_all()
@@ -35,9 +35,9 @@ def main(cli_args: List[str]):
 
     def get_for_address(address: Address):
         try:
-            tokens = proxy.get_esdt_tokens(address)
+            tokens = proxy.get_fungible_tokens_of_account(address)
             tracks.put_for_account(address, tokens)
-        except ProxyRequestError as error:
+        except GenericError as error:
             print(error)
 
     Pool(25).map(get_for_address, addresses)

@@ -280,6 +280,19 @@ def get_token_details_for_address(in_token: str, address: str, proxy: ProxyNetwo
     return 0, 0, ""
 
 
+def build_token_name(owner: Address, prefix: str = ""):
+    prefix = prefix or ""
+    prefix = (prefix + owner.bech32()[4:14]).upper()
+    hex = "0x" + prefix.encode("utf8").hex()
+    return prefix, hex
+
+
+def build_token_ticker(owner: Address, prefix: str = ""):
+    prefix = (prefix + owner.bech32()[4:8]).upper()
+    hex = "0x" + prefix.encode("utf8").hex()
+    return prefix, hex
+
+
 class DecodedTokenAttributes:
     rewards_per_share: int
     original_entering_epoch: int

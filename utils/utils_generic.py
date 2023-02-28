@@ -39,6 +39,11 @@ class BasicEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
+def split_to_chunks(items: Any, chunk_size: int):
+    for i in range(0, len(items), chunk_size):
+        yield items[i:i + chunk_size]
+
+
 def omit_fields(data: Any, fields: List[str] = []):
     if isinstance(data, dict):
         for field in fields:
