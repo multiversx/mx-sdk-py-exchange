@@ -4,7 +4,7 @@ import traceback
 from arrows.stress.contracts.contract import load_code_as_hex
 from contracts.contract_identities import DEXContractInterface, RouterContractVersion
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, get_deployed_address_from_event
-from utils.utils_chain import print_transaction_hash
+from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_warning
 from erdpy.accounts import Account, Address
 from erdpy.contracts import SmartContract, CodeMetadata
@@ -60,7 +60,7 @@ class ProxyDeployerContract(DEXContractInterface):
         try:
             response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
             tx_hash = response.get_hash()
-            print_transaction_hash(tx_hash, proxy.url, True)
+            log_explorer_transaction(tx_hash, proxy.url)
 
             address = contract.address.bech32()
             deployer.nonce += 1

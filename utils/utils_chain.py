@@ -15,6 +15,7 @@ from multiversx_sdk_wallet import UserSigner, pem_format
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 
 from utils import utils_generic
+from utils.utils_generic import logger
 
 logger = logging.getLogger("accounts")
 
@@ -477,15 +478,25 @@ def encode_merged_attributes(encode_data: dict, encode_struct: dict):
     return encoded_data
 
 
-def print_transaction_hash(hash: str, proxy: str, debug_level=True):
-    explorer = ""
-    if proxy == "https://testnet-gateway.multiversx.com":
-        explorer = "https://testnet-explorer.multiversx.com"
-    if proxy == "https://devnet-gateway.multiversx.com":
-        explorer = "https://devnet-explorer.multiversx.com"
-    if proxy == "https://gateway.multiversx.com":
-        explorer = "https://explorer.multiversx.com"
+def log_explorer(proxy: str, name: str, path: str, details: str):
+    networks = {
+        "https://testnet-gateway.multiversx.com":
+            ("MultiversX Testnet Explorer", "https://testnet-explorer.multiversx.com"),
+        "https://devnet-gateway.multiversx.com":
+            ("MultiversX Devnet Explorer", "https://devnet-explorer.multiversx.com"),
+        "https://gateway.multiversx.com":
+            ("MultiversX Mainnet Explorer", "https://explorer.multiversx.com"),
+    }
+    try:
+        explorer_name, explorer_url = networks[proxy]
+        logger.info(f"View this {name} in the {explorer_name}: {explorer_url}/{path}/{details}")
+    except KeyError:
+        logger.info(f"No explorer known for {proxy}. {name} raw path: {path}/{details}")
 
-    if debug_level:
-        print(explorer+"/transactions/"+hash)
 
+def log_explorer_contract_address(address: str, proxy_url: str):
+    log_explorer(proxy_url, "contract address", "accounts", address)
+
+
+def log_explorer_transaction(tx_hash: str, proxy_url: str):
+    log_explorer(proxy_url, "transaction", "transactions", tx_hash)

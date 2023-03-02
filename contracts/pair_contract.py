@@ -7,7 +7,7 @@ from contracts.contract_identities import (
 from utils.utils_tx import (NetworkProviders,
                             prepare_contract_call_tx,
                             send_contract_call_tx)
-from utils.utils_chain import (dec_to_padded_hex, print_transaction_hash,
+from utils.utils_chain import (dec_to_padded_hex, log_explorer_transaction,
                                string_to_hex)
 from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
 from erdpy.accounts import Account, Address
@@ -118,7 +118,7 @@ class PairContract(DEXContractInterface):
         tx.sign(user)
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
 
             return txHash
@@ -155,7 +155,7 @@ class PairContract(DEXContractInterface):
         tx.sign(user)
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
 
             return txHash
@@ -196,7 +196,7 @@ class PairContract(DEXContractInterface):
         tx.sign(user)
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
 
             return txHash
@@ -235,7 +235,7 @@ class PairContract(DEXContractInterface):
         tx.sign(user)
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
         except Exception as ex:
             print(ex)
@@ -269,7 +269,7 @@ class PairContract(DEXContractInterface):
         tx.sign(user)
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
 
             return txHash
@@ -319,7 +319,7 @@ class PairContract(DEXContractInterface):
         try:
             response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
             tx_hash = response.get_hash()
-            print_transaction_hash(tx_hash, proxy.url, True)
+            log_explorer_transaction(tx_hash, proxy.url)
 
             address = contract.address.bech32()
             deployer.nonce += 1
@@ -373,7 +373,7 @@ class PairContract(DEXContractInterface):
         try:
             response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
             tx_hash = response.get_hash()
-            print_transaction_hash(tx_hash, proxy.url, True)
+            log_explorer_transaction(tx_hash, proxy.url)
             deployer.nonce += 1 if tx_hash != "" else 0
 
         except Exception as ex:

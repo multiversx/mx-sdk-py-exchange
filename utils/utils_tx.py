@@ -1,19 +1,23 @@
 import sys
 import time
 import traceback
+from pathlib import Path
 from typing import List, Dict, Any
 
 from multiversx_sdk_core import Transaction, TokenPayment, Address
+from multiversx_sdk_core.interfaces import ICodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider, ApiNetworkProvider
 from multiversx_sdk_network_providers.network_config import NetworkConfig
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
 from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
 from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration, \
-    MultiESDTNFTTransferBuilder
-from utils.utils_chain import Account, print_transaction_hash
+    MultiESDTNFTTransferBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder
+from utils.logger import get_logger
+from utils.utils_chain import Account, log_explorer_transaction
 from utils.utils_generic import print_test_step_fail, print_warning, split_to_chunks, get_continue_confirmation
 
 TX_CACHE: Dict[str, dict] = {}
+logger = get_logger(__name__)
 
 
 class ESDTToken:
@@ -177,11 +181,73 @@ class NetworkProviders:
         return False
 
 
+def _prep_args_for_addresses(args: List):
+    # TODO: remove this when the SDK supports bech32 addresses... or refactor the thing entirely
+    new_args = []
+    for item in args:
+        if type(item) is str and "erd" in item:
+            item = Address.from_bech32(item, "erd")
+        new_args.append(item)
+    return new_args
+
+
+def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
+                      gas_limit: int, contract_file: Path, code_metadata: ICodeMetadata,
+                      args: list = None) -> Transaction:
+    config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
+    args = _prep_args_for_addresses(args)
+    builder = ContractDeploymentBuilder(
+        config=config,
+        owner=deployer.address,
+        gas_limit=gas_limit,
+        code_metadata=code_metadata,
+        code=contract_file.read_bytes(),
+        deploy_arguments=args,
+        nonce=deployer.nonce
+    )
+
+    tx = builder.build()
+    tx.signature = deployer.sign_transaction(tx)
+
+    logger.debug(f"Deploy arguments: {args}")
+    logger.debug(f"Transaction: {tx.to_dictionary()}")
+    logger.debug(f"Transaction data: {tx.data}")
+
+    return tx
+
+
+def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_config: NetworkConfig,
+                       gas_limit: int, contract_file: Path, code_metadata: ICodeMetadata,
+                       args: list = None) -> Transaction:
+    config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
+    args = _prep_args_for_addresses(args)
+    builder = ContractUpgradeBuilder(
+        config=config,
+        contract=contract_address,
+        owner=deployer.address,
+        gas_limit=gas_limit,
+        code_metadata=code_metadata,
+        code=contract_file.read_bytes(),
+        upgrade_arguments=args,
+        nonce=deployer.nonce
+    )
+
+    tx = builder.build()
+    tx.signature = deployer.sign_transaction(tx)
+
+    logger.debug(f"Upgrade arguments: {args}")
+    logger.debug(f"Transaction: {tx.to_dictionary()}")
+    logger.debug(f"Transaction data: {tx.data}")
+
+    return tx
+
+
 def prepare_contract_call_tx(contract_address: Address, deployer: Account,
                              network_config: NetworkConfig, gas_limit: int,
                              function: str, args: list, value: str = "0") -> Transaction:
 
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
+    args = _prep_args_for_addresses(args)
     builder = ContractCallBuilder(
         config=config,
         contract=contract_address,
@@ -204,6 +270,7 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
                                                      value: str = "0") -> Transaction:
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     payment_tokens = [token.to_token_payment() for token in tokens]
+    endpoint_args = _prep_args_for_addresses(endpoint_args)
     builder = ContractCallBuilder(
         config=config,
         contract=contract_address,
@@ -241,11 +308,23 @@ def prepare_multiesdtnfttransfer_tx(destination: Address, user: Account,
     return tx
 
 
+def send_deploy_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
+    try:
+        tx_hash = proxy.send_transaction(tx)
+        log_explorer_transaction(tx_hash, proxy.url)
+    except Exception as ex:
+        print_test_step_fail(f"Failed to deploy due to: {ex}")
+        traceback.print_exception(*sys.exc_info())
+        tx_hash = ""
+
+    return tx_hash
+
+
 def send_contract_call_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
     try:
         tx_hash = proxy.send_transaction(tx)
         # TODO: check if needed to wait for tx to be processed
-        print_transaction_hash(tx_hash, proxy.url, True)
+        log_explorer_transaction(tx_hash, proxy.url)
     except Exception as ex:
         print_test_step_fail(f"Failed to send tx due to: {ex}")
         traceback.print_exception(*sys.exc_info())
@@ -277,8 +356,8 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
     return tx_hash
 
 
-def multi_esdt_tx(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
-                  user: Account, dest: Address, args: list):
+def multi_esdt_transfer(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
+                        user: Account, dest: Address, args: list):
     """ Expected as args:
         type[ESDTToken...]: tokens list
     """
@@ -312,6 +391,38 @@ def endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
     return tx_hash
 
 
+def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
+           owner: Account, bytecode_path: Path, metadata: ICodeMetadata, args: list) -> (str, str):
+    print_warning(f"Deploy {contract_label} contract")
+    network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
+    tx_hash, contract_address = "", ""
+
+    tx = prepare_deploy_tx(owner, network_config, gas, bytecode_path, metadata, args)
+    tx_hash = send_deploy_tx(tx, proxy)
+
+    if tx_hash:
+        while not proxy.get_transaction_status(tx_hash).is_executed():
+            time.sleep(2)
+        contract_address = get_deployed_address_from_tx(tx_hash, proxy)
+        owner.nonce += 1
+
+    return tx_hash, contract_address
+
+
+def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
+                 owner: Account, contract: Address, bytecode_path: Path, metadata: ICodeMetadata,
+                 args: list) -> str:
+    print_warning(f"Upgrade {contract_label} contract")
+    network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
+    tx_hash = ""
+
+    tx = prepare_upgrade_tx(owner, contract, network_config, gas, bytecode_path, metadata, args)
+    tx_hash = send_contract_call_tx(tx, proxy)
+    owner.nonce += 1 if tx_hash != "" else 0
+
+    return tx_hash
+
+
 def get_deployed_address_from_event(tx_result: TransactionOnNetwork) -> str:
     searched_event_id = "SCDeploy"
     deploy_event = tx_result.logs.find_first_or_none_event(searched_event_id)
@@ -320,6 +431,18 @@ def get_deployed_address_from_event(tx_result: TransactionOnNetwork) -> str:
 
     address = deploy_event.address.bech32()
     return address
+
+
+def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
+    try:
+        tx = proxy.get_transaction(tx_hash)
+        contract_address = get_deployed_address_from_event(tx)
+    except Exception as ex:
+        print_test_step_fail(f"Failed to get contract address due to: {ex}")
+        traceback.print_exception(*sys.exc_info())
+        contract_address = ""
+
+    return contract_address
 
 
 def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkProvider,

@@ -1,5 +1,4 @@
-from abc import abstractmethod, ABCMeta, ABC
-from dataclasses import dataclass
+from abc import abstractmethod, ABC
 from enum import Enum
 
 from utils.utils_chain import Account
@@ -86,7 +85,6 @@ class StakingContractVersion(Enum):
 class MetaStakingContractVersion(Enum):
     V1 = 1
     V2 = 2
-
 
 
 class FarmContractIdentity(DEXContractIdentityInterface):

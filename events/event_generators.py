@@ -26,19 +26,19 @@ from utils.utils_chain import (prevent_spam_crash_elrond_proxy_go,
                                get_token_details_for_address, get_all_token_nonces_details_for_account,
                                decode_merged_attributes, dec_to_padded_hex)
 from utils.utils_generic import print_test_step_fail
-from erdpy.accounts import Account, Address
+from utils.utils_chain import Account, WrapperAddress as Address
 
 
 def generate_add_liquidity_event(context: Context, user_account: Account, pair_contract: PairContract):
     print('Attempt addLiquidityEvent')
     txhash = ''
     try:
-        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.proxy.url)
+        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
 
         tokens = [pair_contract.firstToken, pair_contract.secondToken]
 
-        _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.proxy)
-        _, amount_token_b, _ = get_token_details_for_address(tokens[1], user_account.address.bech32(), context.proxy)
+        _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.network_provider.proxy)
+        _, amount_token_b, _ = get_token_details_for_address(tokens[1], user_account.address.bech32(), context.network_provider.proxy)
 
         if amount_token_a <= 0 or amount_token_b <= 0:
             print_test_step_fail(f"Skipped add liquidity because needed tokens NOT found in account.")
@@ -94,11 +94,11 @@ def generate_remove_liquidity_event(context: Context, user_account: Account, pai
     print('Attempt removeLiquidityEvent')
     txhash = ''
     try:
-        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.proxy.url)
+        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
         # userAccount = context.get_random_user_account()
         # pairContract = context.get_random_pair_contract()
 
-        _, amount_lp_token, _ = get_token_details_for_address(pair_contract.lpToken, user_account.address.bech32(), context.proxy)
+        _, amount_lp_token, _ = get_token_details_for_address(pair_contract.lpToken, user_account.address.bech32(), context.network_provider.proxy)
         if amount_lp_token <= 0:
             print(f"Skipped swap because no {pair_contract.lpToken} found in account.")
             return
@@ -139,12 +139,12 @@ def generate_swap_fixed_input(context: Context, user_account: Account, pair_cont
     print('Attempt swapFixedInputEvent')
     txhash = ''
     try:
-        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.proxy.url)
+        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
 
         tokens = [pair_contract.firstToken, pair_contract.secondToken]
         random.shuffle(tokens)
 
-        _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.proxy)
+        _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.network_provider.proxy)
         if amount_token_a <= 0:
             print(f"Skipped swap because no {tokens[0]} found in account.")
             return
@@ -187,12 +187,12 @@ def generate_swap_fixed_output(context: Context, user_account: Account, pair_con
     print('Attempt swapFixedOutputEvent')
     txhash = ''
     try:
-        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.proxy.url)
+        contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
 
         tokens = [pair_contract.firstToken, pair_contract.secondToken]
         random.shuffle(tokens)
 
-        _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.proxy)
+        _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.network_provider.proxy)
         if amount_token_a <= 0:
             print(f"Skipped swap because no {tokens[0]} found in account.")
             return
@@ -233,8 +233,8 @@ def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract:
         farmToken = farmContract.farmToken
         farming_token = farmContract.farmingToken
 
-        farmingTkNonce, farmingTkAmount, _ = get_token_details_for_address(farming_token, userAccount.address, context.proxy)
-        farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmToken, userAccount.address, context.proxy)
+        farmingTkNonce, farmingTkAmount, _ = get_token_details_for_address(farming_token, userAccount.address, context.network_provider.proxy)
+        farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmToken, userAccount.address, context.network_provider.proxy)
 
         if farmingTkNonce == 0 and farmingTkAmount == 0:
             print_test_step_fail(f"SKIPPED: No tokens found!")
@@ -255,13 +255,13 @@ def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract:
         # pre-event logging
         event_log = FarmEventResultLogData()
         event_log.set_generic_event_data(event, userAccount.address.bech32(), farmContract)
-        event_log.set_pre_event_data(context.proxy)
+        event_log.set_pre_event_data(context.network_provider.proxy)
 
         tx_hash = farmContract.enterFarm(context.network_provider, userAccount, event, lockRewards, initial)
         context.observable.set_event(farmContract, userAccount, event, tx_hash)
 
         # post-event logging
-        event_log.set_post_event_data(tx_hash, context.proxy)
+        event_log.set_post_event_data(tx_hash, context.network_provider.proxy)
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
@@ -280,10 +280,10 @@ def generateEnterStakingEvent(context: Context, user: Account, staking_contract:
 
         staking_token_nonce, staking_token_amount, _ = get_token_details_for_address(staking_token,
                                                                                      user.address,
-                                                                                     context.proxy)
+                                                                                     context.network_provider.proxy)
         farm_token_nonce, farm_token_amount, _ = get_token_details_for_address(farm_token,
                                                                                user.address,
-                                                                               context.proxy)
+                                                                               context.network_provider.proxy)
         if not staking_token_amount:
             print_test_step_fail('SKIPPED enterStakingEvent: No tokens found!')
             return
@@ -317,10 +317,10 @@ def generateEnterMetastakeEvent(context: Context, user: Account, metastake_contr
 
         staking_token_nonce, staking_token_amount, _ = get_token_details_for_address(staking_token,
                                                                                      user.address,
-                                                                                     context.proxy)
+                                                                                     context.network_provider.proxy)
         metastake_token_nonce, metastake_token_amount, _ = get_token_details_for_address(metastake_token,
                                                                                          user.address,
-                                                                                         context.proxy)
+                                                                                         context.network_provider.proxy)
 
         if staking_token_nonce == 0 and staking_token_amount == 0:
             print_test_step_fail(f"SKIPPED: No tokens found!")
@@ -367,7 +367,7 @@ def generateExitFarmEvent(context: Context, userAccount: Account, farmContract: 
     tx_hash = ""
     try:
         farmTkNonce, farmTkAmount, farmTkAttr = get_token_details_for_address(farmContract.farmToken,
-                                                                              userAccount.address, context.proxy)
+                                                                              userAccount.address, context.network_provider.proxy)
         if farmTkNonce == 0:
             print(f"Skipped exit farm event. No token retrieved.")
             return
@@ -383,13 +383,13 @@ def generateExitFarmEvent(context: Context, userAccount: Account, farmContract: 
         # pre-event logging
         event_log = FarmEventResultLogData()
         event_log.set_generic_event_data(event, userAccount.address.bech32(), farmContract)
-        event_log.set_pre_event_data(context.proxy)
+        event_log.set_pre_event_data(context.network_provider.proxy)
 
         tx_hash = farmContract.exitFarm(context.network_provider, userAccount, event)
         context.observable.set_event(farmContract, userAccount, event, tx_hash)
 
         # post-event logging
-        event_log.set_post_event_data(tx_hash, context.proxy)
+        event_log.set_post_event_data(tx_hash, context.network_provider.proxy)
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
@@ -406,7 +406,7 @@ def generateUnstakeEvent(context: Context, user: Account, staking_contract: Stak
         stake_token = staking_contract.farm_token
         stake_token_nonce, stake_token_amount, stake_token_attr = get_token_details_for_address(stake_token,
                                                                                                 user.address,
-                                                                                                context.proxy)
+                                                                                                context.network_provider.proxy)
         if not stake_token_nonce:
             print_test_step_fail('SKIPPED unstakingEvent: No tokens to unstake!')
             return
@@ -450,7 +450,7 @@ def generateExitMetastakeEvent(context: Context, user: Account, metastake_contra
     try:
         metastake_token = metastake_contract.metastake_token
         metastake_token_nonce, metastake_token_amount, metastake_token_attributes = get_token_details_for_address(
-            metastake_token, user.address, context.proxy
+            metastake_token, user.address, context.network_provider.proxy
         )
         if metastake_token_nonce == 0:
             print_test_step_fail(f"SKIPPED: No tokens found!")
@@ -500,13 +500,13 @@ def generateClaimRewardsEvent(context: Context, userAccount: Account, farmContra
     try:
         farmTkNonce, farmTkAmount, farmTkAttributes = get_token_details_for_address(farmContract.farmToken,
                                                                                     userAccount.address,
-                                                                                    context.proxy)
+                                                                                    context.network_provider.proxy)
         if farmTkNonce == 0:
             print(f"Skipped claim rewards farm event. No token retrieved.")
             return
 
         farmedTkNonce, farmedTkAmount, _ = get_token_details_for_address(farmContract.farmedToken,
-                                                                         userAccount.address, context.proxy)
+                                                                         userAccount.address, context.network_provider.proxy)
 
         # set correct token balance in case it has been changed since the init of observers
         set_token_balance_event = SetTokenBalanceEvent(farmContract.farmedToken, farmedTkAmount, farmedTkNonce)
@@ -517,13 +517,13 @@ def generateClaimRewardsEvent(context: Context, userAccount: Account, farmContra
         # pre-event logging
         event_log = FarmEventResultLogData()
         event_log.set_generic_event_data(event, userAccount.address.bech32(), farmContract)
-        event_log.set_pre_event_data(context.proxy)
+        event_log.set_pre_event_data(context.network_provider.proxy)
 
         tx_hash = farmContract.claimRewards(context.network_provider, userAccount, event)
         context.observable.set_event(farmContract, userAccount, event, tx_hash)
 
         # post-event logging
-        event_log.set_post_event_data(tx_hash, context.proxy)
+        event_log.set_post_event_data(tx_hash, context.network_provider.proxy)
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
@@ -540,7 +540,7 @@ def generateClaimStakingRewardsEvent(context: Context, user: Account, staking_co
         stake_token = staking_contract.farm_token
         stake_token_nonce, stake_token_amount, attributes = get_token_details_for_address(stake_token,
                                                                                           user.address,
-                                                                                          context.proxy)
+                                                                                          context.network_provider.proxy)
         if not stake_token_nonce:
             print('SKIPPED claimStakingRewardsEvent: No token retrieved!')
             return
@@ -568,7 +568,7 @@ def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastak
         metastake_token_nonce, metastake_token_amount, metastake_token_attributes = get_token_details_for_address(
                                                                                     metastake_token,
                                                                                     user.address,
-                                                                                    context.proxy
+                                                                                    context.network_provider.proxy
                                                                                     )
         if metastake_token_nonce == 0:
             print_test_step_fail(f"SKIPPED: No tokens found!")
@@ -609,7 +609,7 @@ def generateCompoundRewardsEvent(context: Context, userAccount: Account, farmCon
     tx_hash = ""
     try:
         farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmContract.farmToken,
-                                                                     userAccount.address, context.proxy)
+                                                                     userAccount.address, context.network_provider.proxy)
         if farmTkNonce == 0:
             print(f"Skipped compound rewards farm event. No token retrieved.")
             return
@@ -619,12 +619,12 @@ def generateCompoundRewardsEvent(context: Context, userAccount: Account, farmCon
         # pre-event logging
         event_log = FarmEventResultLogData()
         event_log.set_generic_event_data(event, userAccount.address.bech32(), farmContract)
-        event_log.set_pre_event_data(context.proxy)
+        event_log.set_pre_event_data(context.network_provider.proxy)
 
         tx_hash = farmContract.compoundRewards(context.network_provider, userAccount, event)
 
         # post-event logging
-        event_log.set_post_event_data(tx_hash, context.proxy)
+        event_log.set_post_event_data(tx_hash, context.network_provider.proxy)
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
@@ -645,7 +645,7 @@ def generate_migrate_farm_event(context: Context, userAccount: Account, farmCont
     try:
         farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmContract.farmToken,
                                                                      userAccount.address,
-                                                                     context.proxy)
+                                                                     context.network_provider.proxy)
         if farmTkNonce == 0:
             return
 
@@ -654,12 +654,12 @@ def generate_migrate_farm_event(context: Context, userAccount: Account, farmCont
         # pre-event logging
         event_log = FarmEventResultLogData()
         event_log.set_generic_event_data(event, userAccount.address.bech32(), farmContract)
-        event_log.set_pre_event_data(context.proxy)
+        event_log.set_pre_event_data(context.network_provider.proxy)
 
         tx_hash = farmContract.migratePosition(context.network_provider, userAccount, event)
 
         # post-event logging
-        event_log.set_post_event_data(tx_hash, context.proxy)
+        event_log.set_post_event_data(tx_hash, context.network_provider.proxy)
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
@@ -679,7 +679,7 @@ def generateAddLiquidityProxyEvent(context: Context):
 
     nonce = 0
     try:
-        tokens = context.proxy.get_account_tokens(userAccount.address)
+        tokens = context.network_provider.proxy.get_account_tokens(userAccount.address)
         prevent_spam_crash_elrond_proxy_go()
 
         for token in tokens['esdts'].keys():
@@ -710,7 +710,7 @@ def generateRemoveLiquidityProxyEvent(context: Context):
 
     nonce = 0
     try:
-        tokens = context.proxy.get_account_tokens(userAccount.address)
+        tokens = context.network_provider.proxy.get_account_tokens(userAccount.address)
         prevent_spam_crash_elrond_proxy_go()
 
         for token in tokens['esdts'].keys():
@@ -737,8 +737,8 @@ def generateEnterFarmProxyEvent(context: Context, user_account: Account, farm_co
         underlying_farm_token = farm_contract.farmToken
         farming_token = farm_contract.proxyContract.farming_token
 
-        farming_tk_nonce, farming_tk_amount, _ = get_token_details_for_address(farming_token, user_account.address, context.proxy)
-        farm_tk_nonce, farm_tk_amount, _ = get_token_details_for_address(farm_token, user_account.address, context.proxy, underlying_farm_token)
+        farming_tk_nonce, farming_tk_amount, _ = get_token_details_for_address(farming_token, user_account.address, context.network_provider.proxy)
+        farm_tk_nonce, farm_tk_amount, _ = get_token_details_for_address(farm_token, user_account.address, context.network_provider.proxy, underlying_farm_token)
 
         if farming_tk_nonce == 0:
             return
@@ -771,7 +771,7 @@ def generateExitFarmProxyEvent(context: Context, userAccount: Account, farmContr
         underlying_token = farmContract.farmToken
 
         farm_tk_nonce, farm_tk_amount, _ = get_token_details_for_address(farm_token, userAccount.address,
-                                                                         context.proxy, underlying_token)
+                                                                         context.network_provider.proxy, underlying_token)
         if farm_tk_nonce == 0:
             return
 
@@ -800,7 +800,7 @@ def generateClaimRewardsProxyEvent(context: Context, userAccount: Account, farmC
         underlying_token = farmContract.farmToken
 
         farm_tk_nonce, farm_tk_amount, _ = get_token_details_for_address(farm_token, userAccount.address,
-                                                                         context.proxy, underlying_token)
+                                                                         context.network_provider.proxy, underlying_token)
         if farm_tk_nonce == 0:
             return
 
@@ -826,7 +826,7 @@ def generateCompoundRewardsProxyEvent(context: Context, userAccount: Account, fa
         underlying_token = farmContract.farmToken
 
         farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farm_token, userAccount.address,
-                                                                     context.proxy, underlying_token)
+                                                                     context.network_provider.proxy, underlying_token)
         if farmTkNonce == 0:
             return
 
@@ -852,7 +852,7 @@ def generate_deposit_pd_liquidity_event(context: Context, user_account: Account,
     random.shuffle(tokens)
     deposited_token = tokens[0]
 
-    _, amount, _ = get_token_details_for_address(deposited_token, user_account.address, context.proxy)
+    _, amount, _ = get_token_details_for_address(deposited_token, user_account.address, context.network_provider.proxy)
     amount = random.randrange(amount)
 
     event = DepositPDLiquidityEvent(deposited_token, amount)
@@ -874,7 +874,7 @@ def generate_random_deposit_pd_liquidity_event(context: Context):
 
 def generate_withdraw_pd_liquidity_event(context: Context, user_account: Account, pd_contract: PriceDiscoveryContract):
     # TODO: find a smarter/more configurable method of choosing which token to use
-    tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.proxy)
+    tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.network_provider.proxy)
     if len(tokens) == 0:
         print_test_step_fail(f"Generate withdraw price discovery liquidity failed! No redeem tokens available.")
         return
@@ -903,7 +903,7 @@ def generate_random_withdraw_pd_liquidity_event(context: Context):
 
 def generate_redeem_pd_liquidity_event(context: Context, user_account: Account, pd_contract: PriceDiscoveryContract):
     # TODO: find a smarter/more configurable method of choosing which token to use and how much
-    tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.proxy)
+    tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.network_provider.proxy)
     if len(tokens) == 0:
         print_test_step_fail(f"Generate redeem price discovery liquidity failed! No redeem tokens available.")
         return

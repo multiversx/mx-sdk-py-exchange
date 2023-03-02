@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import pathlib
 import shutil
@@ -7,12 +6,16 @@ import stat
 import sys
 import tarfile
 import zipfile
+from builtins import function
+
 import toml
 from enum import Enum
 from pathlib import Path
+from utils.logger import get_logger
 from typing import Any, List, Union, Optional, cast, IO, Dict
 
-logger = logging.getLogger("utils")
+
+logger = get_logger(__name__)
 
 
 class ISerializable:
@@ -251,27 +254,6 @@ def breakpoint():
     debugpy.breakpoint()
 
 
-def log_explorer(chain, name, path, details):
-    networks = {
-        "1": ("Elrond Mainnet Explorer", "https://explorer.elrond.com"),
-        "T": ("Elrond Testnet Explorer", "https://testnet-explorer.elrond.com"),
-        "D": ("Elrond Devnet Explorer", "https://devnet-explorer.elrond.com"),
-    }
-    try:
-        explorer_name, explorer_url = networks[chain]
-        logger.info(f"View this {name} in the {explorer_name}: {explorer_url}/{path}/{details}")
-    except KeyError:
-        return
-
-
-def log_explorer_contract_address(chain, address):
-    log_explorer(chain, "contract address", "accounts", address)
-
-
-def log_explorer_transaction(chain, transaction_hash):
-    log_explorer(chain, "transaction", "transactions", transaction_hash)
-
-
 def get_continue_confirmation(force_continue: bool = False) -> bool:
     if force_continue:
         typed = "y"
@@ -320,6 +302,11 @@ def print_test_substep(msg):
 
 def print_warning(msg):
     print_color(msg, PrintColors.WARNING)
+
+
+def log_unexpected_args(function_purpose: str, args: Any):
+    logger.error(f"Failed to {function_purpose} due to unexpected number of arguments received!")
+    logger.debug(f"Unexpected arguments: {args}")
 
 
 def print_condition_assert(conditions: Dict[bool, str]):

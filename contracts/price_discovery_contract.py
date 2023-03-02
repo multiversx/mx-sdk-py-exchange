@@ -6,7 +6,7 @@ from contracts.contract_identities import PriceDiscoveryContractIdentity, DEXCon
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders
 from events.price_discovery_events import (DepositPDLiquidityEvent,
                                                              WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
-from utils.utils_chain import print_transaction_hash
+from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
 from erdpy.accounts import Account, Address
 from erdpy.contracts import SmartContract, CodeMetadata
@@ -122,7 +122,7 @@ class PriceDiscoveryContract(DEXContractInterface):
 
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
             return txHash
 
@@ -161,7 +161,7 @@ class PriceDiscoveryContract(DEXContractInterface):
 
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
             return txHash
 
@@ -200,7 +200,7 @@ class PriceDiscoveryContract(DEXContractInterface):
 
         try:
             txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            print_transaction_hash(txHash, network_provider.proxy.url)
+            log_explorer_transaction(txHash, network_provider.proxy.url)
             user.nonce += 1
             return txHash
 
@@ -247,7 +247,7 @@ class PriceDiscoveryContract(DEXContractInterface):
         try:
             response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
             tx_hash = response.get_hash()
-            print_transaction_hash(tx_hash, proxy.url, True)
+            log_explorer_transaction(tx_hash, proxy.url)
 
             address = contract.address.bech32()
             deployer.nonce += 1
