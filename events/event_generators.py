@@ -65,7 +65,7 @@ def generate_add_liquidity_event(context: Context, user_account: Account, pair_c
         set_reserves_event = SetCorrectReservesEvent()
         context.observable.set_event(pair_contract, user_account, set_reserves_event, '')
 
-        txhash = pair_contract.addLiquidity(context.network_provider, user_account, event)
+        txhash = pair_contract.add_liquidity(context.network_provider, user_account, event)
         context.observable.set_event(pair_contract, user_account, event, txhash)
 
     except Exception as ex:
@@ -87,7 +87,7 @@ def generate_add_initial_liquidity_event(context: Context, user_account: Account
         tokens[0], 2000, 1,
         tokens[1], 2000, 1
     )
-    pair_contract.addInitialLiquidity(context.network_provider, user_account, event)
+    pair_contract.add_initial_liquidity(context.network_provider, user_account, event)
 
 
 def generate_remove_liquidity_event(context: Context, user_account: Account, pair_contract: PairContract):
@@ -126,7 +126,7 @@ def generate_remove_liquidity_event(context: Context, user_account: Account, pai
         set_reserves_event = SetCorrectReservesEvent()
         context.observable.set_event(pair_contract, user_account, set_reserves_event, '')
 
-        txhash = pair_contract.removeLiquidity(context.network_provider, user_account, event)
+        txhash = pair_contract.remove_liquidity(context.network_provider, user_account, event)
         context.observable.set_event(pair_contract, user_account, event, txhash)
 
     except Exception as ex:
@@ -168,7 +168,7 @@ def generate_swap_fixed_input(context: Context, user_account: Account, pair_cont
         set_reserves_event = SetCorrectReservesEvent()
         context.observable.set_event(pair_contract, user_account, set_reserves_event, '')
 
-        txhash = pair_contract.swapFixedInput(context.network_provider, user_account, event)
+        txhash = pair_contract.swap_fixed_input(context.network_provider, user_account, event)
         context.observable.set_event(pair_contract, user_account, event, txhash)
 
     except Exception as ex:
@@ -210,7 +210,7 @@ def generate_swap_fixed_output(context: Context, user_account: Account, pair_con
         set_reserves_event = SetCorrectReservesEvent()
         context.observable.set_event(pair_contract, user_account, set_reserves_event, '')
 
-        txhash = pair_contract.swapFixedOutput(context.network_provider, user_account, event)
+        txhash = pair_contract.swap_fixed_output(context.network_provider, user_account, event)
         context.observable.set_event(pair_contract, user_account, event, txhash)
 
     except Exception as ex:

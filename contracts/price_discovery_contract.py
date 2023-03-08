@@ -1,17 +1,21 @@
 import sys
 import traceback
 
-from arrows.stress.contracts.contract import load_code_as_hex
-from contracts.contract_identities import PriceDiscoveryContractIdentity, DEXContractInterface
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders
+import config
+from contracts.contract_identities import DEXContractInterface
+from utils.logger import get_logger
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, ESDTToken, \
+    multi_esdt_endpoint_call, deploy, endpoint_call
 from events.price_discovery_events import (DepositPDLiquidityEvent,
-                                                             WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
+                                           WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
 from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
-from erdpy.accounts import Account, Address
-from erdpy.contracts import SmartContract, CodeMetadata
-from erdpy.proxy import ElrondProxy
-from erdpy.transactions import Transaction
+from utils.utils_chain import Account, WrapperAddress as Address
+from multiversx_sdk_core import CodeMetadata
+from multiversx_sdk_network_providers import ProxyNetworkProvider
+
+
+logger = get_logger(__name__)
 
 
 class PriceDiscoveryContract(DEXContractInterface):
@@ -95,139 +99,53 @@ class PriceDiscoveryContract(DEXContractInterface):
                                       fixed_penalty_percentage=config_dict['fixed_penalty_percentage'])
 
     def deposit_liquidity(self, network_provider: NetworkProviders, user: Account, event: DepositPDLiquidityEvent) -> str:
-        print_warning(f"Deposit Price Discovery liquidity")
-        print(f"Account: {user.address}")
-        print(f"Token: {event.deposit_token} Amount: {event.amount}")
-
-        contract = SmartContract(Address(self.address))
+        function_purpose = f"Deposit Price Discovery liquidity"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+        logger.debug(f"Token: {event.deposit_token} Amount: {event.amount}")
 
         gas_limit = 10000000
-        sc_args = [
-            "0x" + event.deposit_token.encode("ascii").hex(),
-            "0x" + "0" + f"{event.amount:x}" if len(f"{event.amount:x}") % 2 else "0x" + f"{event.amount:x}",
-            "0x" + "deposit".encode("ascii").hex(),
-        ]
-        tx_data = contract.prepare_execute_transaction_data("ESDTTransfer", sc_args)
-
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
-            return txHash
-
-        except Exception as ex:
-            print(ex)
-            traceback.print_exception(*sys.exc_info())
-            return ""
+        tokens = [ESDTToken(event.deposit_token, 0, event.amount)]
+        sc_args = [tokens]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), "deposit", sc_args)
 
     def withdraw_liquidity(self, network_provider: NetworkProviders, user: Account, event: WithdrawPDLiquidityEvent) -> str:
-        print_warning(f"Withdraw Price Discovery liquidity")
-        print(f"Account: {user.address}")
-        print(f"Token: {event.deposit_lp_token} Nonce: {event.nonce} Amount: {event.amount}")
-
-        contract = SmartContract(address=user.address)
+        function_purpose = f"Withdraw Price Discovery liquidity"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+        logger.debug(f"Token: {event.deposit_lp_token} Nonce: {event.nonce} Amount: {event.amount}")
 
         gas_limit = 10000000
-        sc_args = [
-            "0x" + event.deposit_lp_token.encode("ascii").hex(),
-            "0x" + "0" + f"{event.nonce:x}" if len(f"{event.nonce:x}") % 2 else "0x" + f"{event.nonce:x}",
-            "0x" + "0" + f"{event.amount:x}" if len(f"{event.amount:x}") % 2 else "0x" + f"{event.amount:x}",
-            "0x" + Address(self.address).hex(),
-            "0x" + "withdraw".encode("ascii").hex(),
-        ]
-        tx_data = contract.prepare_execute_transaction_data("ESDTNFTTransfer", sc_args)
-
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
-            return txHash
-
-        except Exception as ex:
-            print(ex)
-            traceback.print_exception(*sys.exc_info())
-            return ""
+        tokens = [ESDTToken(event.deposit_lp_token, event.nonce, event.amount)]
+        sc_args = [tokens]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), "withdraw", sc_args)
 
     def redeem_liquidity_position(self, network_provider: NetworkProviders, user: Account, event: RedeemPDLPTokensEvent) -> str:
-        print_warning(f"Redeem Price Discovery liquidity")
-        print(f"Account: {user.address}")
-        print(f"Token: {event.deposit_lp_token} Nonce: {event.nonce} Amount: {event.amount}")
-
-        contract = SmartContract(address=user.address)
+        function_purpose = f"Redeem Price Discovery liquidity"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+        logger.debug(f"Token: {event.deposit_lp_token} Nonce: {event.nonce} Amount: {event.amount}")
 
         gas_limit = 10000000
-        sc_args = [
-            "0x" + event.deposit_lp_token.encode("ascii").hex(),
-            "0x" + "0" + f"{event.nonce:x}" if len(f"{event.nonce:x}") % 2 else "0x" + f"{event.nonce:x}",
-            "0x" + "0" + f"{event.amount:x}" if len(f"{event.amount:x}") % 2 else "0x" + f"{event.amount:x}",
-            "0x" + Address(self.address).hex(),
-            "0x" + "redeem".encode("ascii").hex(),
-        ]
-        tx_data = contract.prepare_execute_transaction_data("ESDTNFTTransfer", sc_args)
+        tokens = [ESDTToken(event.deposit_lp_token, event.nonce, event.amount)]
+        sc_args = [tokens]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), "redeem", sc_args)
 
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+        function_purpose = f"Deploy price discovery contract"
+        logger.info(function_purpose)
 
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
-            return txHash
-
-        except Exception as ex:
-            print(ex)
-            traceback.print_exception(*sys.exc_info())
-            return ""
-
-    """ Expected as args:
-        type[str]:  whitelisted deposit rewards address
-    """
-
-    def contract_deploy(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list = []):
-        print_warning("Deploy price discovery contract")
-
-        metadata = CodeMetadata(upgradeable=True, payable=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True)
         network_config = proxy.get_network_config()
         gas_limit = 350000000
-        value = 0
-        address = ""
-        tx_hash = ""
 
         arguments = [
-            "0x" + self.launched_token_id.encode("ascii").hex(),  # launched token id
-            "0x" + self.accepted_token.encode("ascii").hex(),  # accepted token id
-            "0x12",  # launched token decimals
+            self.launched_token_id,  # launched token id
+            self.accepted_token,  # accepted token id
+            18,  # launched token decimals
             self.min_launched_token_price,
             self.start_block,
             self.no_limit_phase_duration_blocks,
@@ -237,64 +155,38 @@ class PriceDiscoveryContract(DEXContractInterface):
             self.min_penalty_percentage,
             self.max_penalty_percentage,
             self.fixed_penalty_percentage,
-            "0x" + Address(self.locking_sc_address).hex()  # locking sc address
+            Address(self.locking_sc_address)  # locking sc address
         ]
 
-        contract = SmartContract(bytecode=bytecode, metadata=metadata)
-        tx = contract.deploy(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                             network_config.chain_id, network_config.min_tx_version)
-
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            address = contract.address.bech32()
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash, address
-
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    """ Expected as args:
+    def issue_redeem_token(self, deployer: Account, proxy: ProxyNetworkProvider, redeem_token_ticker: str):
+        """ Expected as args:
         type[str]: lp token name
         type[str]: lp token ticker
         """
+        function_purpose = f"Issue price discovery redeem token"
+        logger.info(function_purpose)
 
-    def issue_redeem_token(self, deployer: Account, proxy: ElrondProxy, redeem_token_ticker: str):
-        print_warning("Issue price discovery redeem token")
-
-        network_config = proxy.get_network_config()
         gas_limit = 100000000
         sc_args = [
-            "0x" + redeem_token_ticker.encode("ascii").hex(),
-            "0x" + redeem_token_ticker.encode("ascii").hex(),
-            "0x12"
+            redeem_token_ticker,
+            redeem_token_ticker,
+            18,
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "issueRedeemToken", sc_args, value="50000000000000000")
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueRedeemToken", sc_args,
+                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
 
-        return tx_hash
+    def create_initial_redeem_tokens(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Create initial redeem tokens for price discovery contract"
+        logger.info(function_purpose)
 
-    def create_initial_redeem_tokens(self, deployer: Account, proxy: ElrondProxy):
-        print_warning("Create initial redeem tokens for price discovery contract")
-
-        network_config = proxy.get_network_config()
         gas_limit = 50000000
         sc_args = []
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "createInitialRedeemTokens", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "createInitialRedeemTokens", sc_args)
 
-        return tx_hash
-
-    def contract_start(self, deployer: Account, proxy: ElrondProxy, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
 
     def print_contract_info(self):

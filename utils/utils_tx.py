@@ -14,7 +14,8 @@ from multiversx_sdk_core.transaction_builders import ContractCallBuilder, Defaul
     MultiESDTNFTTransferBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder
 from utils.logger import get_logger
 from utils.utils_chain import Account, log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_warning, split_to_chunks, get_continue_confirmation
+from utils.utils_generic import print_test_step_fail, print_warning, split_to_chunks, get_continue_confirmation, \
+    log_unexpected_args
 
 TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
@@ -356,17 +357,17 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
     return tx_hash
 
 
-def multi_esdt_transfer(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
-                        user: Account, dest: Address, args: list):
+def multi_esdt_transfer(proxy: ProxyNetworkProvider, gas: int, user: Account, dest: Address, args: list):
     """ Expected as args:
         type[ESDTToken...]: tokens list
     """
-    print_warning(function_purpose)
+    logger.info(f"Sending multi esdt transfer to {dest}")
+    logger.debug(f"Args: {args}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash = ""
 
     if len(args) < 1:
-        print_test_step_fail(f"FAIL: Failed to {function_purpose}. Args list not as expected.")
+        log_unexpected_args(f"send multi esdt transfer", args)
         return tx_hash
 
     tx = prepare_multiesdtnfttransfer_tx(dest, user, network_config, gas, args)
@@ -376,12 +377,13 @@ def multi_esdt_transfer(function_purpose: str, proxy: ProxyNetworkProvider, gas:
     return tx_hash
 
 
-def endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
-                  user: Account, contract: Address, endpoint: str, args: list, value: str = "0"):
+def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract: Address, endpoint: str, args: list,
+                  value: str = "0"):
     """ Expected as args:
         opt: type[str..]: endpoint arguments
     """
-    print_warning(function_purpose)
+    logger.info(f"Calling {endpoint} at {contract.bech32()}")
+    logger.debug(f"Args: {args}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
 
     tx = prepare_contract_call_tx(contract, user, network_config, gas, endpoint, args, value)
@@ -393,7 +395,8 @@ def endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
 
 def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
            owner: Account, bytecode_path: Path, metadata: ICodeMetadata, args: list) -> (str, str):
-    print_warning(f"Deploy {contract_label} contract")
+    logger.info(f"Deploy {contract_label} contract")
+    logger.debug(f"Args: {args}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
 
@@ -412,9 +415,9 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
 def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
                  owner: Account, contract: Address, bytecode_path: Path, metadata: ICodeMetadata,
                  args: list) -> str:
-    print_warning(f"Upgrade {contract_label} contract")
+    logger.info(f"Upgrade {contract_label} contract")
+    logger.debug(f"Args: {args}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
-    tx_hash = ""
 
     tx = prepare_upgrade_tx(owner, contract, network_config, gas, bytecode_path, metadata, args)
     tx_hash = send_contract_call_tx(tx, proxy)

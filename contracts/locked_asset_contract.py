@@ -1,14 +1,15 @@
 import sys
 import traceback
 
-from arrows.stress.contracts.contract import load_code_as_hex
 from contracts.contract_identities import DEXContractInterface
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx
-from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
-from erdpy.accounts import Account, Address
-from erdpy.contracts import CodeMetadata, SmartContract
-from erdpy.proxy import ElrondProxy
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, log_unexpected_args
+from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
+from multiversx_sdk_core import CodeMetadata
+from multiversx_sdk_network_providers import ProxyNetworkProvider
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class LockedAssetContract(DEXContractInterface):
@@ -31,194 +32,130 @@ class LockedAssetContract(DEXContractInterface):
                                    unlocked_asset=config_dict['unlocked_asset'],
                                    locked_asset=config_dict['locked_asset'])
 
-    def contract_deploy(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list = []):
-        print_warning("Deploy locked asset contract")
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+        function_purpose = f"deploy {type(self).__name__} contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=True, readable=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        value = 0
-        address = ""
-        tx_hash = ""
 
         arguments = [
-            "0x" + self.unlocked_asset.encode("ascii").hex(),
-            "0x000000000000016D11",
-            "0x000000000000018B11",
-            "0x00000000000001A911",
-            "0x00000000000001C711",
-            "0x00000000000001E510",
-            "0x000000000000020310",
+            self.unlocked_asset,
+            93457,
+            101137,
+            108817,
+            116497,
+            124176,
+            131856,
             ]
 
-        contract = SmartContract(bytecode=bytecode, metadata=metadata)
-        tx = contract.deploy(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                             network_config.chain_id, network_config.min_tx_version)
-
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            address = contract.address.bech32()
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash, address
-
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ElrondProxy, bytecode_path,
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
                          args: list = [], no_init: bool = False):
-        print_warning("Upgrade locked asset contract")
+        function_purpose = "Upgrade locked asset contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        value = 0
         tx_hash = ""
 
         if no_init:
             arguments = []
         else:
             arguments = [
-                "0x" + self.unlocked_asset.encode("ascii").hex(),
-                "0x000000000000016D11",
-                "0x000000000000018B11",
-                "0x00000000000001A911",
-                "0x00000000000001C711",
-                "0x00000000000001E510",
-                "0x000000000000020310",
+                self.unlocked_asset,
+                93457,
+                101137,
+                108817,
+                116497,
+                124176,
+                131856,
             ]
 
-        contract = SmartContract(bytecode=bytecode, metadata=metadata, address=Address(self.address))
-        tx = contract.upgrade(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                              network_config.chain_id, network_config.min_tx_version)
+        return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
+                            bytecode_path, metadata, arguments)
 
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
+    def set_new_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, contract_address: str):
+        function_purpose = "Set new factory address"
+        logger.info(function_purpose)
 
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send upgrade transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash
-
-        return tx_hash
-
-    def set_new_factory_address(self, deployer: Account, proxy: ElrondProxy, contract_address: str):
-        print_warning("Set new factory address")
-
-        network_config = proxy.get_network_config()
         gas_limit = 50000000
         sc_args = [
-            "0x" + Address(contract_address).hex()
+            Address(contract_address)
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setNewFactoryAddress", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setNewFactoryAddress", sc_args)
 
-        return tx_hash
-
-    def register_locked_asset_token(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def register_locked_asset_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: token name
             type[str]: token ticker
         """
-        print_warning("Register locked asset token")
+        function_purpose = "Register locked asset token"
+        logger.info(function_purpose)
 
-        network_config = proxy.get_network_config()
         tx_hash = ""
 
         if len(args) != 2:
-            print_test_step_fail(f"FAIL: Failed to register locked token. Args list not as expected.")
+            log_unexpected_args(function_purpose, args)
             return tx_hash
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + args[0].encode("ascii").hex(),
-            "0x" + args[1].encode("ascii").hex(),
-            "0x12"
+            args[0],
+            args[1],
+            18
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "registerLockedAssetToken", sc_args, value="50000000000000000")
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "registerLockedAssetToken", sc_args, value="50000000000000000")
 
-        return tx_hash
+    def set_locked_asset_local_roles(self, deployer: Account, proxy: ProxyNetworkProvider, contract: str):
+        function_purpose = "Set locked asset token local roles"
+        logger.info(function_purpose)
 
-    def set_locked_asset_local_roles(self, deployer: Account, proxy: ElrondProxy, contract: str):
-        print_warning("Set locked asset token local roles")
-
-        network_config = proxy.get_network_config()
         gas_limit = 100000000
         sc_args = [
-            "0x" + Address(contract).hex(),
-            "0x03",
-            "0x04",
-            "0x05",
+            Address(contract),
+            3, 4, 5,
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setLocalRolesLockedAssetToken", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "setLocalRolesLockedAssetToken", sc_args)
 
-        return tx_hash
+    def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
+        function_purpose = "Whitelist contract in locked asset contract"
+        logger.info(function_purpose)
 
-    def whitelist_contract(self, deployer: Account, proxy: ElrondProxy, contract_to_whitelist: str):
-        print_warning("Whitelist contract in locked asset contract")
-
-        network_config = proxy.get_network_config()
         gas_limit = 100000000
         sc_args = [
             "0x" + Address(contract_to_whitelist).hex()
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "whitelist", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "whitelist", sc_args)
 
-        return tx_hash
+    def set_transfer_role_for_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
+        function_purpose = "Set transfer role for contract"
+        logger.info(function_purpose)
 
-    def set_transfer_role_for_contract(self, deployer: Account, proxy: ElrondProxy, contract_to_whitelist: str):
-        print_warning("Set transfer role for contract")
-
-        network_config = proxy.get_network_config()
         gas_limit = 100000000
         sc_args = [
-            "0x" + Address(contract_to_whitelist).hex()
+            Address(contract_to_whitelist)
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setTransferRoleForAddress", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "setTransferRoleForAddress", sc_args)
 
-        return tx_hash
+    def set_burn_role_for_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
+        function_purpose = "Set burn role for contract"
+        logger.info(function_purpose)
 
-    def set_burn_role_for_contract(self, deployer: Account, proxy: ElrondProxy, contract_to_whitelist: str):
-        print_warning("Set burn role for contract")
-
-        network_config = proxy.get_network_config()
         gas_limit = 100000000
         sc_args = [
-            "0x" + Address(contract_to_whitelist).hex()
+            Address(contract_to_whitelist)
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setBurnRoleForAddress", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "setBurnRoleForAddress", sc_args)
 
-        return tx_hash
-
-    def contract_start(self, deployer: Account, proxy: ElrondProxy, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
 
     def print_contract_info(self):

@@ -1,20 +1,15 @@
-import logging
-import random
-import sys
-import traceback
-
 import config
 from contracts.contract_identities import DEXContractInterface, ProxyContractVersion
 from contracts.farm_contract import FarmContract
 from contracts.pair_contract import PairContract
 from utils.logger import get_logger
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, deploy, upgrade_call, \
+from utils.utils_tx import deploy, upgrade_call, \
     endpoint_call, multi_esdt_endpoint_call, ESDTToken
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning, \
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, \
     log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
+from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-from multiversx_sdk_core import Transaction, CodeMetadata
+from multiversx_sdk_core import CodeMetadata
 
 logger = get_logger(__name__)
 
@@ -198,7 +193,7 @@ class DexProxyContract(DEXContractInterface):
         type[list]: locked asset factories contract addresses; care for the correct order based on locked tokens list
         """
         function_purpose = f"deploy {type(self).__name__} contract"
-        logging.info(function_purpose)
+        logger.info(function_purpose)
 
         if len(args) != 1:
             log_unexpected_args(function_purpose, args)
@@ -226,7 +221,7 @@ class DexProxyContract(DEXContractInterface):
         type[list]: locked asset factories contract addresses; care for the correct order based on locked tokens list
         """
         function_purpose = f"upgrade {type(self).__name__} contract"
-        logging.info(function_purpose)
+        logger.info(function_purpose)
 
         if len(args) != 1 and not no_init:
             log_unexpected_args(function_purpose, args)
@@ -258,6 +253,7 @@ class DexProxyContract(DEXContractInterface):
             type[str]: token ticker
         """
         function_purpose = "Register proxy farm token"
+        logger.info(function_purpose)
         tx_hash = ""
 
         if len(args) != 2:
@@ -270,8 +266,8 @@ class DexProxyContract(DEXContractInterface):
             args[1],
             "18"
         ]
-        return endpoint_call(function_purpose, proxy, gas_limit, deployer, Address(self.address), "registerProxyFarm",
-                             sc_args, value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerProxyFarm", sc_args,
+                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
 
     def register_proxy_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """Expecting as args:
@@ -279,6 +275,7 @@ class DexProxyContract(DEXContractInterface):
             type[str]: token ticker
         """
         function_purpose = "Register proxy lp token"
+        logger.info(function_purpose)
         tx_hash = ""
 
         if len(args) != 2:
@@ -291,8 +288,8 @@ class DexProxyContract(DEXContractInterface):
             args[1],
             "18"
         ]
-        return endpoint_call(function_purpose, proxy, gas_limit, deployer, Address(self.address), "registerProxyPair",
-                             sc_args, value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerProxyPair", sc_args,
+                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
 
     """Expecting as args:
     type[str]: token id
@@ -300,6 +297,7 @@ class DexProxyContract(DEXContractInterface):
     """
     def set_local_roles_proxy_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         function_purpose = "Set local roles for proxy token"
+        logger.info(function_purpose)
 
         if len(args) != 2:
             log_unexpected_args(function_purpose, args)
@@ -312,41 +310,41 @@ class DexProxyContract(DEXContractInterface):
             3, 4, 5
         ]
 
-        return endpoint_call(function_purpose, proxy, gas_limit, deployer, Address(self.address), "setLocalRoles",
-                             sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLocalRoles", sc_args)
 
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
         function_purpose = "Set energy factory address in proxy contract"
+        logger.info(function_purpose)
 
         if energy_address == "":
             log_unexpected_args(function_purpose, energy_address)
             return ""
 
         gas_limit = 50000000
-        return endpoint_call(function_purpose, proxy, gas_limit, deployer, Address(self.address),
-                             "setEnergyFactoryAddress", [energy_address])
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
+                             [energy_address])
 
     def add_pair_to_intermediate(self, deployer: Account, proxy: ProxyNetworkProvider, pair_address: str):
         function_purpose = "Add pair to intermediate in proxy contract"
+        logger.info(function_purpose)
 
         if pair_address == "":
             log_unexpected_args(function_purpose, pair_address)
             return ""
 
         gas_limit = 50000000
-        return endpoint_call(function_purpose, proxy, gas_limit, deployer, Address(self.address),
-                             "addPairToIntermediate", [pair_address])
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addPairToIntermediate", [pair_address])
 
     def add_farm_to_intermediate(self, deployer: Account, proxy: ProxyNetworkProvider, farm_address: str):
         function_purpose = "Add farm to intermediate in proxy contract"
+        logger.info(function_purpose)
 
         if farm_address == "":
             log_unexpected_args(function_purpose, farm_address)
             return ""
 
         gas_limit = 50000000
-        return endpoint_call(function_purpose, proxy, gas_limit, deployer, Address(self.address),
-                             "addFarmToIntermediate", [farm_address])
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addFarmToIntermediate", [farm_address])
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

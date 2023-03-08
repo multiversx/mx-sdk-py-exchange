@@ -1,14 +1,16 @@
 import sys
 import traceback
 
-from arrows.stress.contracts.contract import load_code_as_hex
 from contracts.contract_identities import DEXContractInterface
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx
-from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
-from erdpy.accounts import Account, Address
-from erdpy.contracts import CodeMetadata, SmartContract
-from erdpy.proxy import ElrondProxy
+from utils.logger import get_logger
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, endpoint_call
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_warning, log_unexpected_args
+from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
+from multiversx_sdk_core import CodeMetadata
+from multiversx_sdk_network_providers import ProxyNetworkProvider
+
+
+logger = get_logger(__name__)
 
 
 class FeesCollectorContract(DEXContractInterface):
@@ -25,240 +27,152 @@ class FeesCollectorContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return FeesCollectorContract(address=config_dict['address'])
 
-    def contract_deploy(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list = None):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None):
         """ Expected as args:
             type[str]: locked token
             type[str]: energy factory address
         """
-        print_warning("Deploy fees collector contract")
+        function_purpose = f"deploy {type(self).__name__} contract"
+        logger.info(function_purpose)
 
         if len(args) != 2:
-            print_test_step_fail(f"FAIL: Failed to deploy. Args list not as expected.")
-            return ""
+            log_unexpected_args(function_purpose, args)
+            return "", ""
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=True, readable=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        value = 0
-        address = ""
-        tx_hash = ""
 
         arguments = [
-            f"str:{args[0]}",
-            args[1]
+            args[0],
+            Address(args[1])
         ]
-        print(f"Arguments: {arguments}")
-        contract = SmartContract(bytecode=bytecode, metadata=metadata)
-        tx = contract.deploy(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                             network_config.chain_id, network_config.min_tx_version)
-
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            address = contract.address.bech32()
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash, address
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
 
         return tx_hash, address
 
-    def add_known_contracts(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def add_known_contracts(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: addresses
         """
-        print_warning("Add known contract in fees collector contract")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Add known contract in fees collector contract"
+        logger.info(function_purpose)
 
         if len(args) < 1:
-            print_test_step_fail(f"FAIL: Failed to add know contracts. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 10000000
         sc_args = args
         print(f"Arguments: {sc_args}")
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "addKnownContracts", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addKnownContracts", sc_args)
 
-        return tx_hash
-
-    def add_known_tokens(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def add_known_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: tokens
         """
-        print_warning("Add known tokens in fees collector contract")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Add known tokens in fees collector contract"
+        logger.info(function_purpose)
 
         if len(args) < 1:
-            print_test_step_fail(f"FAIL: Failed to add know tokens. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 10000000
-        sc_args = args
-        print(f"Arguments: {sc_args}")
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "addKnownTokens", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addKnownTokens", args)
 
-        return tx_hash
-
-    def remove_known_contracts(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def remove_known_contracts(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: addresses
         """
-        print_warning("Remove known contract in fees collector contract")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Remove known contract in fees collector contract"
+        logger.info(function_purpose)
 
         if len(args) < 1:
-            print_test_step_fail(f"FAIL: Failed to remove know contracts. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 10000000
         sc_args = args
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "removeKnownContracts", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeKnownContracts", sc_args)
 
-        return tx_hash
-
-    def remove_known_tokens(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def remove_known_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: tokens
         """
-        print_warning("Remove known tokens in fees collector contract")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Remove known tokens in fees collector contract"
+        logger.info(function_purpose)
 
         if len(args) < 1:
-            print_test_step_fail(f"FAIL: Failed to remove know tokens. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 10000000
         sc_args = args
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "removeKnownTokens", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeKnownTokens", sc_args)
 
-        return tx_hash
-
-    def set_energy_factory_address(self, deployer: Account, proxy: ElrondProxy, factory_address: str):
+    def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, factory_address: str):
         """ Expected as args:
                     type[str]: energy factory address
         """
-        print_warning("Set Energy factory address in fees collector contract")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Set Energy factory address in fees collector contract"
+        logger.info(function_purpose)
 
         if not factory_address:
-            print_test_step_fail(f"FAIL: Failed to set Energy factory address. Arg not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, factory_address)
+            return ""
 
         gas_limit = 30000000
         sc_args = [
-            "0x" + Address(factory_address).hex()
+            Address(factory_address)
         ]
-        print(f"Arguments: {sc_args}")
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setEnergyFactoryAddress", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress", sc_args)
 
-        return tx_hash
-
-    def set_locking_address(self, deployer: Account, proxy: ElrondProxy, locking_address: str):
+    def set_locking_address(self, deployer: Account, proxy: ProxyNetworkProvider, locking_address: str):
         """ Expected as args:
             type[str]: locking address
         """
-        print_warning("Set locking address in fees collector")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Set locking address in fees collector"
+        logger.info(function_purpose)
 
         if not locking_address:
-            print_test_step_fail(f"FAIL: Failed to set set locking address. Arg not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, locking_address)
+            return ""
 
         gas_limit = 30000000
         sc_args = [
-            "0x" + Address(locking_address).hex()
+            Address(locking_address)
         ]
-        print(f"Arguments: {sc_args}")
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setLockingScAddress", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingScAddress", sc_args)
 
-        return tx_hash
-
-    def set_lock_epochs(self, deployer: Account, proxy: ElrondProxy, lock_epochs: int):
-        print_warning("Set lock epochs in fees collector")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+    def set_lock_epochs(self, deployer: Account, proxy: ProxyNetworkProvider, lock_epochs: int):
+        function_purpose = f"Set lock epochs in fees collector"
+        logger.info(function_purpose)
 
         gas_limit = 30000000
         sc_args = [
             lock_epochs
         ]
-        print(f"Arguments: {sc_args}")
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setLockEpochs", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockEpochs", sc_args)
 
-        return tx_hash
-
-    def set_locked_tokens_per_block(self, deployer: Account, proxy: ElrondProxy, locked_tokens_per_block: int):
-        print_warning("Set locked tokens per block")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+    def set_locked_tokens_per_block(self, deployer: Account, proxy: ProxyNetworkProvider, locked_tokens_per_block: int):
+        function_purpose = f"Set locked tokens per block"
+        logger.info(function_purpose)
 
         gas_limit = 30000000
         sc_args = [
             locked_tokens_per_block
         ]
-        print(f"Arguments: {sc_args}")
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setLockedTokensPerBlock", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockedTokensPerBlock", sc_args)
 
-        return tx_hash
-
-    def claim_rewards(self, user: Account, proxy: ElrondProxy):
-        print_warning("Claim rewards from fees collector")
-
-        network_config = proxy.get_network_config()
+    def claim_rewards(self, user: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Claim rewards from fees collector"
+        logger.info(function_purpose)
 
         gas_limit = 20000000
         sc_args = []
-        tx = prepare_contract_call_tx(Address(self.address), user, network_config, gas_limit,
-                                      "claimRewards", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        user.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimRewards", sc_args)
 
-        return tx_hash
-
-    def contract_start(self, deployer: Account, proxy: ElrondProxy, args: list = None):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass
 
     def print_contract_info(self):

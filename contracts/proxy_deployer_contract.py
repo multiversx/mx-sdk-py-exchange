@@ -1,14 +1,18 @@
 import sys
 import traceback
 
-from arrows.stress.contracts.contract import load_code_as_hex
-from contracts.contract_identities import DEXContractInterface, RouterContractVersion
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, get_deployed_address_from_event
+from contracts.contract_identities import DEXContractInterface
+from utils.logger import get_logger
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, get_deployed_address_from_event, deploy, \
+    endpoint_call, get_deployed_address_from_tx
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_warning
-from erdpy.accounts import Account, Address
-from erdpy.contracts import SmartContract, CodeMetadata
-from erdpy.proxy import ElrondProxy
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_warning, log_unexpected_args
+from utils.utils_chain import Account, WrapperAddress as Address
+from multiversx_sdk_core import CodeMetadata
+from multiversx_sdk_network_providers import ProxyNetworkProvider
+
+
+logger = get_logger(__name__)
 
 
 class ProxyDeployerContract(DEXContractInterface):
@@ -31,117 +35,88 @@ class ProxyDeployerContract(DEXContractInterface):
         return ProxyDeployerContract(address=config_dict['address'],
                                      template_name=config_dict['template'])
 
-    def contract_deploy(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
         type[str]: template sc address
         """
-        print_warning("Deploy proxy deployer contract")
+        function_purpose = f"Deploy proxy deployer contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=True, readable=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        value = 0
-        address = ""
-        tx_hash = ""
 
         if len(args) != 1:
-            print_test_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
-            return tx_hash, address
+            log_unexpected_args(function_purpose, args)
+            return "", ""
 
         arguments = [
-            "0x" + Address(args[0]).hex()
+            Address(args[0])
         ]
 
-        contract = SmartContract(bytecode=bytecode, metadata=metadata)
-        tx = contract.deploy(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                             network_config.chain_id, network_config.min_tx_version)
-
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            address = contract.address.bech32()
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash, address
-
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def farm_contract_deploy(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def farm_contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """Expecting as args:
             type[str]: reward token id
             type[str]: farming token id
             type[str]: pair contract address
         """
-        print_warning("Deploy farm via router")
+        function_purpose = f"Deploy farm via router"
+        logger.info(function_purpose)
 
-        network_config = proxy.get_network_config()
         address, tx_hash = "", ""
 
         if len(args) < 3:
-            print_test_step_fail(f"FAIL: Failed to deploy farm via proxy deployer. Args list not as expected.")
+            log_unexpected_args(function_purpose, args)
             return address, tx_hash
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + args[0].encode("ascii").hex(),
-            "0x" + args[1].encode("ascii").hex(),
-            "0x" + Address(args[2]).hex()
+            args[0],
+            args[1],
+            Address(args[2])
         ]
 
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "deployFarm", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
+        tx_hash = endpoint_call(proxy, gas_limit, deployer, Address(self.address), "deployFarm", sc_args)
 
         # retrieve deployed contract address
         if tx_hash != "":
-            response = proxy.get_transaction(tx_hash, with_results=True)
-            address = get_deployed_address_from_event(response)
-            deployer.nonce += 1
+            address = get_deployed_address_from_tx(tx_hash, proxy)
 
         return tx_hash, address
 
-    def call_farm_endpoint(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def call_farm_endpoint(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
         type[str]: farm address
         type[str]: farm endpoint
         type[list]: farm endpoint args
         """
-        print_warning("Call farm endpoint via proxy deployer")
+        function_purpose = f"Call farm endpoint via proxy deployer"
+        logger.info(function_purpose)
 
-        network_config = proxy.get_network_config()
         tx_hash = ""
 
         if len(args) != 3:
-            print_test_step_fail(f"FAIL: Failed to call farm endpoint. Args list not as expected.")
+            log_unexpected_args(function_purpose, args)
             return tx_hash
 
-        print_warning(f"Calling: {args[1]}")
+        logger.debug(f"Calling remote farm endpoint: {args[1]}")
 
         gas_limit = 20000000
         sc_args = [
-            "0x" + Address(args[0]).hex(),
-            "str:" + args[1],
+            Address(args[0]),
+            args[1],
         ]
-        if type(args[2] != list):
+        if type(args[2]) != list:
             endpoint_args = [args[2]]
         else:
             endpoint_args = args[2]
         sc_args.extend(endpoint_args)
 
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "callFarmEndpoint", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "callFarmEndpoint", sc_args)
 
-        return tx_hash
-
-    def contract_start(self, deployer: Account, proxy: ElrondProxy, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
 
     def print_contract_info(self):

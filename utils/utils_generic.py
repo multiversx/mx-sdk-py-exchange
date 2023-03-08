@@ -6,7 +6,6 @@ import stat
 import sys
 import tarfile
 import zipfile
-from builtins import function
 
 import toml
 from enum import Enum

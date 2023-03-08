@@ -90,7 +90,7 @@ def add_initial_liquidity(context: Context):
                 pair_contract.firstToken, nominated_amount(1000000), 1,
                 pair_contract.secondToken, nominated_amount(1000000), 1
             )
-            pair_contract.addLiquidity(context.network_provider, context.deployer_account, event)
+            pair_contract.add_liquidity(context.network_provider, context.deployer_account, event)
             time.sleep(6)
 
 

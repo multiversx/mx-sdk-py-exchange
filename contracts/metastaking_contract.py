@@ -1,18 +1,20 @@
 import sys
 import traceback
+from operator import ne
 
-from arrows.stress.contracts.contract import load_code_as_hex
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity
-from events.metastake_events import (EnterMetastakeEvent,
-                                                       ExitMetastakeEvent,
-                                                       ClaimRewardsMetastakeEvent)
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders
-from erdpy.accounts import Account, Address
-from erdpy.contracts import SmartContract, CodeMetadata
-from erdpy.proxy import ElrondProxy
-from erdpy.transactions import Transaction
+from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent)
+from utils.logger import get_logger
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, deploy, upgrade_call, \
+    endpoint_call, ESDTToken, multi_esdt_endpoint_call
+from utils.utils_chain import Account, WrapperAddress as Address
+from multiversx_sdk_core import CodeMetadata
+from multiversx_sdk_network_providers import ProxyNetworkProvider
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning, \
+    log_unexpected_args
+
+logger = get_logger(__name__)
 
 
 class MetaStakingContract(DEXContractInterface):
@@ -55,130 +57,79 @@ class MetaStakingContract(DEXContractInterface):
                                    farm_address=config_dict['farm_address'],
                                    stake_address=config_dict['stake_address'])
 
-    def contract_deploy(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list = []):
-        print_warning("Deploy metastaking contract")
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+        function_purpose = f"Deploy metastaking contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=True, readable=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        value = 0
-        address = ""
-        tx_hash = ""
 
         arguments = [
-            "0x" + Address(self.farm_address).hex(),
-            "0x" + Address(self.stake_address).hex(),
-            "0x" + Address(self.lp_address).hex(),
-            "0x" + self.staking_token.encode("ascii").hex(),
-            "0x" + self.farm_token.encode("ascii").hex(),
-            "0x" + self.stake_token.encode("ascii").hex(),
-            "0x" + self.lp_token.encode("ascii").hex(),
+            Address(self.farm_address),
+            Address(self.stake_address),
+            Address(self.lp_address),
+            self.staking_token,
+            self.farm_token,
+            self.stake_token,
+            self.lp_token,
         ]
-        print(f"Arguments: {arguments}")
-        contract = SmartContract(bytecode=bytecode, metadata=metadata)
-        tx = contract.deploy(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                             network_config.chain_id, network_config.min_tx_version)
 
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            address = contract.address.bech32()
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash, address
-
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ElrondProxy, bytecode_path,
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
                          args: list = [], no_init: bool = False):
-        print_warning("Upgrade metastaking contract")
+        function_purpose = f"Upgrade metastaking contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        value = 0
-        tx_hash = ""
 
         if no_init:
             arguments = []
         else:
             arguments = [
-                "0x" + Address(self.farm_address).hex(),
-                "0x" + Address(self.stake_address).hex(),
-                "0x" + Address(self.lp_address).hex(),
-                "0x" + self.staking_token.encode("ascii").hex(),
-                "0x" + self.farm_token.encode("ascii").hex(),
-                "0x" + self.stake_token.encode("ascii").hex(),
-                "0x" + self.lp_token.encode("ascii").hex(),
+                Address(self.farm_address),
+                Address(self.stake_address),
+                Address(self.lp_address),
+                self.staking_token,
+                self.farm_token,
+                self.stake_token,
+                self.lp_token,
             ]
-        print(f"Arguments: {arguments}")
-        contract = SmartContract(bytecode=bytecode, metadata=metadata, address=Address(self.address))
-        tx = contract.upgrade(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                              network_config.chain_id, network_config.min_tx_version)
+        return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
+                            bytecode_path, metadata, arguments)
 
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send upgrade transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash
-
-        return tx_hash
-
-    def register_dual_yield_token(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def register_dual_yield_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: token display name
             type[str]: token ticker
         """
-        print_warning("Register metastaking token")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Register metastaking token"
+        logger.info(function_purpose)
 
         if len(args) != 2:
-            print_test_step_fail(f"FAIL: Failed to register metastake token. Args not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + args[0].encode("ascii").hex(),
-            "0x" + args[1].encode("ascii").hex(),
-            "0x12"
+            args[0],
+            args[1],
+            18
         ]
-        print(f"Arguments: {sc_args}")
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "registerDualYieldToken", sc_args, value="50000000000000000")
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerDualYieldToken", sc_args,
+                             value="50000000000000000")
 
-        return tx_hash
+    def set_local_roles_dual_yield_token(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Set local roles for metastake token"
+        logger.info(function_purpose)
 
-    def set_local_roles_dual_yield_token(self, deployer: Account, proxy: ElrondProxy):
-        print_warning("Set local roles for metastake token")
-
-        network_config = proxy.get_network_config()
         gas_limit = 100000000
         sc_args = []
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setLocalRolesDualYieldToken", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.metastake_token),
+                             "setLocalRolesDualYieldToken", sc_args)
 
-        return tx_hash
-
-    def contract_start(self, deployer: Account, proxy: ElrondProxy, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
 
     def print_contract_info(self):
@@ -190,131 +141,49 @@ class MetaStakingContract(DEXContractInterface):
 
     def enter_metastake(self, network_provider: NetworkProviders, user: Account,
                         event: EnterMetastakeEvent, initial: bool = False) -> str:
-        print_warning('enterMetastaking')
-        print(f"Account: {user.address}")
+        # TODO: remove initial parameter by using the event data
+        function_purpose = f"enterMetastaking"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
 
-        contract = SmartContract(address=user.address)
         metastake_fn = 'stakeFarmTokens'
         gas_limit = 50000000
 
-        sc_args = [
-            '0x' + Address(self.address).hex(),  # contract address
-            '0x01' if initial else '0x02',  # number of tokens sent
-            '0x' + event.metastaking_tk.encode('ascii').hex(),  # farming token
-            '0x' + '0' + f'{event.metastaking_tk_nonce:x}' if len(f'{event.metastaking_tk_nonce:x}') % 2 else
-            '0x' + f'{event.metastaking_tk_nonce:x}',
-            '0x' + '0' + f'{event.metastaking_tk_amount:x}' if len(f'{event.metastaking_tk_amount:x}') % 2 else
-            '0x' + f'{event.metastaking_tk_amount:x}'
-        ]
-
+        tokens = [ESDTToken(event.metastaking_tk, event.metastaking_tk_nonce, event.metastaking_tk_amount)]
         if not initial:
-            sc_args.extend([
-                '0x' + event.metastake_tk.encode('ascii').hex(),  # farming token
-                '0x' + '0' + f'{event.metastake_tk_nonce:x}' if len(f'{event.metastake_tk_nonce:x}') % 2 else
-                '0x' + f'{event.metastake_tk_nonce:x}',
-                '0x' + '0' + f'{event.metastake_tk_amount:x}' if len(f'{event.metastake_tk_amount:x}') % 2 else
-                '0x' + f'{event.metastake_tk_amount:x}'
-            ])
+            tokens.append(ESDTToken(event.metastake_tk, event.metastake_tk_nonce, event.metastake_tk_amount))
 
-        sc_args.extend(['0x' + metastake_fn.encode('ascii').hex()])  # endpoint name
-        tx_data = contract.prepare_execute_transaction_data("MultiESDTNFTTransfer", sc_args)
+        sc_args = [tokens]
 
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = user.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-
-        try:
-            tx_hash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(tx_hash, network_provider.proxy.url)
-            user.nonce += 1
-            return tx_hash
-        except Exception as ex:
-            print(ex)
-            return ''
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+                                        user, Address(self.address), metastake_fn, sc_args)
 
     def exit_metastake(self, network_provider: NetworkProviders, user: Account, event: ExitMetastakeEvent):
-        print_warning('exitMetastaking')
-        print('Account: ', user.address)
+        function_purpose = f"exitMetastaking"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
 
-        contract = SmartContract(address=user.address)
         gas_limit = 50000000
         exit_metastake_fn = 'unstakeFarmTokens'
 
-        sc_args = [
-            '0x' + self.metastake_token.encode('ascii').hex(),
-            '0x' + '0' + f'{event.nonce:x}' if len(f'{event.nonce:x}') % 2 else '0x' + f'{event.nonce:x}',
-            '0x' + '0' + f'{event.amount:x}' if len(f'{event.amount:x}') % 2 else '0x' + f'{event.amount:x}',
-            '0x' + Address(self.address).hex(),
-            '0x' + exit_metastake_fn.encode('ascii').hex(),
-            '0x01',  # first token slippage
-            '0x01'  # second token slippage
-        ]
+        tokens = [ESDTToken(self.metastake_token, event.nonce, event.amount)]
+        sc_args = [tokens,
+                   1,   # first token slippage
+                   1    # second token slippage
+                   ]
 
-        tx_data = contract.prepare_execute_transaction_data('ESDTNFTTransfer', sc_args)
-
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = user.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-
-        try:
-            tx_hash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(tx_hash, network_provider.proxy.url)
-            user.nonce += 1
-
-            return tx_hash
-        except Exception as ex:
-            print(ex)
-            return ''
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+                                        user, Address(self.address), exit_metastake_fn, sc_args)
 
     def claim_rewards_metastaking(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsMetastakeEvent):
-        print_warning('claimDualYield')
-        print('Account: ', user.address)
+        function_purpose = f"claimDualYield"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
 
-        contract = SmartContract(address=user.address)
         gas_limit = 50000000
         claim_fn = 'claimDualYield'
 
-        sc_args = [
-            "0x" + self.metastake_token.encode("ascii").hex(),
-            "0x" + "0" + f"{event.nonce:x}" if len(f"{event.nonce:x}") % 2 else "0x" + f"{event.nonce:x}",
-            "0x" + "0" + f"{event.amount:x}" if len(f"{event.amount:x}") % 2 else "0x" + f"{event.amount:x}",
-            "0x" + Address(self.address).hex(),
-            "0x" + claim_fn.encode('ascii').hex()
-        ]
+        tokens = [ESDTToken(self.metastake_token, event.nonce, event.amount)]
 
-        tx_data = contract.prepare_execute_transaction_data('ESDTNFTTransfer', sc_args)
-
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = user.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-
-        try:
-            tx_hash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(tx_hash, network_provider.proxy.url)
-            user.nonce += 1
-
-            return tx_hash
-        except Exception as ex:
-            print(ex)
-            return ''
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+                                        user, Address(self.address), claim_fn, tokens)

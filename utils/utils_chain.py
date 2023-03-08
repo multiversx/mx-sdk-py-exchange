@@ -15,9 +15,10 @@ from multiversx_sdk_wallet import UserSigner, pem_format
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 
 from utils import utils_generic
-from utils.utils_generic import logger
+from utils.logger import get_logger
 
-logger = logging.getLogger("accounts")
+
+logger = get_logger(__name__)
 
 
 class WrapperAddress(Address):

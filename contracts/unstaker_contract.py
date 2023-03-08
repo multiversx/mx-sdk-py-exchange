@@ -1,15 +1,17 @@
 import sys
 import traceback
 
-from arrows.stress.contracts.contract import load_code_as_hex
 from contracts.contract_identities import DEXContractInterface
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, \
-    multi_esdt_endpoint_call, endpoint_call
+from utils.logger import get_logger
+from utils.utils_tx import endpoint_call, deploy
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
-from erdpy.accounts import Account, Address
-from erdpy.contracts import CodeMetadata, SmartContract
-from erdpy.proxy import ElrondProxy
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, log_unexpected_args
+from utils.utils_chain import Account, WrapperAddress as Address
+from multiversx_sdk_core import CodeMetadata
+from multiversx_sdk_network_providers import ProxyNetworkProvider
+
+
+logger = get_logger(__name__)
 
 
 class UnstakerContract(DEXContractInterface):
@@ -26,84 +28,56 @@ class UnstakerContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return UnstakerContract(address=config_dict['address'])
 
-    def contract_deploy(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
             type[int]: unbond epochs
             type[str]: energy factory address
             type[int]: fees burn percentage
             type[str]: fees collector address
         """
-        print_warning("Deploy token unstake contract")
+        function_purpose = f"Deploy token unstake contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=True, readable=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        value = 0
-        address = ""
-        tx_hash = ""
 
         if len(args) != 4:
-            print_test_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
-            return tx_hash, address
+            log_unexpected_args(function_purpose, args)
+            return "", ""
 
         arguments = args
-        # lock_fee_pairs = list(zip(args[4], args[5]))
-        # lock_options = [item for sublist in lock_fee_pairs for item in sublist]
-        # arguments.extend(lock_options)  # lock_options
-        print(f"Arguments: {arguments}")
-        contract = SmartContract(bytecode=bytecode, metadata=metadata)
-        tx = contract.deploy(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                             network_config.chain_id, network_config.min_tx_version)
-
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            address = contract.address.bech32()
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash, address
-
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def set_energy_factory_address(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[address]: energy factory address
         """
         function_purpose = "set energy factory address"
+        logger.info(function_purpose)
 
         if len(args) < 1:
-            print_test_step_fail(f"FAIL: Failed to {function_purpose} in token unstake contract. "
-                                 f"Args list not as expected.")
+            log_unexpected_args(function_purpose, args)
             return ""
-        print(f"Arguments: {args}")
-        return endpoint_call(function_purpose, proxy, 10000000, deployer, Address(self.address),
-                             "setEnergyFactoryAddress", args)
+        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setEnergyFactoryAddress", args)
 
-    def claim_unlocked_tokens(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def claim_unlocked_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             empty
         """
         function_purpose = "claim unlocked tokens"
-        print(f"Arguments: {args}")
-        return endpoint_call(function_purpose, proxy, 20000000, deployer, Address(self.address),
-                             "claimUnlockedTokens", [])
+        logger.info(function_purpose)
+        return endpoint_call(proxy, 20000000, deployer, Address(self.address), "claimUnlockedTokens", [])
 
-    def cancel_unbond(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def cancel_unbond(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             empty
         """
         function_purpose = "cancel unbond"
-        print(f"Arguments: {args}")
-        return endpoint_call(function_purpose, proxy, 20000000, deployer, Address(self.address),
-                             "cancelUnbond", args)
+        logger.info(function_purpose)
+        return endpoint_call(proxy, 20000000, deployer, Address(self.address), "cancelUnbond", args)
 
-    def contract_start(self, deployer: Account, proxy: ElrondProxy, args: list = None):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass
 
     def print_contract_info(self):

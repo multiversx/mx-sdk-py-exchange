@@ -1,19 +1,16 @@
 import sys
 import traceback
 
-from arrows.stress.contracts.contract import load_code_as_hex
-from contracts.contract_identities import (
-    DEXContractInterface, PairContractVersion)
-from utils.utils_tx import (NetworkProviders,
-                            prepare_contract_call_tx,
-                            send_contract_call_tx)
-from utils.utils_chain import (dec_to_padded_hex, log_explorer_transaction,
-                               string_to_hex)
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
-from erdpy.accounts import Account, Address
-from erdpy.contracts import CodeMetadata, SmartContract
-from erdpy.proxy import ElrondProxy
-from erdpy.transactions import Transaction
+from contracts.contract_identities import (DEXContractInterface, PairContractVersion)
+from utils.logger import get_logger
+from utils.utils_tx import NetworkProviders, endpoint_call, upgrade_call, deploy, ESDTToken, multi_esdt_endpoint_call
+from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, log_unexpected_args
+from utils.utils_chain import Account, WrapperAddress as Address
+from multiversx_sdk_core import CodeMetadata
+from multiversx_sdk_network_providers import ProxyNetworkProvider
+
+
+logger = get_logger(__name__)
 
 
 class SwapFixedInputEvent:
@@ -88,195 +85,82 @@ class PairContract(DEXContractInterface):
             return True
         return False
 
-    def swapFixedInput(self, network_provider: NetworkProviders, user: Account, event: SwapFixedInputEvent):
-        print_warning("swapFixedInput")
-        print(f"Account: {user.address}")
-        print(f"{event.amountA} {event.tokenA} for minimum {event.amountBmin} {event.tokenB}")
-
-        contract = SmartContract(address=self.address)
-
-        gas_limit = 50000000
-        sc_args = [
-            "0x" + event.tokenA.encode("ascii").hex(),
-            "0x" + "0" + f"{event.amountA:x}" if len(f"{event.amountA:x}") % 2 else "0x" + f"{event.amountA:x}",
-            "0x" + "swapTokensFixedInput".encode("ascii").hex(),
-            "0x" + event.tokenB.encode("ascii").hex(),
-            "0x" + "0" + f"{event.amountBmin:x}" if len(
-                f"{event.amountBmin:x}") % 2 else "0x" + f"{event.amountBmin:x}",
-        ]
-        tx_data = contract.prepare_execute_transaction_data("ESDTTransfer", sc_args)
-
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
-
-            return txHash
-        except Exception as ex:
-            print(ex)
-            traceback.print_exception(*sys.exc_info())
-
-    def swapFixedOutput(self, network_provider: NetworkProviders, user: Account, event: SwapFixedOutputEvent):
-        print_warning("swapFixedOutput")
-        print(f"Account: {user.address}")
-
-        contract = SmartContract(address=self.address)
+    def swap_fixed_input(self, network_provider: NetworkProviders, user: Account, event: SwapFixedInputEvent):
+        function_purpose = f"swapFixedInput"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+        logger.debug(f"{event.amountA} {event.tokenA} for minimum {event.amountBmin} {event.tokenB}")
 
         gas_limit = 50000000
+
+        tokens = [ESDTToken(event.tokenA, 0, event.amountA)]
+        sc_args = [tokens,
+                   event.tokenB,
+                   event.amountBmin]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+                                        user, Address(self.address), "swapTokensFixedInput", sc_args)
+
+    def swap_fixed_output(self, network_provider: NetworkProviders, user: Account, event: SwapFixedOutputEvent):
+        function_purpose = f"swap tokens fixed output"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+        logger.debug(f"Maximum {event.amountAmax} {event.tokenA} for {event.amountB} {event.tokenB}")
+
+        gas_limit = 50000000
+
+        tokens = [ESDTToken(event.tokenA, 0, event.amountAmax)]
+        sc_args = [tokens,
+                   event.tokenB,
+                   event.amountB]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+                                        user, Address(self.address), "swapTokensFixedOutput", sc_args)
+
+    def add_liquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
+        function_purpose = f"addLiquidity"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        tokens = [ESDTToken(event.tokenA, 0, event.amountA),
+                  ESDTToken(event.tokenB, 0, event.amountB)]
         sc_args = [
-            "0x" + event.tokenA.encode("ascii").hex(),
-            "0x" + "0" + f"{event.amountAmax:x}" if len(
-                f"{event.amountAmax:x}") % 2 else "0x" + f"{event.amountAmax:x}",
-            "0x" + "swapTokensFixedOutput".encode("ascii").hex(),
-            "0x" + event.tokenB.encode("ascii").hex(),
-            "0x" + "0" + f"{event.amountB:x}" if len(f"{event.amountB:x}") % 2 else "0x" + f"{event.amountB:x}",
-        ]
-        tx_data = contract.prepare_execute_transaction_data("ESDTTransfer", sc_args)
-
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
-
-            return txHash
-        except Exception as ex:
-            ex = ex
-
-    def addLiquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
-        print_warning("addLiquidity")
-        print(f"Account: {user.address}")
-
-        contract = SmartContract(address=user.address)
-
-        sc_args = [
-            "0x" + Address(self.address).hex(),
-            "0x02",
-            "0x" + string_to_hex(event.tokenA),
-            "0x00",
-            "0x" + dec_to_padded_hex(event.amountA),
-            "0x" + string_to_hex(event.tokenB),
-            "0x00",
-            "0x" + dec_to_padded_hex(event.amountB),
-            "0x" + string_to_hex("addLiquidity"),
-            "0x" + dec_to_padded_hex(event.amountAmin),
-            "0x" + dec_to_padded_hex(event.amountBmin)
+            tokens,
+            event.amountAmin,
+            event.amountBmin,
         ]
 
-        tx_data = contract.prepare_execute_transaction_data("MultiESDTNFTTransfer", sc_args)
-        gas_limit = 20000000
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, 20000000,
+                                        user, Address(self.address), "addLiquidity", sc_args)
 
-            return txHash
-        except Exception as ex:
-            print(f'Exception encountered: {ex}')
+    def add_initial_liquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
+        function_purpose = f"addInitialLiquidity"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
 
-    def addInitialLiquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
-        print_warning("addInitialLiquidity")
-        print(f"Account: {user.address}")
+        tokens = [ESDTToken(event.tokenA, 0, event.amountA),
+                  ESDTToken(event.tokenB, 0, event.amountB)]
 
-        contract = SmartContract(address=user.address)
+        sc_args = [tokens]
 
-        sc_args = [
-            "0x" + Address(self.address).hex(),
-            "0x02",
-            "0x" + string_to_hex(event.tokenA),
-            "0x00",
-            "0x" + dec_to_padded_hex(event.amountA),
-            "0x" + string_to_hex(event.tokenB),
-            "0x00",
-            "0x" + dec_to_padded_hex(event.amountB),
-            "0x" + string_to_hex("addInitialLiquidity")
-        ]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, 20000000,
+                                        user, Address(self.address), "addInitialLiquidity", sc_args)
 
-        tx_data = contract.prepare_execute_transaction_data("MultiESDTNFTTransfer", sc_args)
-        gas_limit = 20000000
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
-        except Exception as ex:
-            print(ex)
-            traceback.print_exception(*sys.exc_info())
-
-    def removeLiquidity(self, network_provider: NetworkProviders, user: Account, event: RemoveLiquidityEvent):
-        print_warning("removeLiquidity")
-        print(f"Account: {user.address}")
-
-        contract = SmartContract(address=self.address)
+    def remove_liquidity(self, network_provider: NetworkProviders, user: Account, event: RemoveLiquidityEvent):
+        function_purpose = f"remove liquidity"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
 
         gas_limit = 20000000
-        sc_args = [
-            "0x" + self.lpToken.encode("ascii").hex(),
-            "0x" + "0" + f"{event.amount:x}" if len(f"{event.amount:x}") % 2 else "0x" + f"{event.amount:x}",
-            "0x" + "removeLiquidity".encode("ascii").hex(),
-            "0x" + "0" + f"{event.amountA:x}" if len(f"{event.amountA:x}") % 2 else "0x" + f"{event.amountA:x}",
-            "0x" + "0" + f"{event.amountB:x}" if len(f"{event.amountB:x}") % 2 else "0x" + f"{event.amountB:x}",
-        ]
-        tx_data = contract.prepare_execute_transaction_data("ESDTTransfer", sc_args)
 
-        tx = Transaction()
-        tx.nonce = user.nonce
-        tx.sender = user.address.bech32()
-        tx.receiver = contract.address.bech32()
-        tx.gasPrice = network_provider.network.min_gas_price
-        tx.gasLimit = gas_limit
-        tx.data = tx_data
-        tx.chainID = network_provider.network.chain_id
-        tx.version = network_provider.network.min_tx_version
-        tx.sign(user)
-        try:
-            txHash = network_provider.proxy.send_transaction(tx.to_dictionary())
-            log_explorer_transaction(txHash, network_provider.proxy.url)
-            user.nonce += 1
+        tokens = [ESDTToken(self.lpToken, 0, event.amount)]
+        sc_args = [tokens,
+                   event.amountA,   # slippage first token
+                   event.amountB    # slippage second token
+                   ]
 
-            return txHash
-        except Exception as ex:
-            ex = ex
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+                                        user, Address(self.address), "removeLiquidity", sc_args)
 
-    def contract_deploy(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
             type[str]: router address
             type[str]: whitelisted owner address
@@ -285,19 +169,16 @@ class PairContract(DEXContractInterface):
             type[any]: special fee
             type[str..]: admin addresses (v2 required)
         """
-        print_warning("Deploy pair contract")
+        function_purpose = f"Deploy pair contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=False, readable=True)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=False, readable=True)
+        
         gas_limit = 200000000
-        value = 0
-        address = ""
-        tx_hash = ""
 
         if len(args) < 5:
             print_test_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
-            return tx_hash, address
+            return "", ""
 
         arguments = [
             "0x" + self.firstToken.encode("ascii").hex(),
@@ -312,26 +193,10 @@ class PairContract(DEXContractInterface):
         if self.version == PairContractVersion.V2:
             arguments.extend(args[5:])
 
-        contract = SmartContract(bytecode=bytecode, metadata=metadata)
-        tx = contract.deploy(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                             network_config.chain_id, network_config.min_tx_version)
-
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-
-            address = contract.address.bech32()
-            deployer.nonce += 1
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash, address
-
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, args)
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ElrondProxy, bytecode_path, args: list):
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
             type[str]: router address
             type[str]: whitelisted owner address
@@ -340,24 +205,22 @@ class PairContract(DEXContractInterface):
             type[any]: special fee
             type[str..]: admin addresses (v2 required)
         """
-        print_warning("Upgrade pair contract")
+        function_purpose = f"Upgrade pair contract"
+        logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_sc=False)
-        bytecode: str = load_code_as_hex(bytecode_path)
-        network_config = proxy.get_network_config()
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=False, readable=True)
+        
         gas_limit = 200000000
-        value = 0
-        tx_hash = ""
 
         if len(args) < 5:
-            print_test_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         arguments = [
-            "0x" + self.firstToken.encode("ascii").hex(),
-            "0x" + self.secondToken.encode("ascii").hex(),
-            "0x" + Address(args[0]).hex(),
-            "0x" + Address(args[1]).hex(),
+            self.firstToken,
+            self.secondToken,
+            Address(args[0]),
+            Address(args[1]),
             args[3],
             args[4],
             args[2]
@@ -366,24 +229,10 @@ class PairContract(DEXContractInterface):
         if self.version == PairContractVersion.V2:
             arguments.extend(args[5:])
 
-        contract = SmartContract(address=Address(self.address), bytecode=bytecode, metadata=metadata)
-        tx = contract.upgrade(deployer, arguments, network_config.min_gas_price, gas_limit, value,
-                              network_config.chain_id, network_config.min_tx_version)
+        return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
+                            bytecode_path, metadata, arguments)
 
-        try:
-            response = proxy.send_transaction_and_wait_for_result(tx.to_dictionary())
-            tx_hash = response.get_hash()
-            log_explorer_transaction(tx_hash, proxy.url)
-            deployer.nonce += 1 if tx_hash != "" else 0
-
-        except Exception as ex:
-            print_test_step_fail(f"Failed to send deploy transaction due to: {ex}")
-            traceback.print_exception(*sys.exc_info())
-            return tx_hash
-
-        return tx_hash
-
-    def contract_deploy_via_router(self, deployer: Account, proxy: ElrondProxy, router_contract, args: list):
+    def contract_deploy_via_router(self, deployer: Account, proxy: ProxyNetworkProvider, router_contract, args: list):
         """ Expected as args:
             type[str]: initial liquidity adder address
             type[any]: total fee percentage
@@ -395,7 +244,7 @@ class PairContract(DEXContractInterface):
         tx_hash, address = router_contract.pair_contract_deploy(deployer, proxy, pair_args)
         return tx_hash, address
 
-    def contract_upgrade_via_router(self, deployer: Account, proxy: ElrondProxy, router_contract, args: list) -> str:
+    def contract_upgrade_via_router(self, deployer: Account, proxy: ProxyNetworkProvider, router_contract, args: list) -> str:
         """ Expected as args:
             type[int]: total fee percentage
             type[int]: special fee percentage
@@ -406,197 +255,147 @@ class PairContract(DEXContractInterface):
         tx_hash = router_contract.pair_contract_upgrade(deployer, proxy, pair_args)
         return tx_hash
 
-    def issue_lp_token_via_router(self, deployer: Account, proxy: ElrondProxy, router_contract, args: list):
+    def issue_lp_token_via_router(self, deployer: Account, proxy: ProxyNetworkProvider, router_contract, args: list):
         """ Expected as args:
             type[str]: token display name
             type[str]: token ticker
         """
-        print_warning("Issue LP token via router")
+        function_purpose = f"Issue LP token via router"
+        logger.info(function_purpose)
 
         if len(args) < 2:
-            print_test_step_fail(f"FAIL: Failed to issue lp token. Args list not as expected.")
+            log_unexpected_args(function_purpose, args)
             return ""
 
         tx_hash = router_contract.issue_lp_token(deployer, proxy, [self.address, args[0], args[1]])
         return tx_hash
 
-    def whitelist_contract(self, deployer: Account, proxy: ElrondProxy, contract_to_whitelist: str):
-        print_warning("Whitelist contract in pair")
+    def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
+        function_purpose = f"Whitelist contract in pair"
+        logger.info(function_purpose)
 
-        network_config = proxy.get_network_config()
         gas_limit = 100000000
         sc_args = [
-            "0x" + Address(contract_to_whitelist).hex()
+            Address(contract_to_whitelist)
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "whitelist", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "whitelist", sc_args)
 
-        return tx_hash
-
-    def add_trusted_swap_pair(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def add_trusted_swap_pair(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: trusted swap pair address
             type[str]: trusted pair first token identifier
             type[str]: trusted pair second token identifier
         """
-        print_warning("Whitelist contract in pair")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Whitelist contract in pair"
+        logger.info(function_purpose)
 
         if len(args) != 3:
-            print_test_step_fail(f"FAIL: Failed to add trusted swap pair. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + Address(args[0]).hex(),
-            "0x" + args[1].encode("ascii").hex(),
-            "0x" + args[2].encode("ascii").hex()
+            Address(args[0]),
+            args[1],
+            args[2]
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "addTrustedSwapPair", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addTrustedSwapPair", sc_args)
 
-        return tx_hash
-
-    def add_fees_collector(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def add_fees_collector(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: fees collector address
             type[str]: fees cut
         """
-        print_warning("Setup fees collector in pair")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Setup fees collector in pair"
+        logger.info(function_purpose)
 
         if len(args) != 2:
-            print_test_step_fail(f"FAIL: Failed to setup fees collector in pair. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 50000000
         sc_args = [
-            "0x" + Address(args[0]).hex(),
+            Address(args[0]),
             args[1]
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setupFeesCollector", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setupFeesCollector", sc_args)
 
-        return tx_hash
-
-    def set_fees_percents(self, deployer: Account, proxy: ElrondProxy, args: list):
+    def set_fees_percents(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: total fee percent
             type[str]: special fee percent
         """
-        print_warning("Set fees in pair contract")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+        function_purpose = f"Set fees in pair contract"
+        logger.info(function_purpose)
 
         if len(args) != 2:
-            print_test_step_fail(f"FAIL: Failed to set fees in pair. Args list not as expected.")
-            return tx_hash
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 50000000
         sc_args = args
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setFeePercents", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setFeePercents", sc_args)
 
-        return tx_hash
-
-    def set_lp_token_local_roles_via_router(self, deployer: Account, proxy: ElrondProxy, router_contract):
-        print_warning("Set lp token local roles via router")
+    def set_lp_token_local_roles_via_router(self, deployer: Account, proxy: ProxyNetworkProvider, router_contract):
+        function_purpose = f"Set lp token local roles via router"
+        logger.info(function_purpose)
         tx_hash = router_contract.set_lp_token_local_roles(deployer, proxy, self.address)
         return tx_hash
 
-    """ Expected as args:
-    type[str]: address to receive fees
-    type[str]: expected token
-    """
-
-    def set_fee_on_via_router(self, deployer: Account, proxy: ElrondProxy, router_contract, args: list):
-        print_warning("Set fee on via router")
+    def set_fee_on_via_router(self, deployer: Account, proxy: ProxyNetworkProvider, router_contract, args: list):
+        """ Expected as args:
+            type[str]: address to receive fees
+            type[str]: expected token
+        """
+        function_purpose = f"Set fee on via router"
+        logger.info(function_purpose)
 
         if len(args) != 2:
-            print_test_step_fail(f"FAIL: Failed to set fee on via router. Args list not as expected.")
+            log_unexpected_args(function_purpose, args)
             return ""
 
         tx_hash = router_contract.set_fee_on(deployer, proxy, [self.address, args[0], args[1]])
         return tx_hash
 
-    def set_locking_deadline_epoch(self, deployer: Account, proxy: ElrondProxy, epoch: int):
-        print_warning("Set locking deadline epoch in pool")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+    def set_locking_deadline_epoch(self, deployer: Account, proxy: ProxyNetworkProvider, epoch: int):
+        function_purpose = f"Set locking deadline epoch in pool"
+        logger.info(function_purpose)
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + "0" + f"{epoch:x}" if len(f"{epoch:x}") % 2 else "0x" + f"{epoch:x}"
+            epoch
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setLockingDeadlineEpoch", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingDeadlineEpoch", sc_args)
 
-        return tx_hash
-
-    def set_unlock_epoch(self, deployer: Account, proxy: ElrondProxy, epoch: int):
-        print_warning("Set unlock epoch in pool")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+    def set_unlock_epoch(self, deployer: Account, proxy: ProxyNetworkProvider, epoch: int):
+        function_purpose = f"Set unlock epoch in pool"
+        logger.info(function_purpose)
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + "0" + f"{epoch:x}" if len(f"{epoch:x}") % 2 else "0x" + f"{epoch:x}"
+            epoch
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setUnlockEpoch", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setUnlockEpoch", sc_args)
 
-        return tx_hash
-
-    def set_locking_sc_address(self, deployer: Account, proxy: ElrondProxy, locking_address: str):
-        print_warning("Set locking contract address in pool")
-
-        network_config = proxy.get_network_config()
-        tx_hash = ""
+    def set_locking_sc_address(self, deployer: Account, proxy: ProxyNetworkProvider, locking_address: str):
+        function_purpose = f"Set locking contract address in pool"
+        logger.info(function_purpose)
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + Address(locking_address).hex()
+            Address(locking_address)
         ]
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "setLockingScAddress", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingScAddress", sc_args)
 
-        return tx_hash
+    def resume(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Resume swaps in pool"
+        logger.info(function_purpose)
 
-    def resume(self, deployer: Account, proxy: ElrondProxy):
-        print_warning("Resume swaps in pool")
-
-        network_config = proxy.get_network_config()
         gas_limit = 10000000
         sc_args = []
-        tx = prepare_contract_call_tx(Address(self.address), deployer, network_config, gas_limit,
-                                      "resume", sc_args)
-        tx_hash = send_contract_call_tx(tx, proxy)
-        deployer.nonce += 1 if tx_hash != "" else 0
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
 
-        return tx_hash
-
-    def contract_start(self, deployer: Account, proxy: ElrondProxy, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.resume(deployer, proxy)
 
     def print_contract_info(self):

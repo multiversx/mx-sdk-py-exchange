@@ -60,7 +60,7 @@ def create_remove_liquidity(pair: Address, caller: Account, token_lp: str, netwo
     transfers = [(token_lp, 1)]
     args = [taken_one, taken_two]
     gas_limit = 750000
-    transaction = transfer_multi_esdt_and_execute(pair, caller, transfers, "removeLiquidity", args, gas_limit, network)
+    transaction = transfer_multi_esdt_and_execute(pair, caller, transfers, "remove_liquidity", args, gas_limit, network)
     return transaction
 
 
