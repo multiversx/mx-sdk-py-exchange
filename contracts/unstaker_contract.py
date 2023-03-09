@@ -5,7 +5,7 @@ from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
 from utils.utils_tx import endpoint_call, deploy
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, log_unexpected_args
+from utils.utils_generic import log_step_fail, log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
@@ -81,4 +81,4 @@ class UnstakerContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed token unstake contract: {self.address}")
+        log_step_pass(f"Deployed token unstake contract: {self.address}")

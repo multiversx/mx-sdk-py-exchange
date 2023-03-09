@@ -1,14 +1,10 @@
 import base64
 import time
-import logging
 from multiprocessing import Pool
 from os import path
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, cast
-
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
-
-from contracts.contract_identities import FarmContractVersion
 from multiversx_sdk_core import Address, Transaction
 from multiversx_sdk_core.interfaces import ISignature
 from multiversx_sdk_wallet import UserSigner, pem_format
@@ -55,9 +51,8 @@ class Account:
             self.address = Address.from_hex(self.signer.get_pubkey().hex(), "erd")
 
     def sync_nonce(self, proxy: ProxyNetworkProvider):
-        logger.info("Account.sync_nonce()")
         self.nonce = proxy.get_account(self.address).nonce
-        logger.info(f"Account.sync_nonce() done: {self.nonce}")
+        logger.debug(f"Account.sync_nonce() done: {self.nonce}")
 
     def sign_transaction(self, transaction: Transaction) -> ISignature:
         return self.signer.sign(transaction)
@@ -293,76 +288,6 @@ def build_token_ticker(owner: Address, prefix: str = ""):
     prefix = (prefix + owner.bech32()[4:8]).upper()
     hex = "0x" + prefix.encode("utf8").hex()
     return prefix, hex
-
-
-class DecodedTokenAttributes:
-    rewards_per_share: int
-    original_entering_epoch: int
-    entering_epoch: int
-    apr_multiplier: int
-    locked_rewards: bool
-    initial_farming_amount: int
-    compounded_rewards: int
-    current_farm_amount: int
-
-    def __init__(self, attributes_hex: str, attr_version: FarmContractVersion = None):
-        def slide_indexes(i, j, no_bytes: int):
-            index_f = j
-            index_l = j + (no_bytes * 2)
-            return index_f, index_l
-
-        self.rewards_per_share = 0
-        self.apr_multiplier = 0
-        self.locked_rewards = False
-        self.current_farm_amount = 0
-        self.compounded_rewards = 0
-        self.initial_farming_amount = 0
-
-        # decode rewards per share BigUInt
-        index_first = 0
-        index_last = 8
-        payload_size = int(attributes_hex[index_first:index_last], 16)
-        if payload_size:
-            index_first, index_last = slide_indexes(index_first, index_last, payload_size)
-            self.rewards_per_share = int(attributes_hex[index_first:index_last], 16)
-
-        # decode original entering epoch U64
-        index_first, index_last = slide_indexes(index_first, index_last, 8)
-        self.entering_epoch = int(attributes_hex[index_first:index_last], 16)
-
-        # decode entering epoch U64
-        index_first, index_last = slide_indexes(index_first, index_last, 8)
-        self.original_entering_epoch = int(attributes_hex[index_first:index_last], 16)
-
-        if attr_version == FarmContractVersion.V12:
-            # decode APR multiplier U8
-            index_first, index_last = slide_indexes(index_first, index_last, 1)
-            self.apr_multiplier = int(attributes_hex[index_first:index_last], 16)
-
-            # decode Locked Rewards U8
-            index_first, index_last = slide_indexes(index_first, index_last, 1)
-            self.locked_rewards = bool(int(attributes_hex[index_first:index_last], 16))
-
-        # decode Initial Farming amount BigUInt
-        index_first, index_last = slide_indexes(index_first, index_last, 4)
-        payload_size = int(attributes_hex[index_first:index_last], 16)
-        if payload_size:
-            index_first, index_last = slide_indexes(index_first, index_last, payload_size)
-            self.initial_farming_amount = int(attributes_hex[index_first:index_last], 16)
-
-        # decode Compounded Rewards BigUInt
-        index_first, index_last = slide_indexes(index_first, index_last, 4)
-        payload_size = int(attributes_hex[index_first:index_last], 16)
-        if payload_size:
-            index_first, index_last = slide_indexes(index_first, index_last, payload_size)
-            self.compounded_rewards = int(attributes_hex[index_first:index_last], 16)
-
-        # decode Current Farm amount BigUInt
-        index_first, index_last = slide_indexes(index_first, index_last, 4)
-        payload_size = int(attributes_hex[index_first:index_last], 16)
-        if payload_size:
-            index_first, index_last = slide_indexes(index_first, index_last, payload_size)
-            self.current_farm_amount = int(attributes_hex[index_first:index_last], 16)
 
 
 def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:

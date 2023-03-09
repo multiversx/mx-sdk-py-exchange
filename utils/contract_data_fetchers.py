@@ -3,8 +3,11 @@ import traceback
 
 from multiversx_sdk_core import Address, ContractQueryBuilder
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-
+from utils.logger import get_logger
 from utils.utils_chain import base64_to_hex
+
+
+logger = get_logger(__name__)
 
 
 class DataFetcher:
@@ -17,6 +20,7 @@ class DataFetcher:
         if view_name in self.view_handler_map:
             return self.view_handler_map[view_name](view_name, attrs)
         else:
+            logger.error(f"View name not registered in {type(self).__name__}")
             raise ValueError(f"View name not registered in {type(self).__name__}")
 
     def _query_contract(self, view_name: str, attrs: list = []):
@@ -33,10 +37,9 @@ class DataFetcher:
             result = self._query_contract(view_name, attrs)
             if result.return_data == '':
                 return 0
-            return int(base64_to_hex(result.return_data), base=16)
+            return int(base64_to_hex(result.return_data[0]), base=16)
         except Exception as ex:
-            print(f"Exception encountered on view name {view_name}: {ex}")
-            traceback.print_exception(*sys.exc_info())
+            logger.exception(f"Exception encountered on view name {view_name}: {ex}")
         return -1
 
     def _get_int_list_view(self, view_name: str, attrs) -> list:
@@ -44,17 +47,15 @@ class DataFetcher:
             result = self._query_contract(view_name, attrs)
             return [int(base64_to_hex(elem), base=16) for elem in result.return_data]
         except Exception as ex:
-            print(f"Exception encountered on view name {view_name}: {ex}")
-            traceback.print_exception(*sys.exc_info())
+            logger.exception(f"Exception encountered on view name {view_name}: {ex}")
         return []
 
     def _get_hex_view(self, view_name: str, attrs) -> str:
         try:
             result = self._query_contract(view_name, attrs)
-            return base64_to_hex(result.return_data)
+            return base64_to_hex(result.return_data[0])
         except Exception as ex:
-            print(f"Exception encountered on view name {view_name}: {ex}")
-            traceback.print_exception(*sys.exc_info())
+            logger.exception(f"Exception encountered on view name {view_name}: {ex}")
         return ""
 
     def _get_hex_list_view(self, view_name: str, attrs) -> list:
@@ -62,8 +63,7 @@ class DataFetcher:
             result = self._query_contract(view_name, attrs)
             return [base64_to_hex(elem) for elem in result.return_data]
         except Exception as ex:
-            print(f"Exception encountered on view name {view_name}: {ex}")
-            traceback.print_exception(*sys.exc_info())
+            logger.exception(f"Exception encountered on view name {view_name}: {ex}")
         return []
 
 

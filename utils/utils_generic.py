@@ -286,21 +286,21 @@ def print_color(msg, color: PrintColors):
     print(f"{color.value}{msg}{PrintColors.ENDC.value}")
 
 
-def print_test_step_fail(msg):
-    print_color(msg, PrintColors.FAIL)
+def log_step_fail(msg):
+    logger.error(msg)
 
 
-def print_test_step_pass(msg):
-    print_color(msg, PrintColors.PASS)
+def log_step_pass(msg):
+    logger.info(msg)
 
 
-def print_test_substep(msg):
+def log_substep(msg):
     sub_step_print_header = " ├ "
-    print(f"{sub_step_print_header}{msg}")
+    logger.info(f"{sub_step_print_header}{msg}")
 
 
-def print_warning(msg):
-    print_color(msg, PrintColors.WARNING)
+def log_warning(msg):
+    logger.warning(msg)
 
 
 def log_unexpected_args(function_purpose: str, args: Any):
@@ -308,12 +308,12 @@ def log_unexpected_args(function_purpose: str, args: Any):
     logger.debug(f"Unexpected arguments: {args}")
 
 
-def print_condition_assert(conditions: Dict[bool, str]):
+def log_condition_assert(conditions: Dict[bool, str]):
     for condition, message in conditions.items():
         if condition:
-            print_test_step_pass(f"PASS: {message}")
+            log_step_pass(f"PASS: {message}")
         else:
-            print_test_step_fail(f"FAIL: {message}")
+            log_step_fail(f"FAIL: {message}")
 
 
 class TestStepCondition:
@@ -334,6 +334,6 @@ class TestStepConditions:
     def assert_conditions(self):
         for condition in self.conditions:
             if condition.condition:
-                print_test_step_pass(f"PASS: {condition.message}")
+                log_step_pass(f"PASS: {condition.message}")
             else:
-                print_test_step_fail(f"FAIL: {condition.message}")
+                log_step_fail(f"FAIL: {condition.message}")

@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 
 from typing import Dict, Any, Tuple, List
 
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_warning
+from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 from erdpy.proxy.http_facade import do_get
 
 
@@ -81,7 +81,7 @@ def compare_keys(left_state: dict, right_state: dict) -> Tuple[bool, dict, dict,
 def report_key_files_compare(folder_path: str, left_prefix: str, right_prefix: str, verbose: bool = False):
     compare_count = 0
     if not os.path.exists(folder_path):
-        print_test_step_fail(f"Given folder path doesn't exist.")
+        log_step_fail(f"Given folder path doesn't exist.")
 
     for file in os.listdir(folder_path):
         if f"{left_prefix}" not in file:
@@ -101,21 +101,21 @@ def report_key_files_compare(folder_path: str, left_prefix: str, right_prefix: s
                                                                                                     right_state)
 
         if identical:
-            print_test_step_pass(f"\n{file} and {right_file} are identical.")
+            log_step_pass(f"\n{file} and {right_file} are identical.")
         else:
-            print_test_step_fail(f"\n{file} and {right_file} are not identical.")
+            log_step_fail(f"\n{file} and {right_file} are not identical.")
             if verbose:
                 if keys_in_left:
                     for key, value in keys_in_left.items():
-                        print_warning(f"Data only in {left_prefix}: {key}: {value}")
+                        log_warning(f"Data only in {left_prefix}: {key}: {value}")
                         print(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
                 if keys_in_right:
                     for key, value in keys_in_right.items():
-                        print_warning(f"Data only in {right_prefix}: {key}: {value}")
+                        log_warning(f"Data only in {right_prefix}: {key}: {value}")
                         print(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
                 if common_keys_diff_values:
                     for key, value in common_keys_diff_values.items():
-                        print_warning(f"Common key with different values: {key}: {value}")
+                        log_warning(f"Common key with different values: {key}: {value}")
                         print(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
 
         compare_count += 1

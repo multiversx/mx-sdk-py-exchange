@@ -4,7 +4,7 @@ from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
 from events.farm_events import EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent
 from utils.contract_data_fetchers import StakingContractDataFetcher, ChainDataFetcher
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep
 
 
 class StakingEconomics(Subscriber):
@@ -54,32 +54,32 @@ class StakingEconomics(Subscriber):
         chain_division_safety_constant = self.data_fetcher.get_data("getDivisionSafetyConstant")
 
         if self.rewards_per_share > new_rewards_per_share:
-            print_test_step_fail("TEST CHECK FAIL: Rewards per share decreased!")
-            print_test_substep(f"Old rewards per share: {self.rewards_per_share}")
-            print_test_substep(f"New rewards per share: {new_rewards_per_share}")
+            log_step_fail("TEST CHECK FAIL: Rewards per share decreased!")
+            log_substep(f"Old rewards per share: {self.rewards_per_share}")
+            log_substep(f"New rewards per share: {new_rewards_per_share}")
         if self.last_rewards_block_nonce > new_last_rewards_block_nonce:
-            print_test_step_fail("TEST CHECK FAIL: Last rewards block nonce decreased!")
-            print_test_substep(f"Old rewards block nonce: {self.last_rewards_block_nonce}")
-            print_test_substep(f"New rewards block nonce: {new_last_rewards_block_nonce}")
+            log_step_fail("TEST CHECK FAIL: Last rewards block nonce decreased!")
+            log_substep(f"Old rewards block nonce: {self.last_rewards_block_nonce}")
+            log_substep(f"New rewards block nonce: {new_last_rewards_block_nonce}")
         if self.rewards_per_block != chain_rewards_per_block:
-            print_test_step_fail("TEST CHECK FAIL: Rewards per block has changed!")
-            print_test_substep(f"Old rewards per block: {self.rewards_per_block}")
-            print_test_substep(f"New rewards per block: {chain_rewards_per_block}")
+            log_step_fail("TEST CHECK FAIL: Rewards per block has changed!")
+            log_substep(f"Old rewards per block: {self.rewards_per_block}")
+            log_substep(f"New rewards per block: {chain_rewards_per_block}")
         if self.division_safety_constant != chain_division_safety_constant:
-            print_test_step_fail("TEST CHECK FAIL: Division safety constant has changed!")
-            print_test_substep(f"Old division safety constant: {self.division_safety_constant}")
-            print_test_substep(f"New division safety constant: {chain_division_safety_constant}")
+            log_step_fail("TEST CHECK FAIL: Division safety constant has changed!")
+            log_substep(f"Old division safety constant: {self.division_safety_constant}")
+            log_substep(f"New division safety constant: {chain_division_safety_constant}")
 
-        print_test_step_pass("Checked invariant properties!")
+        log_step_pass("Checked invariant properties!")
 
     def check_enter_staking_properties(self):
         new_token_supply = self.data_fetcher.get_data("getFarmTokenSupply")
         if self.token_supply >= new_token_supply:
-            print_test_step_fail('Staking farm token supply did not increase')
-            print_test_substep(f"Old token supply: {self.token_supply}")
-            print_test_substep(f"New token supply: {new_token_supply}")
+            log_step_fail('Staking farm token supply did not increase')
+            log_substep(f"Old token supply: {self.token_supply}")
+            log_substep(f"New token supply: {new_token_supply}")
 
-        print_test_step_pass('Checked enter staking properties!')
+        log_step_pass('Checked enter staking properties!')
 
     def check_enter_staking_data(self, event: EnterFarmEvent, tx_hash: str):
         new_staking_token_supply = self.data_fetcher.get_data("getFarmTokenSupply")
@@ -97,33 +97,33 @@ class StakingEconomics(Subscriber):
             new_exp_rewards_per_share = 0
 
         if new_staking_token_supply != expected_token_supply:
-            print_test_step_fail('TEST CHECK FAIL: Staking token supply not as expected!')
-            print_test_substep(f"Old Staking token supply: {self.token_supply}")
-            print_test_substep(f"New Staking token supply: {new_staking_token_supply}")
-            print_test_substep(f"Expected Staking token supply: {expected_token_supply}")
+            log_step_fail('TEST CHECK FAIL: Staking token supply not as expected!')
+            log_substep(f"Old Staking token supply: {self.token_supply}")
+            log_substep(f"New Staking token supply: {new_staking_token_supply}")
+            log_substep(f"Expected Staking token supply: {expected_token_supply}")
 
         if new_contract_rewards_per_share != new_exp_rewards_per_share:
-            print_test_step_fail(f"TEST CHECK FAIL: Rewards per share not as expected!")
-            print_test_substep(f"Old Rewards per share in contract: {self.rewards_per_share}")
-            print_test_substep(f"New Rewards per share in contract: {new_contract_rewards_per_share}")
-            print_test_substep(f"Expected Rewards per share: {new_exp_rewards_per_share}")
+            log_step_fail(f"TEST CHECK FAIL: Rewards per share not as expected!")
+            log_substep(f"Old Rewards per share in contract: {self.rewards_per_share}")
+            log_substep(f"New Rewards per share in contract: {new_contract_rewards_per_share}")
+            log_substep(f"Expected Rewards per share: {new_exp_rewards_per_share}")
 
         if tx_block != new_last_rewards_block_nonce:
-            print_test_step_fail(f"TEST CHECK FAIL: Last rewards block nonce not as expected!")
-            print_test_substep(f"Last reward block nonce in contract: {new_last_rewards_block_nonce}")
-            print_test_substep(f"Expected last reward block nonce: {tx_block}")
+            log_step_fail(f"TEST CHECK FAIL: Last rewards block nonce not as expected!")
+            log_substep(f"Last reward block nonce in contract: {new_last_rewards_block_nonce}")
+            log_substep(f"Expected last reward block nonce: {tx_block}")
 
         self.last_block_calculated_rewards = tx_block
-        print_test_step_pass('Checked enter staking data!')
+        log_step_pass('Checked enter staking data!')
 
     def check_exit_staking_properties(self):
         new_token_supply = self.data_fetcher.get_data('getFarmTokenSupply')
         if self.token_supply <= new_token_supply:
-            print_test_step_fail('Staking farm token supply did not decrease')
-            print_test_substep(f"Old token supply: {self.token_supply}")
-            print_test_substep(f"New token supply: {new_token_supply}")
+            log_step_fail('Staking farm token supply did not decrease')
+            log_substep(f"Old token supply: {self.token_supply}")
+            log_substep(f"New token supply: {new_token_supply}")
 
-        print_test_step_pass('Checked exit staking properties')
+        log_step_pass('Checked exit staking properties')
 
     def check_exit_staking_data(self, event: ExitFarmEvent, tx_hash: str):
         new_token_supply = self.data_fetcher.get_data('getFarmTokenSupply')
@@ -138,32 +138,32 @@ class StakingEconomics(Subscriber):
                                     (self.division_safety_constant * aggregated_rewards // self.token_supply)
 
         if new_token_supply != expected_token_supply:
-            print_test_step_fail(f"TEST CHECK FAIL: Farm token supply not as expected!")
-            print_test_substep(f"Farm token supply in contract: {new_token_supply}")
-            print_test_substep(f"Expected Farm token supply: {expected_token_supply}")
+            log_step_fail(f"TEST CHECK FAIL: Farm token supply not as expected!")
+            log_substep(f"Farm token supply in contract: {new_token_supply}")
+            log_substep(f"Expected Farm token supply: {expected_token_supply}")
 
         if new_contract_rewards_per_share != expected_rewards_per_share:
-            print_test_step_fail(f"TEST CHECK FAIL: Rewards per share not as expected!")
-            print_test_substep(f"Old Rewards per share in contract: {self.rewards_per_share}")
-            print_test_substep(f"New Rewards per share in contract: {new_contract_rewards_per_share}")
-            print_test_substep(f"Expected Rewards per share: {expected_rewards_per_share}")
+            log_step_fail(f"TEST CHECK FAIL: Rewards per share not as expected!")
+            log_substep(f"Old Rewards per share in contract: {self.rewards_per_share}")
+            log_substep(f"New Rewards per share in contract: {new_contract_rewards_per_share}")
+            log_substep(f"Expected Rewards per share: {expected_rewards_per_share}")
 
         if tx_block != new_last_rewards_block_nonce:
-            print_test_step_fail(f"TEST CHECK FAIL: Last rewards block nonce not as expected!")
-            print_test_substep(f"Last reward block nonce in contract: {new_last_rewards_block_nonce}")
-            print_test_substep(f"Expected last reward block nonce: {tx_block}")
+            log_step_fail(f"TEST CHECK FAIL: Last rewards block nonce not as expected!")
+            log_substep(f"Last reward block nonce in contract: {new_last_rewards_block_nonce}")
+            log_substep(f"Expected last reward block nonce: {tx_block}")
 
         self.last_block_calculated_rewards = tx_block
-        print_test_step_pass('Checked exit staking data')
+        log_step_pass('Checked exit staking data')
 
     def check_claim_rewards_properties(self):
         new_token_supply = self.data_fetcher.get_data('getFarmTokenSupply')
         if self.token_supply != new_token_supply:
-            print_test_step_fail('Token supply modified!')
-            print_test_substep(f"Old Farm token supply: {self.token_supply}")
-            print_test_substep(f"New Farm token supply: {new_token_supply}")
+            log_step_fail('Token supply modified!')
+            log_substep(f"Old Farm token supply: {self.token_supply}")
+            log_substep(f"New Farm token supply: {new_token_supply}")
 
-        print_test_step_pass("Checked claim rewards properties!")
+        log_step_pass("Checked claim rewards properties!")
 
     def check_claim_rewards_data(self, tx_hash):
         new_token_supply = self.data_fetcher.get_data('getFarmTokenSupply')
@@ -176,23 +176,23 @@ class StakingEconomics(Subscriber):
                                     (self.division_safety_constant * aggregated_rewards // self.token_supply)
 
         if new_token_supply != self.token_supply:
-            print_test_step_fail(f"TEST CHECK FAIL: Token supply not as expected!")
-            print_test_substep(f"Farm token supply in contract: {new_token_supply}")
-            print_test_substep(f"Expected Farm token supply: {self.token_supply}")
+            log_step_fail(f"TEST CHECK FAIL: Token supply not as expected!")
+            log_substep(f"Farm token supply in contract: {new_token_supply}")
+            log_substep(f"Expected Farm token supply: {self.token_supply}")
 
         if new_rewards_per_share != new_exp_rewards_per_share:
-            print_test_step_fail(f"TEST CHECK FAIL: Rewards per share not as expected!")
-            print_test_substep(f"Old Rewards per share in contract: {self.rewards_per_share}")
-            print_test_substep(f"New Rewards per share in contract: {new_rewards_per_share}")
-            print_test_substep(f"Expected Rewards per share: {new_exp_rewards_per_share}")
+            log_step_fail(f"TEST CHECK FAIL: Rewards per share not as expected!")
+            log_substep(f"Old Rewards per share in contract: {self.rewards_per_share}")
+            log_substep(f"New Rewards per share in contract: {new_rewards_per_share}")
+            log_substep(f"Expected Rewards per share: {new_exp_rewards_per_share}")
 
         if tx_block != new_last_rewards_block_nonce:
-            print_test_step_fail(f"TEST CHECK FAIL: Last rewards block nonce not as expected!")
-            print_test_substep(f"Last reward block nonce in contract: {new_last_rewards_block_nonce}")
-            print_test_substep(f"Expected last reward block nonce: {tx_block}")
+            log_step_fail(f"TEST CHECK FAIL: Last rewards block nonce not as expected!")
+            log_substep(f"Last reward block nonce in contract: {new_last_rewards_block_nonce}")
+            log_substep(f"Expected last reward block nonce: {tx_block}")
 
         self.last_block_calculated_rewards = tx_block
-        print_test_step_pass("Checked claim staking rewards data!")
+        log_step_pass("Checked claim staking rewards data!")
 
     def enter_staking_event(self, event: EnterFarmEvent, tx_hash):
         self.check_invariant_properties()
@@ -218,7 +218,7 @@ class StakingEconomics(Subscriber):
     def update(self, publisher: Observable):
         if publisher.contract is not None:
             if self.contract_address.bech32() == publisher.contract.address:
-                self.network_provider.api.wait_for_tx_finalized(publisher.tx_hash)
+                self.network_provider.wait_for_tx_executed(publisher.tx_hash)
                 if type(publisher.event) == EnterFarmEvent:
                     self.enter_staking_event(publisher.event, publisher.tx_hash)
                 elif type(publisher.event) == ExitFarmEvent:

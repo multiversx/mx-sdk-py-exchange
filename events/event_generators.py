@@ -25,7 +25,7 @@ from utils.results_logger import FarmEventResultLogData
 from utils.utils_chain import (prevent_spam_crash_elrond_proxy_go,
                                get_token_details_for_address, get_all_token_nonces_details_for_account,
                                decode_merged_attributes, dec_to_padded_hex)
-from utils.utils_generic import print_test_step_fail
+from utils.utils_generic import log_step_fail
 from utils.utils_chain import Account, WrapperAddress as Address
 
 
@@ -41,7 +41,7 @@ def generate_add_liquidity_event(context: Context, user_account: Account, pair_c
         _, amount_token_b, _ = get_token_details_for_address(tokens[1], user_account.address.bech32(), context.network_provider.proxy)
 
         if amount_token_a <= 0 or amount_token_b <= 0:
-            print_test_step_fail(f"Skipped add liquidity because needed tokens NOT found in account.")
+            log_step_fail(f"Skipped add liquidity because needed tokens NOT found in account.")
             return
 
         max_amount_a = int(amount_token_a * context.add_liquidity_max_amount)
@@ -51,7 +51,7 @@ def generate_add_liquidity_event(context: Context, user_account: Account, pair_c
                                                               max_amount_a])
 
         if equivalent_amount_b <= 0 or equivalent_amount_b > amount_token_b:
-            print_test_step_fail(f'Minimum token equivalent amount not satisfied.')
+            log_step_fail(f'Minimum token equivalent amount not satisfied.')
             return
 
         amount_token_b_min = context.get_slippaged_below_value(equivalent_amount_b)
@@ -156,7 +156,7 @@ def generate_swap_fixed_input(context: Context, user_account: Account, pair_cont
                                                                     amount_token_a_swapped])
 
         if equivalent_amount_token_b <= 0:
-            print_test_step_fail(f'Minimum token equivalent amount not satisfied. Token amount: {equivalent_amount_token_b}')
+            log_step_fail(f'Minimum token equivalent amount not satisfied. Token amount: {equivalent_amount_token_b}')
             return
 
         amount_token_b_min = context.get_slippaged_below_value(equivalent_amount_token_b)
@@ -237,7 +237,7 @@ def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract:
         farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmToken, userAccount.address, context.network_provider.proxy)
 
         if farmingTkNonce == 0 and farmingTkAmount == 0:
-            print_test_step_fail(f"SKIPPED: No tokens found!")
+            log_step_fail(f"SKIPPED: No tokens found!")
             return
 
         initial = True if farmTkNonce == 0 else False
@@ -285,7 +285,7 @@ def generateEnterStakingEvent(context: Context, user: Account, staking_contract:
                                                                                user.address,
                                                                                context.network_provider.proxy)
         if not staking_token_amount:
-            print_test_step_fail('SKIPPED enterStakingEvent: No tokens found!')
+            log_step_fail('SKIPPED enterStakingEvent: No tokens found!')
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -323,7 +323,7 @@ def generateEnterMetastakeEvent(context: Context, user: Account, metastake_contr
                                                                                          context.network_provider.proxy)
 
         if staking_token_nonce == 0 and staking_token_amount == 0:
-            print_test_step_fail(f"SKIPPED: No tokens found!")
+            log_step_fail(f"SKIPPED: No tokens found!")
             return
 
         initial = True if metastake_token_nonce == 0 else False
@@ -408,7 +408,7 @@ def generateUnstakeEvent(context: Context, user: Account, staking_contract: Stak
                                                                                                 user.address,
                                                                                                 context.network_provider.proxy)
         if not stake_token_nonce:
-            print_test_step_fail('SKIPPED unstakingEvent: No tokens to unstake!')
+            log_step_fail('SKIPPED unstakingEvent: No tokens to unstake!')
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -453,7 +453,7 @@ def generateExitMetastakeEvent(context: Context, user: Account, metastake_contra
             metastake_token, user.address, context.network_provider.proxy
         )
         if metastake_token_nonce == 0:
-            print_test_step_fail(f"SKIPPED: No tokens found!")
+            log_step_fail(f"SKIPPED: No tokens found!")
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -571,7 +571,7 @@ def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastak
                                                                                     context.network_provider.proxy
                                                                                     )
         if metastake_token_nonce == 0:
-            print_test_step_fail(f"SKIPPED: No tokens found!")
+            log_step_fail(f"SKIPPED: No tokens found!")
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -876,7 +876,7 @@ def generate_withdraw_pd_liquidity_event(context: Context, user_account: Account
     # TODO: find a smarter/more configurable method of choosing which token to use
     tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.network_provider.proxy)
     if len(tokens) == 0:
-        print_test_step_fail(f"Generate withdraw price discovery liquidity failed! No redeem tokens available.")
+        log_step_fail(f"Generate withdraw price discovery liquidity failed! No redeem tokens available.")
         return
 
     random.shuffle(tokens)
@@ -905,7 +905,7 @@ def generate_redeem_pd_liquidity_event(context: Context, user_account: Account, 
     # TODO: find a smarter/more configurable method of choosing which token to use and how much
     tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.network_provider.proxy)
     if len(tokens) == 0:
-        print_test_step_fail(f"Generate redeem price discovery liquidity failed! No redeem tokens available.")
+        log_step_fail(f"Generate redeem price discovery liquidity failed! No redeem tokens available.")
         return
 
     random.shuffle(tokens)

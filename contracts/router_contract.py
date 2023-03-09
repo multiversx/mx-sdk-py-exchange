@@ -2,7 +2,7 @@ import config
 from contracts.contract_identities import DEXContractInterface, RouterContractVersion
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, get_deployed_address_from_tx, endpoint_call
-from utils.utils_generic import print_test_step_pass, log_unexpected_args
+from utils.utils_generic import log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
@@ -218,4 +218,4 @@ class RouterContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed router contract: {self.address}")
+        log_step_pass(f"Deployed router contract: {self.address}")

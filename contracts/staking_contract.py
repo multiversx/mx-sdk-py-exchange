@@ -5,7 +5,7 @@ from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-from utils.utils_generic import print_test_step_pass, print_test_substep, log_unexpected_args
+from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
                                 ClaimRewardsFarmEvent, CompoundRewardsFarmEvent)
 
@@ -239,6 +239,6 @@ class StakingContract(DEXContractInterface):
         _ = self.resume(deployer, proxy)
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed staking contract: {self.address}")
-        print_test_substep(f"Staking token: {self.farming_token}")
-        print_test_substep(f"Stake token: {self.farm_token}")
+        log_step_pass(f"Deployed staking contract: {self.address}")
+        log_substep(f"Staking token: {self.farming_token}")
+        log_substep(f"Stake token: {self.farm_token}")

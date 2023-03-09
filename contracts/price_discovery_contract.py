@@ -9,7 +9,7 @@ from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, Netw
 from events.price_discovery_events import (DepositPDLiquidityEvent,
                                            WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
@@ -190,5 +190,5 @@ class PriceDiscoveryContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed price discovery contract: {self.address}")
-        print_test_substep(f"Redeem token: {self.redeem_token}")
+        log_step_pass(f"Deployed price discovery contract: {self.address}")
+        log_substep(f"Redeem token: {self.redeem_token}")

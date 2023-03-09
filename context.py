@@ -60,7 +60,7 @@ class Context:
         # deploy closing
         self.deploy_structure.print_deployed_contracts()
 
-        self.observable = self.init_observers()
+        # self.observable = self.init_observers()
 
     def init_observers(self):
         observable = Observable()

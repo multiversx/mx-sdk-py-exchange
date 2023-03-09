@@ -1,7 +1,7 @@
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
 from utils.utils_tx import multi_esdt_endpoint_call, endpoint_call, deploy, upgrade_call
-from utils.utils_generic import print_test_step_pass, print_test_substep, log_unexpected_args
+from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
@@ -450,8 +450,8 @@ class SimpleLockEnergyContract(DEXContractInterface):
         self.resume(deployer, proxy)
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed simple lock energy contract: {self.address}")
-        print_test_substep(f"Base token: {self.base_token}")
-        print_test_substep(f"Locked token: {self.locked_token}")
-        print_test_substep(f"Locked LP token: {self.lp_proxy_token}")
-        print_test_substep(f"Locked Farm token: {self.farm_proxy_token}")
+        log_step_pass(f"Deployed simple lock energy contract: {self.address}")
+        log_substep(f"Base token: {self.base_token}")
+        log_substep(f"Locked token: {self.locked_token}")
+        log_substep(f"Locked LP token: {self.lp_proxy_token}")
+        log_substep(f"Locked Farm token: {self.farm_proxy_token}")

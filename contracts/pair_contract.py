@@ -4,7 +4,7 @@ import traceback
 from contracts.contract_identities import (DEXContractInterface, PairContractVersion)
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, endpoint_call, upgrade_call, deploy, ESDTToken, multi_esdt_endpoint_call
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, log_unexpected_args
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
@@ -177,7 +177,7 @@ class PairContract(DEXContractInterface):
         gas_limit = 200000000
 
         if len(args) < 5:
-            print_test_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
+            log_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
             return "", ""
 
         arguments = [
@@ -399,7 +399,7 @@ class PairContract(DEXContractInterface):
         _ = self.resume(deployer, proxy)
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed pair contract: {self.address}")
-        print_test_substep(f"First token: {self.firstToken}")
-        print_test_substep(f"Second token: {self.secondToken}")
-        print_test_substep(f"LP token: {self.lpToken}")
+        log_step_pass(f"Deployed pair contract: {self.address}")
+        log_substep(f"First token: {self.firstToken}")
+        log_substep(f"Second token: {self.secondToken}")
+        log_substep(f"LP token: {self.lpToken}")

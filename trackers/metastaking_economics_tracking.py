@@ -1,6 +1,6 @@
 from erdpy.accounts import Address
 from utils.utils_tx import NetworkProviders
-from utils.utils_generic import print_test_step_pass
+from utils.utils_generic import log_step_pass
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher, ChainDataFetcher
 from events.metastake_events import (EnterMetastakeEvent,
                                                        ExitMetastakeEvent,
@@ -141,19 +141,19 @@ class MetastakingEconomics(Subscriber):
         self.staking_tracker.check_invariant_properties()
         self.staking_tracker.check_enter_staking_properties()
         self.check_enter_metastaking_data(publisher)
-        print_test_step_pass('Checked enter metastaking event economics!')
+        log_step_pass('Checked enter metastaking event economics!')
 
     def check_exit_metastaking(self, publisher: Observable):
         self.staking_tracker.check_invariant_properties()
         self.staking_tracker.check_exit_staking_properties()
         self.check_exit_metastaking_data(publisher)
-        print_test_step_pass('Checked exit metastaking event economics!')
+        log_step_pass('Checked exit metastaking event economics!')
 
     def check_claim_rewards(self, publisher: Observable):
         self.staking_tracker.check_invariant_properties()
         self.staking_tracker.check_claim_rewards_properties()
         self.check_claim_rewards_data(publisher)
-        print_test_step_pass('Checked claim metastaking rewards event economics!')
+        log_step_pass('Checked claim metastaking rewards event economics!')
 
     def update_trackers_data(self):
         self.staking_tracker.update_data()
@@ -164,7 +164,7 @@ class MetastakingEconomics(Subscriber):
         if publisher.contract is not None:
             if str(self.contract_address) == publisher.contract.address:
                 if publisher.tx_hash:
-                    self.network_provider.api.wait_for_tx_finalized(publisher.tx_hash)
+                    self.network_provider.wait_for_tx_executed(publisher.tx_hash)
                 if isinstance(publisher.event, SetCorrectReservesEvent):
                     self.update_trackers_data()
                 elif isinstance(publisher.event, EnterMetastakeEvent):

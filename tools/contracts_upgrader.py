@@ -24,7 +24,7 @@ from utils.contract_data_fetchers import RouterContractDataFetcher, PairContract
     StakingContractDataFetcher, FarmContractDataFetcher
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import base64_to_hex
-from utils.utils_generic import print_test_step_fail
+from utils.utils_generic import log_step_fail
 from tools import config_contracts_upgrader as config
 from erdpy.accounts import Address, Account
 from erdpy.proxy import ElrondProxy
@@ -1015,7 +1015,7 @@ def fetch_contract_states(prefix: str, network_providers: NetworkProviders):
         get_account_keys_online(LOCKED_ASSET_FACTORY_CONTRACT, network_providers.proxy.url,
                                 with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
     else:
-        print_test_step_fail(f"Locked asset factory address not available. No state saved for this!")
+        log_step_fail(f"Locked asset factory address not available. No state saved for this!")
 
     # get proxy dex state
     # filename = get_contract_save_name(PROXY_DEX_LABEL, PROXY_DEX_CONTRACT, prefix)
@@ -1028,7 +1028,7 @@ def fetch_contract_states(prefix: str, network_providers: NetworkProviders):
         get_account_keys_online(ROUTER_CONTRACT, network_providers.proxy.url,
                                 with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
     else:
-        print_test_step_fail(f"Router address not available. No state saved for this!")
+        log_step_fail(f"Router address not available. No state saved for this!")
 
     # get template state
     router_data_fetcher = RouterContractDataFetcher(Address(ROUTER_CONTRACT), network_providers.proxy.url)

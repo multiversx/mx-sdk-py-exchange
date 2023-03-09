@@ -5,7 +5,7 @@ from contracts.pair_contract import PairContract
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
     endpoint_call, multi_esdt_endpoint_call, ESDTToken
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, \
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep, \
     log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_network_providers import ProxyNetworkProvider
@@ -200,7 +200,7 @@ class DexProxyContract(DEXContractInterface):
             return "", ""
 
         if len(self.locked_tokens) != len(args[0]):
-            print_test_step_fail(f"FAIL: Failed to deploy contract. "
+            log_step_fail(f"FAIL: Failed to deploy contract. "
                                  f"Mismatch between locked tokens and factory addresses.")
             return "", ""
 
@@ -228,7 +228,7 @@ class DexProxyContract(DEXContractInterface):
             return "", ""
 
         if not no_init and len(self.locked_tokens) != len(args[0]):
-            print_test_step_fail(f"FAIL: Failed to upgrade contract. "
+            log_step_fail(f"FAIL: Failed to upgrade contract. "
                                  f"Mismatch between locked tokens and factory addresses.")
             return "", ""
 
@@ -350,8 +350,8 @@ class DexProxyContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed proxy contract: {self.address}")
-        print_test_substep(f"Token: {self.token}")
-        print_test_substep(f"Locked tokens: {self.locked_tokens}")
-        print_test_substep(f"Proxy LP token: {self.proxy_lp_token}")
-        print_test_substep(f"Proxy Farm token: {self.proxy_farm_token}")
+        log_step_pass(f"Deployed proxy contract: {self.address}")
+        log_substep(f"Token: {self.token}")
+        log_substep(f"Locked tokens: {self.locked_tokens}")
+        log_substep(f"Proxy LP token: {self.proxy_lp_token}")
+        log_substep(f"Proxy Farm token: {self.proxy_farm_token}")

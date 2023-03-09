@@ -6,10 +6,10 @@ TOKENS_CONTRACT_ADDRESS = "erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzl
 ZERO_CONTRACT_ADDRESS = "erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu"
 DEFAULT_WORKSPACE = Path(__file__).parent
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"
-DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "devnet_wallet.pem"
+DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1_1.pem"
-DEFAULT_PROXY = "https://devnet-gateway.elrond.com"
-DEFAULT_API = "https://devnet-api.elrond.com"
+DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"
+DEFAULT_API = "https://devnet-api.multiversx.com"
 HISTORY_PROXY = ""
 
 DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000   # TODO: try to override this with testnet define to tidy code up

@@ -24,7 +24,7 @@ from utils.contract_data_fetchers import PairContractDataFetcher, SimpleLockEner
 from utils.utils_tx import ESDTToken
 from utils.utils_chain import nominated_amount, \
     get_token_details_for_address, get_all_token_nonces_details_for_account
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_condition_assert, TestStepConditions
+from utils.utils_generic import log_step_fail, log_step_pass, log_condition_assert, TestStepConditions
 from arrows.stress.send_token_from_minter import main as send_token_from_minter
 from arrows.stress.send_egld_from_minter import main as send_egld_from_minter
 from arrows.stress.shared import get_shard_of_address
@@ -120,17 +120,17 @@ def scenarios(context: Context, threads: int, repeats: int):
                 try:
                     for future in concurrent.futures.as_completed(futures):
                         finished_jobs += 1
-                        print_test_step_pass(f"Finished {finished_jobs} repeats.")
+                        log_step_pass(f"Finished {finished_jobs} repeats.")
                         futures.remove(future)
                         # spawn a new job
                         futures.append(executor.submit(scenarios_per_account, context, random.choice(accounts)))
                         if future.exception() is not None:
-                            print_test_step_fail(f"Thread failed: {future.exception()}")
+                            log_step_fail(f"Thread failed: {future.exception()}")
                 except Exception as ex:
                     traceback.print_exception(*sys.exc_info())
-                    print_test_step_fail(f"Something failed: {ex}")
+                    log_step_fail(f"Something failed: {ex}")
     else:
-        print_test_step_fail(f"Number of threads must be minimum 1!")
+        log_step_fail(f"Number of threads must be minimum 1!")
         return
 
 

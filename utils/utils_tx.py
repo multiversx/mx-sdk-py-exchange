@@ -14,7 +14,7 @@ from multiversx_sdk_core.transaction_builders import ContractCallBuilder, Defaul
     MultiESDTNFTTransferBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder
 from utils.logger import get_logger
 from utils.utils_chain import Account, log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_warning, split_to_chunks, get_continue_confirmation, \
+from utils.utils_generic import log_step_fail, log_warning, split_to_chunks, get_continue_confirmation, \
     log_unexpected_args
 
 TX_CACHE: Dict[str, dict] = {}
@@ -67,20 +67,21 @@ class NetworkProviders:
         time.sleep(2)  # temporary fix for the api returning the wrong status
         while True:
             status = self.api.get_transaction_status(tx_hash)
+            logger.debug(f"Transaction {tx_hash} status: {status.status}")
             if status.is_executed():
                 break
-            time.sleep(self.network.round_duration)
+            time.sleep(self.network.round_duration // 1000)
 
     def check_deploy_tx_status(self, tx_hash: str, address: str, msg_label: str = "") -> bool:
         if not tx_hash:
             if msg_label:
-                print_test_step_fail(f"FAIL: no tx hash for {msg_label} contract deployment!")
+                log_step_fail(f"FAIL: no tx hash for {msg_label} contract deployment!")
             return False
 
         status = self.api.get_transaction_status(tx_hash)
         if status.is_failed() or address == "":
             if msg_label:
-                print_test_step_fail(f"FAIL: transaction for {msg_label} contract deployment failed "
+                log_step_fail(f"FAIL: transaction for {msg_label} contract deployment failed "
                                      f"or couldn't retrieve address!")
             return False
         return True
@@ -88,22 +89,23 @@ class NetworkProviders:
     def check_complex_tx_status(self, tx_hash: str, msg_label: str = "") -> bool:
         if not tx_hash:
             if msg_label:
-                print_test_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
+                log_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
             return False
 
+        logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
         self.wait_for_tx_executed(tx_hash)
         return self.check_simple_tx_status(tx_hash, msg_label)
 
     def check_simple_tx_status(self, tx_hash: str, msg_label: str = "") -> bool:
         if not tx_hash:
             if msg_label:
-                print_test_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
+                log_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
             return False
 
         results = self.api.get_transaction_status(tx_hash)
         if results.is_failed():
             if msg_label:
-                print_test_step_fail(f"Transaction to {msg_label} failed!")
+                log_step_fail(f"Transaction to {msg_label} failed!")
             return False
         return True
 
@@ -211,8 +213,6 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
     tx.signature = deployer.sign_transaction(tx)
 
     logger.debug(f"Deploy arguments: {args}")
-    logger.debug(f"Transaction: {tx.to_dictionary()}")
-    logger.debug(f"Transaction data: {tx.data}")
 
     return tx
 
@@ -237,8 +237,6 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
     tx.signature = deployer.sign_transaction(tx)
 
     logger.debug(f"Upgrade arguments: {args}")
-    logger.debug(f"Transaction: {tx.to_dictionary()}")
-    logger.debug(f"Transaction data: {tx.data}")
 
     return tx
 
@@ -261,6 +259,8 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
     )
     tx = builder.build()
     tx.signature = deployer.sign_transaction(tx)
+
+    logger.debug(f"Contract call arguments: {args}")
 
     return tx
 
@@ -285,6 +285,8 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
     )
     tx = builder.build()
     tx.signature = user.sign_transaction(tx)
+
+    logger.debug(f"Contract call arguments: {endpoint_args}")
 
     return tx
 
@@ -314,7 +316,7 @@ def send_deploy_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
         tx_hash = proxy.send_transaction(tx)
         log_explorer_transaction(tx_hash, proxy.url)
     except Exception as ex:
-        print_test_step_fail(f"Failed to deploy due to: {ex}")
+        log_step_fail(f"Failed to deploy due to: {ex}")
         traceback.print_exception(*sys.exc_info())
         tx_hash = ""
 
@@ -327,7 +329,7 @@ def send_contract_call_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
         # TODO: check if needed to wait for tx to be processed
         log_explorer_transaction(tx_hash, proxy.url)
     except Exception as ex:
-        print_test_step_fail(f"Failed to send tx due to: {ex}")
+        log_step_fail(f"Failed to send tx due to: {ex}")
         traceback.print_exception(*sys.exc_info())
         return ""
 
@@ -340,12 +342,12 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
         type[List[ESDTToken]]: tokens list
         opt: type[str..]: endpoint arguments
     """
-    print_warning(function_purpose)
+    log_warning(function_purpose)
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash = ""
 
     if len(args) < 1:
-        print_test_step_fail(f"FAIL: Failed to {function_purpose}. Args list not as expected.")
+        log_step_fail(f"FAIL: Failed to {function_purpose}. Args list not as expected.")
         return tx_hash
 
     ep_args = args[1:] if len(args) != 1 else []
@@ -361,7 +363,7 @@ def multi_esdt_transfer(proxy: ProxyNetworkProvider, gas: int, user: Account, de
     """ Expected as args:
         type[ESDTToken...]: tokens list
     """
-    logger.info(f"Sending multi esdt transfer to {dest}")
+    logger.debug(f"Sending multi esdt transfer to {dest}")
     logger.debug(f"Args: {args}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash = ""
@@ -382,7 +384,7 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
     """ Expected as args:
         opt: type[str..]: endpoint arguments
     """
-    logger.info(f"Calling {endpoint} at {contract.bech32()}")
+    logger.debug(f"Calling {endpoint} at {contract.bech32()}")
     logger.debug(f"Args: {args}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
 
@@ -395,8 +397,7 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
 
 def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
            owner: Account, bytecode_path: Path, metadata: ICodeMetadata, args: list) -> (str, str):
-    logger.info(f"Deploy {contract_label} contract")
-    logger.debug(f"Args: {args}")
+    logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
 
@@ -404,8 +405,14 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
     tx_hash = send_deploy_tx(tx, proxy)
 
     if tx_hash:
+        time.sleep(2)
         while not proxy.get_transaction_status(tx_hash).is_executed():
             time.sleep(2)
+
+        if not proxy.get_transaction_status(tx_hash).is_successful():
+            log_step_fail(f"Transaction to deploy {contract_label} contract failed.")
+            return tx_hash, contract_address
+
         contract_address = get_deployed_address_from_tx(tx_hash, proxy)
         owner.nonce += 1
 
@@ -415,8 +422,7 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
 def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
                  owner: Account, contract: Address, bytecode_path: Path, metadata: ICodeMetadata,
                  args: list) -> str:
-    logger.info(f"Upgrade {contract_label} contract")
-    logger.debug(f"Args: {args}")
+    logger.debug(f"Upgrade {contract_label} contract")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
 
     tx = prepare_upgrade_tx(owner, contract, network_config, gas, bytecode_path, metadata, args)
@@ -441,8 +447,7 @@ def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> s
         tx = proxy.get_transaction(tx_hash)
         contract_address = get_deployed_address_from_event(tx)
     except Exception as ex:
-        print_test_step_fail(f"Failed to get contract address due to: {ex}")
-        traceback.print_exception(*sys.exc_info())
+        logger.exception(f"Failed to get contract address due to: {ex}")
         contract_address = ""
 
     return contract_address
@@ -452,17 +457,17 @@ def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkP
                            chunk_size: int, sleep: int = 0, confirm_yes: bool = False):
     chunks = list(split_to_chunks(transactions, chunk_size))
 
-    print(f"{len(transactions)} transactions have been prepared, in {len(chunks)} chunks of size {chunk_size}")
+    logger.debug(f"{len(transactions)} transactions have been prepared, in {len(chunks)} chunks of size {chunk_size}")
     get_continue_confirmation(confirm_yes)
 
     chunk_index = 0
     hashes = []
     for chunk in chunks:
-        print("... chunk", chunk_index, "out of", len(chunks))
+        logger.debug(f"... chunk {chunk_index} out of {len(chunks)}")
 
         num_sent, sent_hashes = proxy.send_transactions(chunk)
         if len(chunk) != num_sent:
-            print(f"sent {num_sent} instead of {len(chunk)}")
+            logger.debug(f"sent {num_sent} instead of {len(chunk)}")
 
         chunk_index += 1
         hashes.extend(sent_hashes)

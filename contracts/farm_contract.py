@@ -9,7 +9,7 @@ from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning, \
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
     log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
                                 CompoundRewardsFarmEvent, MigratePositionFarmEvent)
@@ -400,7 +400,7 @@ class FarmContract(DEXContractInterface):
         _ = self.resume(deployer, proxy)
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed farm contract: {self.address}")
-        print_test_substep(f"Farming token: {self.farmingToken}")
-        print_test_substep(f"Farmed token: {self.farmedToken}")
-        print_test_substep(f"Farm token: {self.farmToken}")
+        log_step_pass(f"Deployed farm contract: {self.address}")
+        log_substep(f"Farming token: {self.farmingToken}")
+        log_substep(f"Farmed token: {self.farmedToken}")
+        log_substep(f"Farm token: {self.farmToken}")

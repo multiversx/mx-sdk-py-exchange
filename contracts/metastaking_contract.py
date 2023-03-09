@@ -11,7 +11,7 @@ from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, print_warning, \
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
     log_unexpected_args
 
 logger = get_logger(__name__)
@@ -133,11 +133,11 @@ class MetaStakingContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed metastaking contract: {self.address}")
-        print_test_substep(f"Staking token: {self.staking_token}")
-        print_test_substep(f"Stake address: {self.stake_address}")
-        print_test_substep(f"Farm address: {self.farm_address}")
-        print_test_substep(f"LP address: {self.lp_address}")
+        log_step_pass(f"Deployed metastaking contract: {self.address}")
+        log_substep(f"Staking token: {self.staking_token}")
+        log_substep(f"Stake address: {self.stake_address}")
+        log_substep(f"Farm address: {self.farm_address}")
+        log_substep(f"LP address: {self.lp_address}")
 
     def enter_metastake(self, network_provider: NetworkProviders, user: Account,
                         event: EnterMetastakeEvent, initial: bool = False) -> str:

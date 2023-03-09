@@ -15,7 +15,7 @@ from events.event_generators import (generate_add_initial_liquidity_event,
                                                        generateClaimMetastakeRewardsEvent,
                                                        generateExitMetastakeEvent,
                                                        generateExitFarmEvent)
-from utils.utils_generic import print_test_step_pass
+from utils.utils_generic import log_step_pass
 from arrows.stress.send_token_from_minter import main as send_token_from_minter
 from arrows.stress.shared import get_shard_of_address
 from erdpy.accounts import Account
@@ -85,7 +85,7 @@ def stress(context: Context, threads: int, repeats: int):
             try:
                 for _ in concurrent.futures.as_completed(futures):
                     finished_jobs += 1
-                    print_test_step_pass(f"Finished {finished_jobs} repeats.")
+                    log_step_pass(f"Finished {finished_jobs} repeats.")
 
                     if repeats == 0 or repeats > finished_jobs:
                         # spawn a new job

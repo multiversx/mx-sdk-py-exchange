@@ -27,8 +27,8 @@ from contracts.dex_proxy_contract import DexProxyContract
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import hex_to_string
 from utils.utils_chain import Account, WrapperAddress as Address
-from utils.utils_generic import write_json_file, read_json_file, print_test_step_fail, print_test_step_pass, \
-    print_warning
+from utils.utils_generic import write_json_file, read_json_file, log_step_fail, log_step_pass, \
+    log_warning
 from deploy import populate_deploy_lists
 
 
@@ -53,7 +53,7 @@ class ContractStructure:
             Path(config.DEFAULT_CONFIG_SAVE_PATH).mkdir(parents=True, exist_ok=True)
 
             write_json_file(filepath, dump)
-            print_test_step_pass(f"Saved deployed {self.label} contracts.")
+            log_step_pass(f"Saved deployed {self.label} contracts.")
 
     def get_saved_deployed_contracts(self) -> list:
         contracts_list = []
@@ -87,14 +87,14 @@ class ContractStructure:
         contracts_list = self.get_saved_deployed_contracts()
         if len(self.deploy_structure_list) == len(contracts_list):
             self.deployed_contracts = contracts_list
-            print_test_step_pass(f"Loaded {len(contracts_list)} {self.label}.")
+            log_step_pass(f"Loaded {len(contracts_list)} {self.label}.")
             return
 
-        print_test_step_fail(f"No contracts fetched for: {self.label}; "
+        log_step_fail(f"No contracts fetched for: {self.label}; "
                              f"Either no save available or mismatch between deploy structure and loaded contracts.")
 
     def print_deployed_contracts(self):
-        print_test_step_pass(f"{self.label}:")
+        log_step_pass(f"{self.label}:")
         for contract in self.deployed_contracts:
             contract.print_contract_info()
 
@@ -191,7 +191,7 @@ class DeployStructure:
                     token_hashes.extend(hashes)
 
                 for txhash in token_hashes:
-                    network_provider.api.wait_for_tx_finalized(txhash)
+                    network_provider.wait_for_tx_executed(txhash)
 
                 time.sleep(40)
 
@@ -214,22 +214,22 @@ class DeployStructure:
         if self.tokens:
             filepath = config.DEFAULT_CONFIG_SAVE_PATH / "deployed_tokens.json"
             write_json_file(filepath, self.tokens)
-            print_test_step_pass("Saved deployed tokens.")
+            log_step_pass("Saved deployed tokens.")
         else:
-            print_test_step_fail("No tokens to save!")
+            log_step_fail("No tokens to save!")
 
     def get_saved_deployed_tokens(self) -> list:
         filepath = config.DEFAULT_CONFIG_SAVE_PATH / "deployed_tokens.json"
         retrieved_tokens = read_json_file(filepath)
 
         if retrieved_tokens and len(retrieved_tokens) == self.number_of_tokens:
-            print_test_step_pass(f"Loaded {len(retrieved_tokens)} tokens.")
+            log_step_pass(f"Loaded {len(retrieved_tokens)} tokens.")
             return retrieved_tokens
         elif retrieved_tokens and len(retrieved_tokens) >= self.number_of_tokens:
-            print_test_step_fail(f"Loaded {len(retrieved_tokens)} tokens instead of expected {self.number_of_tokens}.")
+            log_step_fail(f"Loaded {len(retrieved_tokens)} tokens instead of expected {self.number_of_tokens}.")
             return retrieved_tokens
         else:
-            print_test_step_fail("No tokens loaded!")
+            log_step_fail("No tokens loaded!")
             return []
 
     def load_deployed_tokens(self) -> bool:
@@ -245,7 +245,7 @@ class DeployStructure:
             contracts.save_deployed_contracts()
 
     def print_deployed_contracts(self):
-        print_test_step_pass(f"Deployed contracts below:")
+        log_step_pass(f"Deployed contracts below:")
         for contracts in self.contracts.values():
             contracts.print_deployed_contracts()
             print("")
@@ -258,14 +258,14 @@ class DeployStructure:
             if not clean_deploy_override and not contracts.deploy_clean:
                 contracts.load_deployed_contracts()
             else:
-                print_test_step_pass(f"Starting setup process for {contract_label}:")
+                log_step_pass(f"Starting setup process for {contract_label}:")
                 contracts.deploy_function(contract_label, deployer_account, network_provider)
                 if len(contracts.deployed_contracts) > 0:
                     contracts.print_deployed_contracts()
                     self.contracts[contract_label] = contracts
                     contracts.save_deployed_contracts()
                 else:
-                    print_warning(f"No contracts deployed for {contract_label}!")
+                    log_warning(f"No contracts deployed for {contract_label}!")
 
     # should be run for fresh deployed contracts
     def start_deployed_contracts(self, deployer_account: Account, network_provider: NetworkProviders,
@@ -321,7 +321,7 @@ class DeployStructure:
 
         # Set proxy in pairs
         if len(pair_contracts.deploy_structure_list) != len(pair_contracts.deployed_contracts):
-            print_test_step_fail(f"Uneven length of pair deployed contracts! Skipping.")
+            log_step_fail(f"Uneven length of pair deployed contracts! Skipping.")
             return
         for index, config_pair in enumerate(pair_contracts.deploy_structure_list):
             if search_label in config_pair:
@@ -332,7 +332,7 @@ class DeployStructure:
                     config_pair[search_label])
 
                 if not proxy_contract:
-                    print_test_step_fail(f"Configured proxy not found for pair: {pair_contract.address}")
+                    log_step_fail(f"Configured proxy not found for pair: {pair_contract.address}")
 
                 tx_hash = proxy_contract.add_pair_to_intermediate(deployer_account, network_providers.proxy,
                                                                   pair_contract.address)
@@ -367,7 +367,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "locked asset"): return
             deployed_locked_asset_contract.address = contract_address
-            print_test_step_pass(f"Locked asset contract address: {contract_address}")
+            log_step_pass(f"Locked asset contract address: {contract_address}")
 
             # register locked token and save it
             tx_hash = deployed_locked_asset_contract.register_locked_asset_token(deployer_account,
@@ -402,7 +402,7 @@ class DeployStructure:
             elif contracts_index == config.PROXIES_V2:
                 version = ProxyContractVersion.V2
             else:
-                print_test_step_fail(f"Aborting deploy: Unsupported proxy label.")
+                log_step_fail(f"Aborting deploy: Unsupported proxy label.")
                 return
 
             # deploy proxy contract
@@ -414,7 +414,7 @@ class DeployStructure:
 
             if version == ProxyContractVersion.V1 or ProxyContractVersion.V2:
                 if 'locked_asset' not in config_proxy and version == ProxyContractVersion.V1:
-                    print_test_step_fail(f"Aborting deploy: locked asset not configured.")
+                    log_step_fail(f"Aborting deploy: locked asset not configured.")
                     return
 
                 locked_asset_contract = self.contracts[config.LOCKED_ASSETS].\
@@ -424,18 +424,18 @@ class DeployStructure:
                     locked_assets.append(locked_asset_contract.locked_asset)
                     factory_addresses.append(locked_asset_contract.address)
                 elif version == ProxyContractVersion.V1:
-                    print_test_step_fail(f"Aborting deploy: locked asset contract not available.")
+                    log_step_fail(f"Aborting deploy: locked asset contract not available.")
                     return
 
             if version == ProxyContractVersion.V2:
                 if 'energy_factory' not in config_proxy:
-                    print_test_step_fail(f"Aborting deploy: energy factory not configured.")
+                    log_step_fail(f"Aborting deploy: energy factory not configured.")
                     return
 
                 energy_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].\
                     get_deployed_contract_by_index(config_proxy["energy_factory"])
                 if asset and asset != energy_contract.base_token:
-                    print_test_step_fail(f"Aborting deploy: Mismatch configuration in base tokens.")
+                    log_step_fail(f"Aborting deploy: Mismatch configuration in base tokens.")
                     return
                 elif not asset:
                     asset = energy_contract.base_token
@@ -456,7 +456,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "proxy"): return
             deployed_proxy_contract.address = contract_address
-            print_test_step_pass(f"Proxy contract address: {contract_address}")
+            log_step_pass(f"Proxy contract address: {contract_address}")
 
             # register proxy lp token and save it
             tx_hash = deployed_proxy_contract.register_proxy_lp_token(deployer_account,
@@ -522,7 +522,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "simple lock"): return
             deployed_simple_lock_contract.address = contract_address
-            print_test_step_pass(f"Simple lock contract address: {contract_address}")
+            log_step_pass(f"Simple lock contract address: {contract_address}")
 
             # issue locked token and save it
             tx_hash = deployed_simple_lock_contract.issue_locked_token(deployer_account,
@@ -554,7 +554,7 @@ class DeployStructure:
                     contract_config['energy_factory']
                 )
             else:
-                print_test_step_fail(f"Aborting deploy: Energy factory not configured! Contract will be dumped.")
+                log_step_fail(f"Aborting deploy: Energy factory not configured! Contract will be dumped.")
                 return
 
             # deploy contract
@@ -565,7 +565,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "fees collector"): return
             deployed_contract.address = contract_address
-            print_test_step_pass(f"Fees collector contract address: {contract_address}")
+            log_step_pass(f"Fees collector contract address: {contract_address}")
 
             # set energy factory in fees collector
             tx_hash = deployed_contract.set_energy_factory_address(deployer_account, network_providers.proxy,
@@ -610,10 +610,10 @@ class DeployStructure:
                 locked_asset_factory = self.contracts[config.LOCKED_ASSETS].get_deployed_contract_by_index(
                     contract_config['locked_asset_factory'])
                 if locked_asset_factory is None:
-                    print_test_step_fail(f"Aborting deploy: Locked asset factory contract not available! Contract will be dumped.")
+                    log_step_fail(f"Aborting deploy: Locked asset factory contract not available! Contract will be dumped.")
                     return
             else:
-                print_test_step_fail(f"Aborting deploy: Locked asset factory not configured! Contract will be dumped.")
+                log_step_fail(f"Aborting deploy: Locked asset factory not configured! Contract will be dumped.")
                 return
 
             # deploy contract
@@ -626,7 +626,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "simple lock energy"): return
             deployed_contract.address = contract_address
-            print_test_step_pass(f"Simple lock energy contract address: {contract_address}")
+            log_step_pass(f"Simple lock energy contract address: {contract_address}")
 
             # issue locked token and save it
             tx_hash = deployed_contract.issue_locked_token(deployer_account,
@@ -666,11 +666,11 @@ class DeployStructure:
                 fees_collector = self.contracts[config.FEES_COLLECTORS].get_deployed_contract_by_index(
                     contract_config["fees_collector"])
                 if fees_collector is None:
-                    print_test_step_fail(f"Aborting deploy: Fees collector contract not available! "
+                    log_step_fail(f"Aborting deploy: Fees collector contract not available! "
                                          f"Contract will be dumped.")
                     return
             else:
-                print_test_step_fail(
+                log_step_fail(
                     f"Aborting deploy: Fees collector not configured! Contract will be dumped.")
                 return
 
@@ -679,11 +679,11 @@ class DeployStructure:
                 energy_factory = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
                     contract_config['energy_factory'])
                 if energy_factory is None:
-                    print_test_step_fail(f"Aborting deploy: Energy factory contract not available! "
+                    log_step_fail(f"Aborting deploy: Energy factory contract not available! "
                                          f"Contract will be dumped.")
                     return
             else:
-                print_test_step_fail(f"Aborting deploy: Energy factory not configured! Contract will be dumped.")
+                log_step_fail(f"Aborting deploy: Energy factory not configured! Contract will be dumped.")
                 return
 
             # deploy contract
@@ -695,7 +695,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "token unstake"): return
             deployed_contract.address = contract_address
-            print_test_step_pass(f"Token unstake contract address: {contract_address}")
+            log_step_pass(f"Token unstake contract address: {contract_address}")
 
             # Set special role on unlocked asset for burning base token
             tx_hash = self.esdt_contract.set_special_role_token(deployer_account,
@@ -763,7 +763,7 @@ class DeployStructure:
 
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "router"): return
             router_contract.address = contract_address
-            print_test_step_pass(f"Router contract address: {contract_address}")
+            log_step_pass(f"Router contract address: {contract_address}")
 
             deployed_contracts.append(router_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -787,7 +787,7 @@ class DeployStructure:
 
             router_contract = self.contracts[used_router_label].get_deployed_contract_by_index(0)
             if router_contract is None:
-                print_test_step_fail(f"Aborting deploy: Router contract not available! Contract will be dumped.")
+                log_step_fail(f"Aborting deploy: Router contract not available! Contract will be dumped.")
                 return
 
             # deploy contract
@@ -805,7 +805,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "pair via router"): return
             deployed_pair_contract.address = contract_address
-            print_test_step_pass(f"Pair contract address: {contract_address}")
+            log_step_pass(f"Pair contract address: {contract_address}")
 
             # issue LP token and save it
             tx_hash = deployed_pair_contract.issue_lp_token_via_router(deployer_account, network_providers.proxy,
@@ -831,7 +831,7 @@ class DeployStructure:
                     proxy_contract = self.contracts[config.PROXIES_V2].\
                         get_deployed_contract_by_index(config_pool["proxy_v2"])
                 if proxy_contract is None:
-                    print_test_step_fail(f"Aborting setup: Proxy contract not available! Contract will be dumped.")
+                    log_step_fail(f"Aborting setup: Proxy contract not available! Contract will be dumped.")
                     return
                 tx_hash = proxy_contract.add_pair_to_intermediate(deployer_account, network_providers.proxy,
                                                                   contract_address)
@@ -856,7 +856,7 @@ class DeployStructure:
                 deployed_simple_lock: Optional[SimpleLockContract] = None
                 deployed_simple_lock = self.contracts[config.SIMPLE_LOCKS].get_deployed_contract_by_index(config_pool['simple_lock'])
                 if deployed_simple_lock is None:
-                    print_test_step_fail(f"Aborting setup: Simple lock contract not available! Contract will be dumped.")
+                    log_step_fail(f"Aborting setup: Simple lock contract not available! Contract will be dumped.")
                     return
                 # add simple lock address in pair
                 tx_hash = deployed_pair_contract.set_locking_sc_address(deployer_account, network_providers.proxy,
@@ -874,10 +874,10 @@ class DeployStructure:
                 fees_collector: Optional[FeesCollectorContract] = None
                 fees_collector = self.contracts[config.FEES_COLLECTORS].get_deployed_contract_by_index(config_pool['fees_collector'])
                 if fees_collector is None:
-                    print_test_step_fail(f"Aborting setup: Fees collector contract not available! Contract will be dumped.")
+                    log_step_fail(f"Aborting setup: Fees collector contract not available! Contract will be dumped.")
                     return
                 if 'fees_collector_cut' not in config_pool:
-                    print_test_step_fail(f"Aborting setup: fees_collector_cut not available in config! Contract will be dumped.")
+                    log_step_fail(f"Aborting setup: fees_collector_cut not available in config! Contract will be dumped.")
                     return
                 fees_cut = config_pool['fees_collector_cut']
 
@@ -910,7 +910,7 @@ class DeployStructure:
 
             if version == FarmContractVersion.V14Locked:
                 if not self.contracts[config.LOCKED_ASSETS].deployed_contracts:
-                    print_test_step_fail("Aborting deploy for farm locked. Locked asset contract not existing.")
+                    log_step_fail("Aborting deploy for farm locked. Locked asset contract not existing.")
                     return
                 locked_asset_contract = self.contracts[config.LOCKED_ASSETS].deployed_contracts[0]
                 locked_asset_address = locked_asset_contract.address
@@ -925,7 +925,7 @@ class DeployStructure:
                 farming_token = lp_contract.lpToken
                 lp_address = lp_contract.address
             else:
-                print_test_step_fail(f'Aborting deploy: farming token/pool not configured!')
+                log_step_fail(f'Aborting deploy: farming token/pool not configured!')
                 return
 
             # deploy contract
@@ -941,7 +941,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "farm"): return
             deployed_farm_contract.address = contract_address
-            print_test_step_pass(f"Farm contract address: {contract_address}")
+            log_step_pass(f"Farm contract address: {contract_address}")
 
             # register farm token and save it
             tx_hash = deployed_farm_contract.register_farm_token(deployer_account, network_providers.proxy, farm_token)
@@ -998,20 +998,20 @@ class DeployStructure:
         for contract_config in contract_structure.deploy_structure_list:
             # deploy template contract
             if "template" not in contract_config:
-                print_test_step_fail(f"Aborting deploy: template not configured")
+                log_step_fail(f"Aborting deploy: template not configured")
                 return
 
             template_name = contract_config['template']
             if template_name in self.contracts:
                 contract_bytecode = self.contracts[contract_config['template']].bytecode
             else:
-                print_test_step_fail("Aborting deploy: Template for proxy deployer not valid.")
+                log_step_fail("Aborting deploy: Template for proxy deployer not valid.")
                 return
 
             if template_name == config.FARMS_V2:
                 version = FarmContractVersion.V2Boosted
             else:
-                print_test_step_fail(f"Aborting deploy: invalid template configured")
+                log_step_fail(f"Aborting deploy: invalid template configured")
                 return
 
             template_contract = FarmContract(
@@ -1035,7 +1035,7 @@ class DeployStructure:
 
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "proxy deployer"): return
             contract.address = contract_address
-            print_test_step_pass(f"Proxy deployer contract address: {contract_address}")
+            log_step_pass(f"Proxy deployer contract address: {contract_address}")
 
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -1049,7 +1049,7 @@ class DeployStructure:
             # deploy farm contract from proxy deployer
             # get deployer proxy contract
             if "deployer" not in contract_config:
-                print_test_step_fail(f"Aborting deploy: deployer not configured")
+                log_step_fail(f"Aborting deploy: deployer not configured")
                 return
 
             deployer_contract: Optional[ProxyDeployerContract] = \
@@ -1057,7 +1057,7 @@ class DeployStructure:
                 contract_config['deployer'])
 
             if deployer_contract is None:
-                print_test_step_fail(f"Aborting deploy: deployer contract not available")
+                log_step_fail(f"Aborting deploy: deployer contract not available")
 
             # determine version
             version = None
@@ -1066,7 +1066,7 @@ class DeployStructure:
 
             # get lock factory
             if 'lock_factory' not in contract_config:
-                print_test_step_fail("Aborting deploy: Locked factory contract not existing!")
+                log_step_fail("Aborting deploy: Locked factory contract not existing!")
                 return
             locking_contract: Optional[SimpleLockEnergyContract] = None
             locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
@@ -1085,12 +1085,12 @@ class DeployStructure:
                 lp_contract = self.contracts[config.PAIRS_V2].get_deployed_contract_by_index(
                     contract_config['farming_pool'])
                 if lp_contract is None:
-                    print_test_step_fail(f'Aborting deploy: farming pool v2 not existing!')
+                    log_step_fail(f'Aborting deploy: farming pool v2 not existing!')
                     return
                 farming_token = lp_contract.lpToken
                 lp_address = lp_contract.address
             else:
-                print_test_step_fail(f'Aborting deploy: farming token/pool not configured!')
+                log_step_fail(f'Aborting deploy: farming token/pool not configured!')
                 return
 
             # deploy contract
@@ -1105,7 +1105,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "boosted farm"): return
             deployed_contract.address = contract_address
-            print_test_step_pass(f"Farm contract address: {contract_address}")
+            log_step_pass(f"Farm contract address: {contract_address}")
 
             # register farm token and save it
             tx_hash = deployed_contract.register_farm_token(deployer_account, network_providers.proxy,
@@ -1131,7 +1131,7 @@ class DeployStructure:
                                                                 locking_contract.address])
                 if not network_providers.check_simple_tx_status(tx_hash, "set energy address in farm"): return
             else:
-                print_test_step_fail(f"Failed to set up energy contract in farm. Energy contract not available!")
+                log_step_fail(f"Failed to set up energy contract in farm. Energy contract not available!")
                 return
 
             # Set locking contract
@@ -1145,13 +1145,13 @@ class DeployStructure:
                                                                 locking_contract.address])
                 if not network_providers.check_simple_tx_status(tx_hash, "set locking address in farm"): return
             else:
-                print_test_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
+                log_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
                 return
 
             # Set lock epochs
             if 'lock_epochs' not in contract_config:
                 lock_epochs = 1440
-                print_test_step_fail(f"Rewards per block not configured! Setting default: {lock_epochs}")
+                log_step_fail(f"Rewards per block not configured! Setting default: {lock_epochs}")
             else:
                 lock_epochs = contract_config['lock_epochs']
             # tx_hash = deployed_contract.set_lock_epochs(deployer_account, network_providers.proxy,
@@ -1166,7 +1166,7 @@ class DeployStructure:
             # Set boosted yields rewards percentage
             if 'boosted_rewards' not in contract_config:
                 boosted_rewards = 6000
-                print_test_step_fail(f"Boosted yields rewards percentage configured! Setting default: {boosted_rewards}")
+                log_step_fail(f"Boosted yields rewards percentage configured! Setting default: {boosted_rewards}")
             else:
                 boosted_rewards = contract_config['boosted_rewards']
             tx_hash = deployed_contract.set_boosted_yields_rewards_percentage(deployer_account, network_providers.proxy,
@@ -1180,7 +1180,7 @@ class DeployStructure:
                     "farm_const" not in contract_config or \
                     "min_energy" not in contract_config or \
                     "min_farm" not in contract_config:
-                print_test_step_fail(f"Aborting deploy: Boosted yields factors not configured!")
+                log_step_fail(f"Aborting deploy: Boosted yields factors not configured!")
             tx_hash = deployed_contract.set_boosted_yields_factors(deployer_account, network_providers.proxy,
                                                                    [contract_config['base_const'],
                                                                     contract_config['energy_const'],
@@ -1193,7 +1193,7 @@ class DeployStructure:
             # set rewards per block
             if 'rpb' not in contract_config:
                 rpb = 10000
-                print_test_step_fail(f"Rewards per block not configured! Setting default: {rpb}")
+                log_step_fail(f"Rewards per block not configured! Setting default: {rpb}")
             else:
                 rpb = contract_config['rpb']
             tx_hash = deployed_contract.set_rewards_per_block(deployer_account, network_providers.proxy,
@@ -1202,7 +1202,7 @@ class DeployStructure:
 
             # set penalty percent
             if 'penalty' not in contract_config:
-                print_test_step_fail(f"Penalty percent not configured! Setting default: 0")
+                log_step_fail(f"Penalty percent not configured! Setting default: 0")
                 penalty = 0
             else:
                 penalty = contract_config['penalty']
@@ -1225,7 +1225,7 @@ class DeployStructure:
         for contract_config in contract_structure.deploy_structure_list:
             # get lock factory
             if 'lock_factory' not in contract_config:
-                print_test_step_fail("Aborting deploy: Locked factory contract not existing!")
+                log_step_fail("Aborting deploy: Locked factory contract not existing!")
                 return
             locking_contract: Optional[SimpleLockEnergyContract] = None
             locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
@@ -1244,12 +1244,12 @@ class DeployStructure:
                 lp_contract = self.contracts[config.PAIRS_V2].get_deployed_contract_by_index(
                     contract_config['farming_pool'])
                 if lp_contract is None:
-                    print_test_step_fail(f'Aborting deploy: farming pool v2 not existing!')
+                    log_step_fail(f'Aborting deploy: farming pool v2 not existing!')
                     return
                 farming_token = lp_contract.lpToken
                 lp_address = lp_contract.address
             else:
-                print_test_step_fail(f'Aborting deploy: farming token/pool not configured!')
+                log_step_fail(f'Aborting deploy: farming token/pool not configured!')
                 return
 
             version = FarmContractVersion.V2Boosted
@@ -1268,7 +1268,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "boosted farm"): return
             deployed_contract.address = contract_address
-            print_test_step_pass(f"Farm contract address: {contract_address}")
+            log_step_pass(f"Farm contract address: {contract_address}")
 
             # register farm token and save it
             tx_hash = deployed_contract.register_farm_token(deployer_account, network_providers.proxy,
@@ -1289,7 +1289,7 @@ class DeployStructure:
                                                                        locking_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash, "set energy address in farm"): return
             else:
-                print_test_step_fail(f"Failed to set up energy contract in farm. Energy contract not available!")
+                log_step_fail(f"Failed to set up energy contract in farm. Energy contract not available!")
                 return
 
             # Set locking contract
@@ -1298,13 +1298,13 @@ class DeployStructure:
                                                                 locking_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash, "set locking address in farm"): return
             else:
-                print_test_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
+                log_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
                 return
 
             # Set lock epochs
             if 'lock_epochs' not in contract_config:
                 lock_epochs = 1440
-                print_test_step_fail(f"Rewards per block not configured! Setting default: {lock_epochs}")
+                log_step_fail(f"Rewards per block not configured! Setting default: {lock_epochs}")
             else:
                 lock_epochs = contract_config['lock_epochs']
 
@@ -1315,7 +1315,7 @@ class DeployStructure:
             # Set boosted yields rewards percentage
             if 'boosted_rewards' not in contract_config:
                 boosted_rewards = 6000
-                print_test_step_fail(f"Boosted yields rewards percentage configured! Setting default: {boosted_rewards}")
+                log_step_fail(f"Boosted yields rewards percentage configured! Setting default: {boosted_rewards}")
             else:
                 boosted_rewards = contract_config['boosted_rewards']
             tx_hash = deployed_contract.set_boosted_yields_rewards_percentage(deployer_account, network_providers.proxy,
@@ -1329,7 +1329,7 @@ class DeployStructure:
                     "farm_const" not in contract_config or \
                     "min_energy" not in contract_config or \
                     "min_farm" not in contract_config:
-                print_test_step_fail(f"Aborting deploy: Boosted yields factors not configured!")
+                log_step_fail(f"Aborting deploy: Boosted yields factors not configured!")
             tx_hash = deployed_contract.set_boosted_yields_factors(deployer_account, network_providers.proxy,
                                                                    [contract_config['base_const'],
                                                                     contract_config['energy_const'],
@@ -1342,7 +1342,7 @@ class DeployStructure:
             # set rewards per block
             if 'rpb' not in contract_config:
                 rpb = 10000
-                print_test_step_fail(f"Rewards per block not configured! Setting default: {rpb}")
+                log_step_fail(f"Rewards per block not configured! Setting default: {rpb}")
             else:
                 rpb = contract_config['rpb']
             tx_hash = deployed_contract.set_rewards_per_block(deployer_account, network_providers.proxy,
@@ -1351,7 +1351,7 @@ class DeployStructure:
 
             # set penalty percent
             if 'penalty' not in contract_config:
-                print_test_step_fail(f"Penalty percent not configured! Setting default: 0")
+                log_step_fail(f"Penalty percent not configured! Setting default: 0")
                 penalty = 0
             else:
                 penalty = contract_config['penalty']
@@ -1361,7 +1361,7 @@ class DeployStructure:
 
             # set minimum farming epochs
             if 'min_farming_epochs' not in contract_config:
-                print_test_step_fail(f"Penalty percent not configured! Setting default: 7")
+                log_step_fail(f"Penalty percent not configured! Setting default: 7")
                 min_epochs = 7
             else:
                 min_epochs = contract_config['min_farming_epochs']
@@ -1424,7 +1424,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "farm"): return
             deployed_farm_contract.address = contract_address
-            print_test_step_pass(f"Farm contract address: {contract_address}")
+            log_step_pass(f"Farm contract address: {contract_address}")
 
             # register farm token and save it
             tx_hash = deployed_farm_contract.register_farm_token(deployer_account, network_providers.proxy, farm_token)
@@ -1471,7 +1471,7 @@ class DeployStructure:
         for config_pd in contract_structure.deploy_structure_list:
             config_pd_pool = self.contracts[config.PAIRS].deploy_structure_list[config_pd["pool"]]
             if not self.contracts[config.SIMPLE_LOCKS].deployed_contracts:
-                print_test_step_fail("Skipped deploy for price discovery. Simple lock contract not existing.")
+                log_step_fail("Skipped deploy for price discovery. Simple lock contract not existing.")
                 return
             deployed_simple_lock: SimpleLockContract
             deployed_simple_lock = self.contracts[config.SIMPLE_LOCKS].deployed_contracts[0]
@@ -1513,7 +1513,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "price discovery"): return
             deployed_pd_contract.address = contract_address
-            print_test_step_pass(f"Price discovery contract address: {contract_address}")
+            log_step_pass(f"Price discovery contract address: {contract_address}")
 
             # issue redeem token
             tx_hash = deployed_pd_contract.issue_redeem_token(deployer_account, network_providers.proxy, redeem_token)
@@ -1521,7 +1521,7 @@ class DeployStructure:
             redeem_token_hex = PriceDiscoveryContractDataFetcher(Address(deployed_pd_contract.address),
                                                                  network_providers.proxy.url).get_data("getRedeemTokenId")
             if hex_to_string(redeem_token_hex) == "EGLD":
-                print_test_step_fail(f"FAIL: contract failed to set the issued token!")
+                log_step_fail(f"FAIL: contract failed to set the issued token!")
                 return
             deployed_pd_contract.redeem_token = hex_to_string(redeem_token_hex)
 
@@ -1565,7 +1565,7 @@ class DeployStructure:
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "stake contract"): return
             deployed_staking_contract.address = contract_address
-            print_test_step_pass(f"Stake contract address: {contract_address}")
+            log_step_pass(f"Stake contract address: {contract_address}")
 
             # register farm token and save it
             tx_hash = deployed_staking_contract.register_farm_token(deployer_account, network_providers.proxy,
@@ -1600,7 +1600,7 @@ class DeployStructure:
             elif 'pool_v2' in config_metastaking:
                 lp = self.contracts[config.PAIRS_V2].get_deployed_contract_by_index(config_metastaking['pool_v2'])
             else:
-                print_test_step_fail(f"Aborting deploy: no farm pool for metastaking deploy")
+                log_step_fail(f"Aborting deploy: no farm pool for metastaking deploy")
                 return
             farm: Optional[FarmContract] = None
             if 'farm_unlocked' in config_metastaking:
@@ -1613,7 +1613,7 @@ class DeployStructure:
                 farm = self.contracts[config.FARMS_V2].get_deployed_contract_by_index(
                     config_metastaking['farm_boosted'])
             else:
-                print_test_step_fail(f"Aborting deploy: no farm configured for metastaking deploy")
+                log_step_fail(f"Aborting deploy: no farm configured for metastaking deploy")
                 return
 
             staking: Optional[StakingContract] = None
@@ -1640,7 +1640,7 @@ class DeployStructure:
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "metastake"):
                 return
             deployed_metastaking_contract.address = contract_address
-            print_test_step_pass(f"Metastake contract address: {contract_address}")
+            log_step_pass(f"Metastake contract address: {contract_address}")
 
             # register metastake token and save it
             tx_hash = deployed_metastaking_contract.register_dual_yield_token(deployer_account, network_providers.proxy,

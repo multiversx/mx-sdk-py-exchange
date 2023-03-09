@@ -19,7 +19,7 @@ from events.event_generators import (generate_add_initial_liquidity_event,
 from utils.utils_tx import ESDTToken
 from utils.utils_chain import nominated_amount, \
     get_token_details_for_address
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_condition_assert, TestStepConditions
+from utils.utils_generic import log_step_fail, log_step_pass, log_condition_assert, TestStepConditions
 from arrows.stress.send_token_from_minter import main as send_token_from_minter
 from arrows.stress.shared import get_shard_of_address
 from erdpy.accounts import Account
@@ -86,7 +86,7 @@ def scenarios(context: Context, threads: int, repeats: int):
                 try:
                     for _ in concurrent.futures.as_completed(futures):
                         finished_jobs += 1
-                        print_test_step_pass(f"Finished {finished_jobs} repeats.")
+                        log_step_pass(f"Finished {finished_jobs} repeats.")
 
                         if repeats == 0 or repeats > finished_jobs:
                             # spawn a new job
@@ -94,7 +94,7 @@ def scenarios(context: Context, threads: int, repeats: int):
                 except Exception as ex:
                     pass
     else:
-        print_test_step_fail(f"Number of threads must be minimum 1!")
+        log_step_fail(f"Number of threads must be minimum 1!")
         return
 
 

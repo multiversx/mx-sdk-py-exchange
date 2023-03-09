@@ -3,7 +3,7 @@ import traceback
 
 from contracts.contract_identities import DEXContractInterface
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
-from utils.utils_generic import print_test_step_fail, print_test_step_pass, print_test_substep, log_unexpected_args
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
@@ -41,12 +41,12 @@ class LockedAssetContract(DEXContractInterface):
 
         arguments = [
             self.unlocked_asset,
-            93457,
-            101137,
-            108817,
-            116497,
-            124176,
-            131856,
+            bytes.fromhex("000000000000016D11"),
+            bytes.fromhex("000000000000018B11"),
+            bytes.fromhex("00000000000001A911"),
+            bytes.fromhex("00000000000001C711"),
+            bytes.fromhex("00000000000001E510"),
+            bytes.fromhex("000000000000020310"),
             ]
 
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
@@ -159,6 +159,6 @@ class LockedAssetContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        print_test_step_pass(f"Deployed locked asset contract: {self.address}")
-        print_test_substep(f"Unlocked token: {self.unlocked_asset}")
-        print_test_substep(f"Locked token: {self.locked_asset}")
+        log_step_pass(f"Deployed locked asset contract: {self.address}")
+        log_substep(f"Unlocked token: {self.unlocked_asset}")
+        log_substep(f"Locked token: {self.locked_asset}")
