@@ -7,6 +7,7 @@ from contracts.farm_contract import FarmContract
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.metastaking_contract import MetaStakingContract
 from contracts.pair_contract import PairContract
+from contracts.locked_asset_contract import LockedAssetContract
 import config
 from contracts.router_contract import RouterContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
@@ -14,7 +15,7 @@ from contracts.staking_contract import StakingContract
 from contracts.unstaker_contract import UnstakerContract
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher, \
     FarmContractDataFetcher, SimpleLockEnergyContractDataFetcher, StakingContractDataFetcher, \
-    MetaStakingContractDataFetcher, ProxyContractDataFetcher
+    MetaStakingContractDataFetcher, ProxyContractDataFetcher, LockedAssetContractDataFetcher
 from utils.utils_chain import hex_to_string, WrapperAddress as Address
 
 
@@ -59,6 +60,15 @@ def retrieve_simple_lock_energy_by_address(address: str) -> Optional[SimpleLockE
     locked_token = hex_to_string(data_fetcher.get_data("getLockedTokenId"))
 
     contract = SimpleLockEnergyContract(base_token=base_token, locked_token=locked_token, address=address)
+    return contract
+
+
+def retrieve_locked_asset_factory_by_address(address: str) -> Optional[LockedAssetContract]:
+    data_fetcher = LockedAssetContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+    base_token = hex_to_string(data_fetcher.get_data("getAssetTokenId"))
+    locked_token = hex_to_string(data_fetcher.get_data("getLockedAssetTokenId"))
+
+    contract = LockedAssetContract(locked_asset=locked_token, unlocked_asset=base_token, address=address)
     return contract
 
 

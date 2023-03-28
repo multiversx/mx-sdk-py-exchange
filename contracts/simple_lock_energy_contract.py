@@ -88,7 +88,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         arguments = [
             self.base_token,   # base token id
             args[0],           # legacy token id
-            args[1],   # locked asset factory address
+            Address(args[1]),   # locked asset factory address
             args[2]   # min migrated token locking epochs
         ]
 

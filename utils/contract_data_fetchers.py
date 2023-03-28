@@ -98,7 +98,7 @@ class SimpleLockContractDataFetcher(DataFetcher):
             "getPenaltyPercentage": self._get_int_list_view,
             "getFeesBurnPercentage": self._get_int_view,
             "getEnergyAmountForUser": self._get_int_view,
-            "getEnergyEntryForUser": self._get_int_view,
+            "getEnergyEntryForUser": self._get_hex_view,
             "getFeesCollectorAddress": self._get_hex_view,
         }
 
@@ -112,7 +112,7 @@ class SimpleLockEnergyContractDataFetcher(DataFetcher):
             "getFarmProxyTokenId": self._get_hex_view,
             "getBaseAssetTokenId": self._get_hex_view,
             "getEnergyAmountForUser": self._get_int_view,
-            "getEnergyEntryForUser": self._get_int_view,
+            "getEnergyEntryForUser": self._get_hex_view,
             "getFeesBurnPercentage": self._get_int_view,
             "getPenaltyPercentage": self._get_hex_view,
             "getLockOptions": self._get_int_list_view,

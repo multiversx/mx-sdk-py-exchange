@@ -189,7 +189,7 @@ def _prep_args_for_addresses(args: List):
     new_args = []
     for item in args:
         if type(item) is str and "erd" in item:
-            item = Address.from_bech32(item, "erd")
+            item = Address.from_bech32(item)
         new_args.append(item)
     return new_args
 
@@ -199,6 +199,7 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
                       args: list = None) -> Transaction:
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
+    logger.debug(f"Deploy arguments: {args}")
     builder = ContractDeploymentBuilder(
         config=config,
         owner=deployer.address,
@@ -212,8 +213,6 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
     tx = builder.build()
     tx.signature = deployer.sign_transaction(tx)
 
-    logger.debug(f"Deploy arguments: {args}")
-
     return tx
 
 
@@ -222,6 +221,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
                        args: list = None) -> Transaction:
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
+    logger.debug(f"Upgrade arguments: {args}")
     builder = ContractUpgradeBuilder(
         config=config,
         contract=contract_address,
@@ -236,8 +236,6 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
     tx = builder.build()
     tx.signature = deployer.sign_transaction(tx)
 
-    logger.debug(f"Upgrade arguments: {args}")
-
     return tx
 
 
@@ -247,6 +245,7 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
 
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
+    logger.debug(f"Contract call arguments: {args}")
     builder = ContractCallBuilder(
         config=config,
         contract=contract_address,
@@ -260,8 +259,6 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
     tx = builder.build()
     tx.signature = deployer.sign_transaction(tx)
 
-    logger.debug(f"Contract call arguments: {args}")
-
     return tx
 
 
@@ -272,6 +269,7 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     payment_tokens = [token.to_token_payment() for token in tokens]
     endpoint_args = _prep_args_for_addresses(endpoint_args)
+    logger.debug(f"Contract call arguments: {endpoint_args}")
     builder = ContractCallBuilder(
         config=config,
         contract=contract_address,
@@ -285,8 +283,6 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
     )
     tx = builder.build()
     tx.signature = user.sign_transaction(tx)
-
-    logger.debug(f"Contract call arguments: {endpoint_args}")
 
     return tx
 
@@ -396,12 +392,12 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
 
 
 def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
-           owner: Account, bytecode_path: Path, metadata: ICodeMetadata, args: list) -> (str, str):
+           owner: Account, bytecode_path: str, metadata: ICodeMetadata, args: list) -> (str, str):
     logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
 
-    tx = prepare_deploy_tx(owner, network_config, gas, bytecode_path, metadata, args)
+    tx = prepare_deploy_tx(owner, network_config, gas, Path(bytecode_path), metadata, args)
     tx_hash = send_deploy_tx(tx, proxy)
 
     if tx_hash:
@@ -420,12 +416,12 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
 
 
 def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
-                 owner: Account, contract: Address, bytecode_path: Path, metadata: ICodeMetadata,
+                 owner: Account, contract: Address, bytecode_path: str, metadata: ICodeMetadata,
                  args: list) -> str:
     logger.debug(f"Upgrade {contract_label} contract")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
 
-    tx = prepare_upgrade_tx(owner, contract, network_config, gas, bytecode_path, metadata, args)
+    tx = prepare_upgrade_tx(owner, contract, network_config, gas, Path(bytecode_path), metadata, args)
     tx_hash = send_contract_call_tx(tx, proxy)
     owner.nonce += 1 if tx_hash != "" else 0
 
