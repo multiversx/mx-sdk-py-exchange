@@ -24,3 +24,25 @@ python3 -m venv ./.venv
 source ./.venv/bin/activate
 pip install -r ./requirements.txt --upgrade
 ```
+
+### Operation
+Start by initializing the environment:
+```
+export PYTHONPATH=.
+```
+
+#### Config
+To configure the exchange setup and operation, config.py has to be edited accordingly.
+In the config.py file you should configure the following:
+- used network
+- PEM accounts for exchange operations
+- DEX deploy configuration
+- DEX contract binaries paths
+
+#### Deploy
+To deploy a clean exchange setup, run:
+```
+python3 deploy/dex_deploy.py --deploy-contracts=clean --deploy-tokens=clean
+```
+The flags `--deploy-contracts` and `--deploy-tokens` can be set to `clean` or `config` to either deploy a clean setup 
+or add to on top of an existing one.

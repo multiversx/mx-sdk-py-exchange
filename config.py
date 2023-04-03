@@ -1,23 +1,24 @@
 from pathlib import Path
 
 HOME = Path().home()
-
-TOKENS_CONTRACT_ADDRESS = "erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzllls8a5w6u"
-ZERO_CONTRACT_ADDRESS = "erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu"
 DEFAULT_WORKSPACE = Path(__file__).parent
-DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"
-DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"
-DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1_1.pem"
-DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"
-DEFAULT_API = "https://devnet-api.multiversx.com"
-HISTORY_PROXY = ""
 
-DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000   # TODO: try to override this with testnet define to tidy code up
-DEFAULT_GAS_BASE_LIMIT_ISSUE = 60000000
-DEFAULT_TOKEN_PREFIX = "TDEX"     # limit yourself to max 6 chars to allow automatic ticker build
-DEFAULT_TOKEN_SUPPLY_EXP = 27       # supply to be minted in exponents of 10
-DEFAULT_TOKEN_DECIMALS = 18         # decimals on minted tokens in exponents of 10
-DEFAULT_MINT_VALUE = 1  # EGLD      # TODO: don't go sub-unitary cause headaches occur. just don't be cheap for now...
+# ------------ For normal operation, modify below ------------ #
+# Used net
+DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"                     # Proxy to be used for ALL operations
+DEFAULT_API = "https://devnet-api.multiversx.com"                           # API to be used for ALL operations
+HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
+# TODO: try to override the default issue token price with testnet definition to tidy code up
+DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.05 EGLD - change only if different setup on nets
+
+# Operation wallets
+DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
+DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
+DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1_1.pem"       # DEX admin address
+
+# Used DEX deploy configuration
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
+DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
 # DEX setup
 LOCKED_ASSET_FACTORY_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "factory.wasm"
@@ -42,6 +43,20 @@ PAIR_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-r
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
 FARM_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "farm-with-locked-rewards.wasm"
 
+
+# ------------ Generic configuration below; Modify only in case of framework changes ------------ #
+TOKENS_CONTRACT_ADDRESS = "erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzllls8a5w6u"
+ZERO_CONTRACT_ADDRESS = "erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu"
+
+DEFAULT_GAS_BASE_LIMIT_ISSUE = 60000000
+DEFAULT_TOKEN_PREFIX = "TDEX"     # limit yourself to max 6 chars to allow automatic ticker build
+DEFAULT_TOKEN_SUPPLY_EXP = 27       # supply to be minted in exponents of 10
+DEFAULT_TOKEN_DECIMALS = 18         # decimals on minted tokens in exponents of 10
+DEFAULT_MINT_VALUE = 1  # EGLD      # TODO: don't go sub-unitary cause headaches occur. just don't be cheap for now...
+
+CROSS_SHARD_DELAY = 60
+INTRA_SHARD_DELAY = 10
+
 LOCKED_ASSETS = "locked_assets"
 PROXIES = "proxies"
 PROXIES_V2 = "proxies_v2"
@@ -63,12 +78,6 @@ STAKINGS_V2 = "stakings_v2"
 METASTAKINGS = "metastakings"
 METASTAKINGS_V2 = "metastakings_v2"
 FEES_COLLECTORS = "fees_collectors"
-
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-testruns"
-DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"
-
-CROSS_SHARD_DELAY = 60
-INTRA_SHARD_DELAY = 10
 
 
 def get_default_contracts_file():
