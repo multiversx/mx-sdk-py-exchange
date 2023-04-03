@@ -211,7 +211,7 @@ class DexProxyContract(DEXContractInterface):
         locked_tokens_args = list(sum(zip(self.locked_tokens, args[0]), ()))
         arguments.extend(locked_tokens_args)
 
-        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, args)
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
 
         return tx_hash, address
 
@@ -264,7 +264,7 @@ class DexProxyContract(DEXContractInterface):
         sc_args = [
             args[0],
             args[1],
-            "18"
+            18
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerProxyFarm", sc_args,
                              value=config.DEFAULT_ISSUE_TOKEN_PRICE)
@@ -286,7 +286,7 @@ class DexProxyContract(DEXContractInterface):
         sc_args = [
             args[0],
             args[1],
-            "18"
+            18
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerProxyPair", sc_args,
                              value=config.DEFAULT_ISSUE_TOKEN_PRICE)

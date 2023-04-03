@@ -193,7 +193,7 @@ class PairContract(DEXContractInterface):
         if self.version == PairContractVersion.V2:
             arguments.extend(args[5:])
 
-        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, args)
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):

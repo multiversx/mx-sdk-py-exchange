@@ -226,7 +226,7 @@ class DeployStructure:
             log_step_pass(f"Loaded {len(retrieved_tokens)} tokens.")
             return retrieved_tokens
         elif retrieved_tokens and len(retrieved_tokens) >= self.number_of_tokens:
-            log_step_fail(f"Loaded {len(retrieved_tokens)} tokens instead of expected {self.number_of_tokens}.")
+            log_warning(f"Loaded {len(retrieved_tokens)} tokens instead of expected {self.number_of_tokens}.")
             return retrieved_tokens
         else:
             log_step_fail("No tokens loaded!")

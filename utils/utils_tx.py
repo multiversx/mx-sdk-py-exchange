@@ -84,6 +84,7 @@ class NetworkProviders:
                 log_step_fail(f"FAIL: transaction for {msg_label} contract deployment failed "
                                      f"or couldn't retrieve address!")
             return False
+        logger.debug(f"Transaction {tx_hash} status: {status.status}")
         return True
 
     def check_complex_tx_status(self, tx_hash: str, msg_label: str = "") -> bool:
@@ -107,6 +108,7 @@ class NetworkProviders:
             if msg_label:
                 log_step_fail(f"Transaction to {msg_label} failed!")
             return False
+        logger.debug(f"Transaction {tx_hash} status: {results.status}")
         return True
 
     def get_tx_operations(self, tx_hash: str) -> list:

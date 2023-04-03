@@ -128,7 +128,7 @@ class LockedAssetContract(DEXContractInterface):
 
         gas_limit = 100000000
         sc_args = [
-            "0x" + Address(contract_to_whitelist).hex()
+            Address(contract_to_whitelist)
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
                              "whitelist", sc_args)
