@@ -64,7 +64,7 @@ class NetworkProviders:
         self.network = self.proxy.get_network_config()
 
     def wait_for_tx_executed(self, tx_hash: str):
-        time.sleep(2)  # temporary fix for the api returning the wrong status
+        time.sleep(3)  # temporary fix for the api returning the wrong status
         while True:
             status = self.api.get_transaction_status(tx_hash)
             logger.debug(f"Transaction {tx_hash} status: {status.status}")
@@ -103,6 +103,7 @@ class NetworkProviders:
                 log_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
             return False
 
+        time.sleep(3)  # temporary fix for the api returning wrong statuses
         results = self.api.get_transaction_status(tx_hash)
         if results.is_failed():
             if msg_label:
@@ -403,14 +404,6 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
     tx_hash = send_deploy_tx(tx, proxy)
 
     if tx_hash:
-        time.sleep(2)
-        while not proxy.get_transaction_status(tx_hash).is_executed():
-            time.sleep(2)
-
-        if not proxy.get_transaction_status(tx_hash).is_successful():
-            log_step_fail(f"Transaction to deploy {contract_label} contract failed.")
-            return tx_hash, contract_address
-
         contract_address = get_deployed_address_from_tx(tx_hash, proxy)
         owner.nonce += 1
 
@@ -442,8 +435,17 @@ def get_deployed_address_from_event(tx_result: TransactionOnNetwork) -> str:
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
     try:
+        time.sleep(3)
+        while not proxy.get_transaction_status(tx_hash).is_executed():
+            time.sleep(6)
+
+        if not proxy.get_transaction_status(tx_hash).is_successful():
+            logger.debug(f"Deploy transaction {tx_hash} failed.")
+            return ""
+
         tx = proxy.get_transaction(tx_hash)
         contract_address = get_deployed_address_from_event(tx)
+        logger.debug(f"Deployed contract address: {contract_address}")
     except Exception as ex:
         logger.exception(f"Failed to get contract address due to: {ex}")
         contract_address = ""

@@ -819,7 +819,7 @@ class DeployStructure:
             tx_hash = deployed_pair_contract.set_lp_token_local_roles_via_router(deployer_account,
                                                                                  network_providers.proxy,
                                                                                  router_contract)
-            if not network_providers.check_simple_tx_status(tx_hash, "set lp token local roles via router"): return
+            if not network_providers.check_complex_tx_status(tx_hash, "set lp token local roles via router"): return
 
             # Set proxy if applicable
             if "proxy" in config_pool or "proxy_v2" in config_pool:

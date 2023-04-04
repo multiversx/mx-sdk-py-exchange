@@ -1,6 +1,7 @@
 import sys
 import traceback
 
+import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
 from utils.logger import get_logger
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, ESDTToken, \
@@ -232,7 +233,8 @@ class FarmContract(DEXContractInterface):
 
         logger.debug(f"Arguments: {sc_args}")
 
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerFarmToken", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerFarmToken", sc_args,
+                             config.DEFAULT_ISSUE_TOKEN_PRICE)
 
     def set_local_roles_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider):
         function_purpose = "Set local roles for farm token"
@@ -251,7 +253,7 @@ class FarmContract(DEXContractInterface):
             rewards_amount
         ]
         logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setRewardsPerBlock", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPerBlockRewardAmount", sc_args)
 
     def set_penalty_percent(self, deployer: Account, proxy: ProxyNetworkProvider, percent: int):
         function_purpose = "Set penalty percent in farm"
@@ -262,7 +264,7 @@ class FarmContract(DEXContractInterface):
             percent
         ]
         logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPenaltyPercent", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "set_penalty_percent", sc_args)
 
     def set_minimum_farming_epochs(self, deployer: Account, proxy: ProxyNetworkProvider, epochs: int):
         function_purpose = "Set minimum farming epochs in farm"
@@ -273,7 +275,7 @@ class FarmContract(DEXContractInterface):
             epochs
         ]
         logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setMinimumFarmingEpochs", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "set_minimum_farming_epochs", sc_args)
 
     def set_boosted_yields_factors(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """Only V2Boosted.
@@ -328,7 +330,7 @@ class FarmContract(DEXContractInterface):
         gas_limit = 70000000
         sc_args = [locking_address]
         logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingAddress", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingScAddress", sc_args)
 
     def set_lock_epochs(self, deployer: Account, proxy: ProxyNetworkProvider, lock_epochs: int):
         """Only V2Boosted.

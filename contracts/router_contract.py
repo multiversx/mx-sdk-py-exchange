@@ -156,7 +156,7 @@ class RouterContract(DEXContractInterface):
 
         gas_limit = 100000000
         sc_args = [
-            Address(args[0]).hex(),
+            Address(args[0]),
             args[1],
             args[2]
         ]
@@ -188,8 +188,8 @@ class RouterContract(DEXContractInterface):
 
         gas_limit = 100000000
         sc_args = [
-            Address(args[0]).hex(),
-            Address(args[1]).hex(),
+            Address(args[0]),
+            Address(args[1]),
             args[2]
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setFeeOn", sc_args)
