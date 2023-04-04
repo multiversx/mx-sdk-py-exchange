@@ -20,6 +20,8 @@ from utils.utils_generic import log_step_fail, log_warning, split_to_chunks, get
 TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
 
+API_TX_DELAY = 4
+
 
 class ESDTToken:
     token_id: str
@@ -64,7 +66,7 @@ class NetworkProviders:
         self.network = self.proxy.get_network_config()
 
     def wait_for_tx_executed(self, tx_hash: str):
-        time.sleep(3)  # temporary fix for the api returning the wrong status
+        time.sleep(API_TX_DELAY)  # temporary fix for the api returning the wrong status
         while True:
             status = self.api.get_transaction_status(tx_hash)
             logger.debug(f"Transaction {tx_hash} status: {status.status}")
@@ -103,7 +105,7 @@ class NetworkProviders:
                 log_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
             return False
 
-        time.sleep(3)  # temporary fix for the api returning wrong statuses
+        time.sleep(API_TX_DELAY)  # temporary fix for the api returning wrong statuses
         results = self.api.get_transaction_status(tx_hash)
         if results.is_failed():
             if msg_label:
@@ -435,7 +437,7 @@ def get_deployed_address_from_event(tx_result: TransactionOnNetwork) -> str:
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
     try:
-        time.sleep(3)
+        time.sleep(API_TX_DELAY)
         while not proxy.get_transaction_status(tx_hash).is_executed():
             time.sleep(6)
 
