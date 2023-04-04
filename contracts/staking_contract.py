@@ -192,7 +192,7 @@ class StakingContract(DEXContractInterface):
 
         gas_limit = 50000000
 
-        tokens = [ESDTToken(self.farm_token, 0, rewards_amount)]
+        tokens = [ESDTToken(self.farmed_token, 0, rewards_amount)]
         sc_args = [tokens]
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, deployer,
                                         Address(self.address), "topUpRewards", sc_args)

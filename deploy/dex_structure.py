@@ -118,16 +118,16 @@ class DeployStructure:
                                   self.simple_lock_deploy, False),
             config.SIMPLE_LOCKS_ENERGY:
                 ContractStructure(config.SIMPLE_LOCKS_ENERGY, SimpleLockEnergyContract, config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH,
-                                  self.simple_lock_energy_deploy, True),
+                                  self.simple_lock_energy_deploy, False),
             config.FEES_COLLECTORS:
                 ContractStructure(config.FEES_COLLECTORS, FeesCollectorContract, config.FEES_COLLECTOR_BYTECODE_PATH,
-                                  self.fees_collector_deploy, True),
+                                  self.fees_collector_deploy, False),
             config.UNSTAKERS:
                 ContractStructure(config.UNSTAKERS, UnstakerContract, config.UNSTAKER_BYTECODE_PATH,
-                                  self.token_unstake_deploy, True),
+                                  self.token_unstake_deploy, False),
             config.PROXIES_V2:
                 ContractStructure(config.PROXIES_V2, DexProxyContract, config.PROXY_V2_BYTECODE_PATH,
-                                  self.proxy_deploy, True),
+                                  self.proxy_deploy, False),
             config.ROUTER:
                 ContractStructure(config.ROUTER, RouterContract, config.ROUTER_BYTECODE_PATH,
                                   self.router_deploy, False),
@@ -154,7 +154,7 @@ class DeployStructure:
                                   self.proxy_deployer_deploy, False),
             config.FARMS_V2:
                 ContractStructure(config.FARMS_V2, FarmContract, config.FARM_V2_BYTECODE_PATH,
-                                  self.farm_boosted_deploy, True),  # self.farm_deploy_from_proxy_deployer, True),
+                                  self.farm_boosted_deploy, False),  # self.farm_deploy_from_proxy_deployer, True),
             config.PRICE_DISCOVERIES:
                 ContractStructure(config.PRICE_DISCOVERIES, PriceDiscoveryContract, config.PRICE_DISCOVERY_BYTECODE_PATH,
                                   self.price_discovery_deploy, False),
@@ -169,7 +169,7 @@ class DeployStructure:
                                   self.metastaking_deploy, False),
             config.METASTAKINGS_V2:
                 ContractStructure(config.METASTAKINGS_V2, MetaStakingContract, config.STAKING_PROXY_V2_BYTECODE_PATH,
-                                  self.metastaking_deploy, True)
+                                  self.metastaking_deploy, False)
         }
 
     # main entry method to deploy tokens (either deploy fresh ones or reuse existing ones)
