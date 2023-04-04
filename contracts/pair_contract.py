@@ -181,10 +181,10 @@ class PairContract(DEXContractInterface):
             return "", ""
 
         arguments = [
-            "0x" + self.firstToken.encode("ascii").hex(),
-            "0x" + self.secondToken.encode("ascii").hex(),
-            "0x" + Address(args[0]).hex(),
-            "0x" + Address(args[1]).hex(),
+            self.firstToken,
+            self.secondToken,
+            Address(args[0]),
+            Address(args[1]),
             args[3],
             args[4],
             args[2]
