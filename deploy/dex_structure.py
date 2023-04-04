@@ -725,7 +725,7 @@ class DeployStructure:
                                                                 "whitelist energy address in fees collector"): return
 
                 tx_hash = fees_collector.add_known_tokens(deployer_account, network_providers.proxy,
-                                                          [f"str:{energy_factory.locked_token}"])
+                                                          [energy_factory.locked_token])
                 if not network_providers.check_simple_tx_status(tx_hash,
                                                                 "whitelist locked token in fees collector"): return
 
@@ -890,8 +890,8 @@ class DeployStructure:
                 _ = fees_collector.add_known_contracts(deployer_account, network_providers.proxy,
                                                        [contract_address])
                 _ = fees_collector.add_known_tokens(deployer_account, network_providers.proxy,
-                                                    [f"str:{deployed_pair_contract.firstToken}",
-                                                     f"str:{deployed_pair_contract.secondToken}"])
+                                                    [deployed_pair_contract.firstToken,
+                                                     deployed_pair_contract.secondToken])
 
             deployed_contracts.append(deployed_pair_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
