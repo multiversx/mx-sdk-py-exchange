@@ -102,7 +102,7 @@ class RouterContract(DEXContractInterface):
         if self.version == RouterContractVersion.V2:
             sc_args.extend(args[5:])
 
-        tx_hash = endpoint_call(proxy, gas_limit, deployer, Address(self.address), "deployPair", sc_args)
+        tx_hash = endpoint_call(proxy, gas_limit, deployer, Address(self.address), "createPair", sc_args)
 
         # retrieve deployed contract address
         if tx_hash != "":
