@@ -3,9 +3,7 @@ import traceback
 
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, get_deployed_address_from_event, deploy, \
-    endpoint_call, get_deployed_address_from_tx
-from utils.utils_chain import log_explorer_transaction
+from utils.utils_tx import deploy, endpoint_call, get_deployed_address_from_tx
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata

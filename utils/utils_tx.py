@@ -2,13 +2,14 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 from multiversx_sdk_core import Transaction, TokenPayment, Address
 from multiversx_sdk_core.interfaces import ICodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider, ApiNetworkProvider
 from multiversx_sdk_network_providers.network_config import NetworkConfig
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
+from multiversx_sdk_network_providers.transaction_events import TransactionEvent
 from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
 from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration, \
     MultiESDTNFTTransferBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder
@@ -21,6 +22,7 @@ TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
 
 API_TX_DELAY = 4
+MAX_TX_FETCH_RETRIES = 50 // API_TX_DELAY
 
 
 class ESDTToken:
@@ -425,34 +427,60 @@ def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
     return tx_hash
 
 
-def get_deployed_address_from_event(tx_result: TransactionOnNetwork) -> str:
-    searched_event_id = "SCDeploy"
-    deploy_event = tx_result.logs.find_first_or_none_event(searched_event_id)
-    if deploy_event is None:
-        return ""
+def check_error_from_event(tx_result: TransactionOnNetwork) -> bool:
+    searched_event_id = ["signalError", "internalVMErrors"]
+    for event_id in searched_event_id:
+        error_event = tx_result.logs.find_first_or_none_event(event_id)
+        if error_event is not None:
+            return True
+    return False
 
-    address = deploy_event.address.bech32()
-    return address
 
-
-def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
+def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) -> Union[TransactionEvent, None]:
     try:
         time.sleep(API_TX_DELAY)
         while not proxy.get_transaction_status(tx_hash).is_executed():
             time.sleep(6)
 
         if not proxy.get_transaction_status(tx_hash).is_successful():
-            logger.debug(f"Deploy transaction {tx_hash} failed.")
-            return ""
+            logger.debug(f"Transaction {tx_hash} failed.")
+            return None
 
         tx = proxy.get_transaction(tx_hash)
-        contract_address = get_deployed_address_from_event(tx)
-        logger.debug(f"Deployed contract address: {contract_address}")
-    except Exception as ex:
-        logger.exception(f"Failed to get contract address due to: {ex}")
-        contract_address = ""
+        event = tx.logs.find_first_or_none_event(event_id)
 
-    return contract_address
+        # if event is still not available, but the transaction was successful, try fetching again until either event is
+        # available or transaction is failed
+        # timeout after MAX_TX_FETCH_RETRIES
+        attempt = 0
+        while event is None and attempt < MAX_TX_FETCH_RETRIES:
+            attempt += 1
+            if check_error_from_event(tx):
+                logger.debug(f"Transaction {tx_hash} failed.")
+                return None
+            time.sleep(API_TX_DELAY)
+            tx = proxy.get_transaction(tx_hash)
+            event = tx.logs.find_first_or_none_event(event_id)
+
+    except Exception as ex:
+        logger.exception(f"Failed to get event due to: {ex}")
+        event = None
+
+    return event
+
+
+def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
+    event = get_event_from_tx("SCDeploy", tx_hash, proxy)
+    if event is None:
+        return ""
+    return event.address.bech32()
+
+
+def get_issued_token_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
+    event = get_event_from_tx("registerAndSetAllRoles", tx_hash, proxy)
+    if event is None:
+        return ""
+    return str(event.topics[0])
 
 
 def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkProvider,

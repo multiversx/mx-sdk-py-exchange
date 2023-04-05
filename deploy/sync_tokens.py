@@ -1,4 +1,3 @@
-import logging
 import sys
 from argparse import ArgumentParser
 from multiprocessing.dummy import Pool
@@ -6,14 +5,16 @@ from typing import List
 
 import config
 from deploy.tokens_tracks import BunchOfTracks
+from utils.logger import get_logger
 from utils.utils_chain import BunchOfAccounts
 from utils.utils_chain import WrapperAddress as Address
 from multiversx_sdk_network_providers.errors import GenericError
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 
+logger = get_logger(__name__)
+
 
 def main(cli_args: List[str]):
-    logging.basicConfig(level=logging.ERROR)
 
     parser = ArgumentParser()
     parser.add_argument("--proxy", default=config.DEFAULT_PROXY)
