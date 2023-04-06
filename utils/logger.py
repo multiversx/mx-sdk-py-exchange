@@ -35,6 +35,9 @@ def get_logger(name: str) -> logging.Logger:
     console_handler.setFormatter(ScreenFormatter())
 
     # file handler
+    logs_path = config.get_default_log_file()
+    if not logs_path.exists():
+        logs_path.parent.mkdir(parents=True, exist_ok=True)
     file_handler = logging.FileHandler(config.get_default_log_file())
     file_handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s : %(message)s")
