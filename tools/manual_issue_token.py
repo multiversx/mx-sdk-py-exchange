@@ -4,13 +4,11 @@ from argparse import ArgumentParser
 from typing import List
 
 import config
-from arrows.stress.esdtnft.shared import (build_token_name, build_token_ticker,
-                                          load_contracts, make_call_arg_ascii,
-                                          make_call_arg_pubkey)
-from arrows.stress.shared import BunchOfAccounts, broadcast_transactions
-from erdpy.contracts import SmartContract
-from erdpy.proxy.core import ElrondProxy
-from erdpy.transactions import Transaction
+from utils.utils_tx import broadcast_transactions
+from utils.utils_chain import BunchOfAccounts
+from multiversx_sdk_cli.contracts import SmartContract
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from multiversx_sdk_cli.transactions import Transaction
 
 
 def main(cli_args: List[str]):
@@ -32,7 +30,7 @@ def main(cli_args: List[str]):
 
     args = parser.parse_args(cli_args)
 
-    proxy = ElrondProxy(args.proxy)
+    proxy = ProxyNetworkProvider(args.proxy)
     network = proxy.get_network_config()
 
     bunch_of_accounts = BunchOfAccounts.load_accounts_from_files([args.accounts])

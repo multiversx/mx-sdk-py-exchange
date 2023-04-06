@@ -5,14 +5,15 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import List
 
-from arrows.stress.contracts.transaction_builder import (number_as_arg,
+from ported_arrows.stress.contracts.transaction_builder import (number_as_arg,
                                                          string_as_arg,
                                                          token_id_as_arg)
-from arrows.stress.shared import BunchOfAccounts, broadcast_transactions
-from erdpy.accounts import Account, Address
-from erdpy.proxy.core import ElrondProxy
-from erdpy.proxy.messages import NetworkConfig
-from erdpy.transactions import Transaction
+from utils.utils_tx import broadcast_transactions
+from utils.utils_chain import BunchOfAccounts
+from multiversx_sdk_cli.accounts import Account, Address
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from multiversx_sdk_network_providers.network_config import NetworkConfig
+from multiversx_sdk_cli.transactions import Transaction
 
 
 def main(cli_args: List[str]):
@@ -24,7 +25,7 @@ def main(cli_args: List[str]):
     parser.add_argument("--pair", required=True)
     args = parser.parse_args(cli_args)
 
-    proxy = ElrondProxy(args.proxy)
+    proxy = ProxyNetworkProvider(args.proxy)
     network = proxy.get_network_config()
     pair = Address(args.pair)
     accounts = BunchOfAccounts.load_accounts_from_files([Path(args.accounts)])

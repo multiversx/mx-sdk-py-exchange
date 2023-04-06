@@ -7,8 +7,8 @@ import requests
 from argparse import ArgumentParser
 from typing import List
 
-from arrows.AutomaticTests.ElasticIndexer import ElasticIndexer
-from arrows.AutomaticTests.ProxyExtension import ProxyExtension
+from ported_arrows.AutomaticTests.ElasticIndexer import ElasticIndexer
+from ported_arrows.AutomaticTests.ProxyExtension import ProxyExtension
 from contracts.contract_identities import RouterContractVersion, PairContractVersion, \
     StakingContractVersion, ProxyContractVersion, FarmContractVersion
 from contracts.dex_proxy_contract import DexProxyContract
@@ -26,8 +26,8 @@ from utils.utils_tx import NetworkProviders
 from utils.utils_chain import base64_to_hex
 from utils.utils_generic import log_step_fail
 from tools import config_contracts_upgrader as config
-from erdpy.accounts import Address, Account
-from erdpy.proxy import ElrondProxy
+from multiversx_sdk_cli.accounts import Address, Account
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from pathlib import Path
 
 PROXY = config.DEFAULT_PROXY
@@ -96,7 +96,7 @@ def main(cli_args: List[str]):
     args = parser.parse_args(cli_args)
 
     api = ElasticIndexer(API)
-    proxy = ElrondProxy(PROXY)
+    proxy = ProxyNetworkProvider(PROXY)
     extended_proxy = ProxyExtension(PROXY)
     network_providers = NetworkProviders(api, proxy, extended_proxy)
 
@@ -203,7 +203,7 @@ def save_wasm(code_data_hex: str, code_hash: str):
     print(f"Created wasm binary in: {output_file}")
 
 
-def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save_path: Path, proxy: ElrondProxy):
+def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save_path: Path, proxy: ProxyNetworkProvider):
     pairs_data = {}
     for address in contract_addresses:
         contract_addr = Address(address)
@@ -223,13 +223,13 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
         print(f"Dumped {contract_label} data in {save_path}")
 
 
-def fetch_and_save_pairs_from_chain(proxy: ElrondProxy):
+def fetch_and_save_pairs_from_chain(proxy: ProxyNetworkProvider):
     router_data_fetcher = RouterContractDataFetcher(Address(ROUTER_CONTRACT), PROXY)
     registered_pairs = router_data_fetcher.get_data("getAllPairsManagedAddresses")
     fetch_and_save_contracts(registered_pairs, PAIRS_LABEL, OUTPUT_PAIR_CONTRACTS_FILE, proxy)
 
 
-def fetch_and_save_farms_from_chain(proxy: ElrondProxy):
+def fetch_and_save_farms_from_chain(proxy: ProxyNetworkProvider):
     farmsv13 = get_farm_addresses_from_chain("v1.3")
     farmsv13locked = get_farm_addresses_locked_from_chain()
     farmsv12 = get_farm_addresses_from_chain("v1.2")
@@ -238,12 +238,12 @@ def fetch_and_save_farms_from_chain(proxy: ElrondProxy):
     fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE, proxy)
 
 
-def fetch_and_save_stakings_from_chain(proxy: ElrondProxy):
+def fetch_and_save_stakings_from_chain(proxy: ProxyNetworkProvider):
     stakings = get_staking_addresses_from_chain()
     fetch_and_save_contracts(stakings, STAKINGS_LABEL, OUTPUT_STAKING_CONTRACTS_FILE, proxy)
 
 
-def fetch_and_save_metastakings_from_chain(proxy: ElrondProxy):
+def fetch_and_save_metastakings_from_chain(proxy: ProxyNetworkProvider):
     metastakings = get_metastaking_addresses_from_chain()
     fetch_and_save_contracts(metastakings, METASTAKINGS_LABEL, OUTPUT_METASTAKING_CONTRACTS_FILE, proxy)
 

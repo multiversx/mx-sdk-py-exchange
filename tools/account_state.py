@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from typing import Dict, Any, Tuple, List
 
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
-from erdpy.proxy.http_facade import do_get
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 
 
 def main(cli_args: List[str]):
@@ -22,11 +22,12 @@ def main(cli_args: List[str]):
 
 def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0, with_save_in: str = "") -> Dict[str, Any]:
     if block_number == 0:
-        url = f"{proxy_url}/address/{address}/keys"
+        resource_url = f"address/{address}/keys"
     else:
-        url = f"{proxy_url}/address/{address}/keys?blockNonce={block_number}"
+        resource_url = f"address/{address}/keys?blockNonce={block_number}"
 
-    response = do_get(url)
+    proxy = ProxyNetworkProvider(proxy_url)
+    response = proxy.do_get_generic(resource_url)
     keys = response.get("pairs", dict())
 
     if keys and with_save_in:

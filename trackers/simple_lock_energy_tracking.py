@@ -2,7 +2,7 @@ from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from utils.contract_data_fetchers import SimpleLockEnergyContractDataFetcher
 from utils.utils_tx import ESDTToken, NetworkProviders
 from utils.utils_chain import get_token_details_for_address, decode_merged_attributes, base64_to_hex
-from erdpy.accounts import Account, Address
+from multiversx_sdk_cli.accounts import Address
 
 
 class SimpleLockEnergyTokenAttributes:

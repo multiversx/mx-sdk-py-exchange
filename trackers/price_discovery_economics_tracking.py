@@ -6,8 +6,8 @@ from events.price_discovery_events import (DepositPDLiquidityEvent,
 from contracts.contract_identities import PriceDiscoveryContractIdentity
 from utils.utils_chain import get_all_token_nonces_details_for_account, get_token_details_for_address
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep
-from erdpy.accounts import Address
-from erdpy.proxy import ElrondProxy
+from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 
 
 class PriceDiscoveryAccountEconomics:
@@ -27,7 +27,7 @@ class PriceDiscoveryAccountEconomics:
 
 class PriceDiscoveryEconomics:
     def __init__(self, contract_identity: PriceDiscoveryContractIdentity, proxy_url: str):
-        self.proxy = ElrondProxy(proxy_url)
+        self.proxy = ProxyNetworkProvider(proxy_url)
         self.pd_contract_identity = contract_identity
         self.contract_data_fetcher = PriceDiscoveryContractDataFetcher(Address(contract_identity.address), proxy_url)
 

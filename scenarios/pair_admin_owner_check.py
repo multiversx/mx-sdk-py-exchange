@@ -8,9 +8,9 @@ from context import Context
 from events.event_generators import (
     generate_add_initial_liquidity_event, generate_add_liquidity_event,
     generate_swap_fixed_input)
-from arrows.stress.send_token_from_minter import main as send_token_from_minter
-from arrows.stress.shared import get_shard_of_address
-from erdpy.accounts import Account
+from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
+from ported_arrows.stress.shared import get_shard_of_address
+from multiversx_sdk_cli.accounts import Account
 
 
 def main(cli_args: List[str]):

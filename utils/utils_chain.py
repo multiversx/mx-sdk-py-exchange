@@ -7,7 +7,8 @@ from typing import List, Dict, Any, Optional, Set, cast
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
 from multiversx_sdk_core import Address, Transaction
 from multiversx_sdk_core.interfaces import ISignature
-from multiversx_sdk_wallet import UserSigner, pem_format
+from multiversx_sdk_wallet.user_signer import UserSigner
+from multiversx_sdk_wallet.pem_entry import PemEntry
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 
 from utils import utils_generic
@@ -68,7 +69,7 @@ class BunchOfAccounts:
 
         for file in files:
             # Assume multi-account PEM files.
-            pem_entries = len(pem_format.parse_all(file))
+            pem_entries = len(PemEntry.from_text_all(file.read_text()))
             for index in range(pem_entries):
                 account = Account(pem_file=str(file), pem_index=index)
                 loaded.append(account)
