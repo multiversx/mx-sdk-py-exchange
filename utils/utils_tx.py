@@ -101,6 +101,10 @@ class NetworkProviders:
         logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
         time.sleep(API_LONG_TX_DELAY - API_TX_DELAY)  # temporary fix for the api returning the wrong status
         self.wait_for_tx_executed(tx_hash)
+        if self.check_simple_tx_status(tx_hash, msg_label):
+            # most likely a false positive, try again
+            time.sleep(API_LONG_TX_DELAY - API_TX_DELAY)
+            self.wait_for_tx_executed(tx_hash)
         return self.check_simple_tx_status(tx_hash, msg_label)
 
     def check_simple_tx_status(self, tx_hash: str, msg_label: str = "") -> bool:
@@ -359,7 +363,7 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
         type[List[ESDTToken]]: tokens list
         opt: type[str..]: endpoint arguments
     """
-    log_warning(function_purpose)
+    logger.debug(function_purpose)
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash = ""
 
