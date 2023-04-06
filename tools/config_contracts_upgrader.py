@@ -71,10 +71,6 @@ CROSS_SHARD_DELAY = 60
 INTRA_SHARD_DELAY = 10
 
 
-def get_default_contracts_file():
-    return DEFAULT_WORKSPACE / "contracts.json"
-
-
 def get_default_tokens_file():
     return DEFAULT_WORKSPACE / "tokens.json"
 

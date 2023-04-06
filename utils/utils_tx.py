@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Union
 
 from multiversx_sdk_core import Transaction, TokenPayment, Address
 from multiversx_sdk_core.interfaces import ICodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider, ApiNetworkProvider
+from multiversx_sdk_network_providers import ProxyNetworkProvider, ApiNetworkProvider, GenericError
 from multiversx_sdk_network_providers.network_config import NetworkConfig
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
 from multiversx_sdk_network_providers.transaction_events import TransactionEvent
@@ -21,7 +21,8 @@ from utils.utils_generic import log_step_fail, log_warning, split_to_chunks, get
 TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
 
-API_TX_DELAY = 4
+API_TX_DELAY = 2
+API_LONG_TX_DELAY = 6
 MAX_TX_FETCH_RETRIES = 50 // API_TX_DELAY
 
 
@@ -98,6 +99,7 @@ class NetworkProviders:
             return False
 
         logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
+        time.sleep(API_LONG_TX_DELAY - API_TX_DELAY)  # temporary fix for the api returning the wrong status
         self.wait_for_tx_executed(tx_hash)
         return self.check_simple_tx_status(tx_hash, msg_label)
 
@@ -107,8 +109,20 @@ class NetworkProviders:
                 log_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
             return False
 
+        results = None
         time.sleep(API_TX_DELAY)  # temporary fix for the api returning wrong statuses
-        results = self.api.get_transaction_status(tx_hash)
+        try:
+            results = self.api.get_transaction_status(tx_hash)
+        except GenericError as e:
+            if '404' in e.data:
+                # api didn't index the transaction yet, try again after a delay
+                logger.debug(f"Transaction {tx_hash} not indexed yet, trying again in {API_TX_DELAY} seconds...")
+                time.sleep(API_TX_DELAY)
+                results = self.api.get_transaction_status(tx_hash)
+
+        if results is None:
+            log_step_fail(f"FAIL: couldn't retrieve transaction {tx_hash} status!")
+
         if results.is_failed():
             if msg_label:
                 log_step_fail(f"Transaction to {msg_label} failed!")

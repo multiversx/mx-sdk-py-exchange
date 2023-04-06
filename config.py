@@ -80,9 +80,9 @@ METASTAKINGS_V2 = "metastakings_v2"
 FEES_COLLECTORS = "fees_collectors"
 
 
-def get_default_contracts_file():
-    return DEFAULT_WORKSPACE / "contracts.json"
-
-
 def get_default_tokens_file():
-    return DEFAULT_WORKSPACE / "tokens.json"
+    return DEFAULT_CONFIG_SAVE_PATH / "tokens.json"
+
+
+def get_default_log_file():
+    return DEFAULT_WORKSPACE / "logs" / "trace.log"

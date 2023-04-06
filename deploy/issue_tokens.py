@@ -19,7 +19,6 @@ def main(cli_args: List[str]):
     parser = ArgumentParser()
     parser.add_argument("--proxy", default=config.DEFAULT_PROXY)
     parser.add_argument("--account", default=config.DEFAULT_OWNER)
-    parser.add_argument("--contracts", default=config.get_default_contracts_file())
     parser.add_argument("--sleep-between-chunks", type=int, default=5)
     parser.add_argument("--chunk-size", type=int, default=400)
     parser.add_argument("--from-shard")

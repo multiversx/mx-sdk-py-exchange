@@ -4,3 +4,7 @@
 /.vscode
 /logs/*
 /tools/notebooks/env.py
+.venv
+__pycache__
+/deploy/*/tokens.json
+/deploy/*/deployed_*.json

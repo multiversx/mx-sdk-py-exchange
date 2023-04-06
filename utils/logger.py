@@ -1,4 +1,5 @@
 import logging
+import config
 
 
 class ScreenFormatter(logging.Formatter):
@@ -34,7 +35,7 @@ def get_logger(name: str) -> logging.Logger:
     console_handler.setFormatter(ScreenFormatter())
 
     # file handler
-    file_handler = logging.FileHandler(f"trace.log")
+    file_handler = logging.FileHandler(config.get_default_log_file())
     file_handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s : %(message)s")
     file_handler.setFormatter(formatter)
