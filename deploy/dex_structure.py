@@ -191,7 +191,7 @@ class DeployStructure:
                     token_hashes.extend(hashes)
 
                 for txhash in token_hashes:
-                    network_provider.wait_for_tx_executed(txhash)
+                    network_provider.check_complex_tx_status(txhash)
 
                 time.sleep(40)
 

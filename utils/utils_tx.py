@@ -1,6 +1,7 @@
 import sys
 import time
 import traceback
+from os import read
 from pathlib import Path
 from typing import List, Dict, Any, Union
 
@@ -10,6 +11,7 @@ from multiversx_sdk_network_providers import ProxyNetworkProvider, ApiNetworkPro
 from multiversx_sdk_network_providers.network_config import NetworkConfig
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
 from multiversx_sdk_network_providers.transaction_events import TransactionEvent
+from multiversx_sdk_network_providers.transaction_status import TransactionStatus
 from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
 from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration, \
     MultiESDTNFTTransferBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder
@@ -21,8 +23,9 @@ from utils.utils_generic import log_step_fail, log_warning, split_to_chunks, get
 TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
 
-API_TX_DELAY = 2
+API_TX_DELAY = 3
 API_LONG_TX_DELAY = 6
+API_TX_STATUS_REFETCH_DELAY = 2
 MAX_TX_FETCH_RETRIES = 50 // API_TX_DELAY
 
 
@@ -68,14 +71,30 @@ class NetworkProviders:
         self.proxy = ProxyNetworkProvider(proxy)
         self.network = self.proxy.get_network_config()
 
-    def wait_for_tx_executed(self, tx_hash: str):
-        time.sleep(API_TX_DELAY)  # temporary fix for the api returning the wrong status
-        while True:
+    def _get_initial_tx_status(self, tx_hash: str) -> Union[None, TransactionStatus]:
+        # due to API data propagation delays, some transactions may not be indexed yet at the time of the request
+        results = None
+        try:
+            results = self.api.get_transaction_status(tx_hash)
+        except GenericError as e:
+            if '404' in e.data:
+                # api didn't index the transaction yet, try again after a delay
+                logger.debug(f"Transaction {tx_hash} not indexed yet, "
+                             f"trying again in {API_TX_STATUS_REFETCH_DELAY} seconds...")
+                time.sleep(API_TX_STATUS_REFETCH_DELAY)
+                results = self.api.get_transaction_status(tx_hash)
+        return results
+
+    def wait_for_tx_executed(self, tx_hash: str) -> Union[None, TransactionStatus]:
+        status = self._get_initial_tx_status(tx_hash)
+        if status is None:
+            log_step_fail(f"Wait failed. Transaction {tx_hash} not found!")
+            return None
+        while not status.is_executed():
+            time.sleep(API_TX_STATUS_REFETCH_DELAY)
             status = self.api.get_transaction_status(tx_hash)
             logger.debug(f"Transaction {tx_hash} status: {status.status}")
-            if status.is_executed():
-                break
-            time.sleep(self.network.round_duration // 1000)
+        return status
 
     def check_deploy_tx_status(self, tx_hash: str, address: str, msg_label: str = "") -> bool:
         if not tx_hash:
@@ -83,8 +102,8 @@ class NetworkProviders:
                 log_step_fail(f"FAIL: no tx hash for {msg_label} contract deployment!")
             return False
 
-        status = self.api.get_transaction_status(tx_hash)
-        if status.is_failed() or address == "":
+        status = self.wait_for_tx_executed(tx_hash)
+        if status is None or status.is_failed() or address == "":
             if msg_label:
                 log_step_fail(f"FAIL: transaction for {msg_label} contract deployment failed "
                                      f"or couldn't retrieve address!")
@@ -99,13 +118,28 @@ class NetworkProviders:
             return False
 
         logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
-        time.sleep(API_LONG_TX_DELAY - API_TX_DELAY)  # temporary fix for the api returning the wrong status
-        self.wait_for_tx_executed(tx_hash)
-        if self.check_simple_tx_status(tx_hash, msg_label):
-            # most likely a false positive, try again
-            time.sleep(API_LONG_TX_DELAY - API_TX_DELAY)
-            self.wait_for_tx_executed(tx_hash)
-        return self.check_simple_tx_status(tx_hash, msg_label)
+        start_time = time.time()
+
+        # temporary fix for the api returning the wrong status
+        # start by avoiding an early false success followed by pending (usually occurring in the first 2 rounds)
+        time.sleep(API_LONG_TX_DELAY)
+        status = self.check_simple_tx_status(tx_hash, msg_label)
+        if status:
+            ready_time = time.time()
+            if ready_time - start_time < 2 * self.network.round_duration // 1000:
+                # most likely a false positive, wait again
+                logger.debug(f"TX status most likely false success, making sure...")
+                time.sleep(API_LONG_TX_DELAY)
+                status = self.wait_for_tx_executed(tx_hash)
+
+        # we need to check for false success again,
+        # because the api may return a fake success at the end followed by fail
+        if status:
+            logger.debug(f"Making sure tx status is not false success...")
+            time.sleep(API_LONG_TX_DELAY)
+            status = self.check_simple_tx_status(tx_hash, msg_label)
+
+        return status
 
     def check_simple_tx_status(self, tx_hash: str, msg_label: str = "") -> bool:
         if not tx_hash:
@@ -113,19 +147,10 @@ class NetworkProviders:
                 log_step_fail(f"FAIL: no tx hash for {msg_label} transaction!")
             return False
 
-        results = None
-        time.sleep(API_TX_DELAY)  # temporary fix for the api returning wrong statuses
-        try:
-            results = self.api.get_transaction_status(tx_hash)
-        except GenericError as e:
-            if '404' in e.data:
-                # api didn't index the transaction yet, try again after a delay
-                logger.debug(f"Transaction {tx_hash} not indexed yet, trying again in {API_TX_DELAY} seconds...")
-                time.sleep(API_TX_DELAY)
-                results = self.api.get_transaction_status(tx_hash)
-
+        results = self.wait_for_tx_executed(tx_hash)
         if results is None:
             log_step_fail(f"FAIL: couldn't retrieve transaction {tx_hash} status!")
+            return False
 
         if results.is_failed():
             if msg_label:
@@ -492,13 +517,6 @@ def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> s
     if event is None:
         return ""
     return event.address.bech32()
-
-
-def get_issued_token_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
-    event = get_event_from_tx("registerAndSetAllRoles", tx_hash, proxy)
-    if event is None:
-        return ""
-    return str(event.topics[0])
 
 
 def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkProvider,
