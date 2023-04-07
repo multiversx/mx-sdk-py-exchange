@@ -16,9 +16,9 @@ from events.event_generators import (generate_add_initial_liquidity_event,
                                                        generateExitMetastakeEvent,
                                                        generateExitFarmEvent)
 from utils.utils_generic import log_step_pass
-from arrows.stress.send_token_from_minter import main as send_token_from_minter
-from arrows.stress.shared import get_shard_of_address
-from erdpy.accounts import Account
+from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
+from ported_arrows.stress.shared import get_shard_of_address
+from multiversx_sdk_cli.accounts import Account
 
 
 def main(cli_args: List[str]):
@@ -43,9 +43,9 @@ def main(cli_args: List[str]):
 
 
 def create_nonce_file(context: Context):
-    context.accounts.sync_nonces(context.proxy)
+    context.accounts.sync_nonces(context.network_provider.proxy)
     context.accounts.store_nonces(context.nonces_file)
-    context.deployer_account.sync_nonce(context.proxy)
+    context.deployer_account.sync_nonce(context.network_provider.proxy)
 
 
 def send_tokens(context: Context):

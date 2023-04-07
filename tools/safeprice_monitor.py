@@ -4,8 +4,8 @@ import time
 from typing import List
 
 from utils.contract_data_fetchers import PairContractDataFetcher
-from erdpy.accounts import Address
-from erdpy.proxy.core import ElrondProxy
+from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from utils.utils_chain import decode_merged_attributes
 
 PROXY = "https://gateway.elrond.com"
@@ -21,7 +21,7 @@ MODEL_SAMPLES = 100
 
 def main(cli_args: List[str]):
     contract_data_fetcher = PairContractDataFetcher(Address(PAIR_ADDRESS), PROXY)
-    proxy = ElrondProxy(PROXY)
+    proxy = ProxyNetworkProvider(PROXY)
 
     esdt_token_payment_schema = {
         'token_type': 'u8',

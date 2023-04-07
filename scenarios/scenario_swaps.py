@@ -25,10 +25,10 @@ from utils.utils_tx import ESDTToken
 from utils.utils_chain import nominated_amount, \
     get_token_details_for_address, get_all_token_nonces_details_for_account
 from utils.utils_generic import log_step_fail, log_step_pass, log_condition_assert, TestStepConditions
-from arrows.stress.send_token_from_minter import main as send_token_from_minter
-from arrows.stress.send_egld_from_minter import main as send_egld_from_minter
-from arrows.stress.shared import get_shard_of_address
-from erdpy.accounts import Account, Address
+from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
+from ported_arrows.stress.send_egld_from_minter import main as send_egld_from_minter
+from ported_arrows.stress.shared import get_shard_of_address
+from multiversx_sdk_cli.accounts import Account, Address
 
 
 def main(cli_args: List[str]):

@@ -2,12 +2,12 @@ import sys
 import time
 from argparse import ArgumentParser
 from typing import List
-from arrows.stress.contracts.transaction_builder import number_as_arg, string_as_arg
-from arrows.stress.shared import broadcast_transactions
-from erdpy.accounts import Account, Address
-from erdpy.proxy.core import ElrondProxy
-from erdpy.proxy.messages import NetworkConfig
-from erdpy.transactions import Transaction
+from ported_arrows.stress.contracts.transaction_builder import number_as_arg, string_as_arg
+from utils.utils_tx import broadcast_transactions
+from multiversx_sdk_cli.accounts import Account, Address
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from multiversx_sdk_network_providers.network_config import NetworkConfig
+from multiversx_sdk_cli.transactions import Transaction
 
 
 def claim_metastaking_rewards(caller: Account, contract_addr: Address, number_of_tokens: int, token_identifier: str,
@@ -40,7 +40,7 @@ def main(cli_args: List[str]):
     parser.add_argument('--contract-address', required=True)
     args = parser.parse_args(cli_args)
 
-    proxy = ElrondProxy(args.proxy)
+    proxy = ProxyNetworkProvider(args.proxy)
     network = proxy.get_network_config()
     account = Account(pem_file=args.account)
     account.sync_nonce(proxy)

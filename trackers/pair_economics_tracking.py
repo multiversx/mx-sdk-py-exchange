@@ -1,4 +1,4 @@
-from erdpy.accounts import Address
+from multiversx_sdk_cli.accounts import Address
 from utils.utils_tx import NetworkProviders
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable

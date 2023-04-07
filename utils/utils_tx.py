@@ -3,7 +3,7 @@ import time
 import traceback
 from os import read
 from pathlib import Path
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Union, Tuple
 
 from multiversx_sdk_core import Transaction, TokenPayment, Address
 from multiversx_sdk_core.interfaces import ICodeMetadata
@@ -442,7 +442,7 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
 
 
 def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
-           owner: Account, bytecode_path: str, metadata: ICodeMetadata, args: list) -> (str, str):
+           owner: Account, bytecode_path: str, metadata: ICodeMetadata, args: list) -> Tuple[str, str]:
     logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""

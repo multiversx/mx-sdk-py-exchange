@@ -1,4 +1,4 @@
-from erdpy.accounts import Address
+from multiversx_sdk_cli.accounts import Address
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import log_step_pass
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher, ChainDataFetcher

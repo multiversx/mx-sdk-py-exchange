@@ -20,7 +20,7 @@ from events.event_generators import (generate_add_liquidity_event, generate_swap
                                                        generateRandomCompoundRewardsProxyEvent, generateEnterFarmEvent,
                                                        generateExitFarmEvent, generateClaimRewardsEvent,
                                                        generateEnterFarmv12Event, generate_add_initial_liquidity_event)
-from erdpy.accounts import Account
+from multiversx_sdk_cli.accounts import Account
 
 
 def main():
