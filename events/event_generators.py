@@ -47,7 +47,7 @@ def generate_add_liquidity_event(context: Context, user_account: Account, pair_c
         max_amount_a = int(amount_token_a * context.add_liquidity_max_amount)
         # should do a try except block on get equivalent
         equivalent_amount_b = contract_data_fetcher.get_data("getEquivalent",
-                                                             ["0x" + tokens[0].encode('utf-8').hex(),
+                                                             [tokens[0],
                                                               max_amount_a])
 
         if equivalent_amount_b <= 0 or equivalent_amount_b > amount_token_b:
@@ -152,7 +152,7 @@ def generate_swap_fixed_input(context: Context, user_account: Account, pair_cont
                                                   int(amount_token_a * context.swap_max_tokens_to_spend))
 
         equivalent_amount_token_b = contract_data_fetcher.get_data("getAmountOut",
-                                                                   ["0x"+tokens[0].encode('utf-8').hex(),
+                                                                   [tokens[0],
                                                                     amount_token_a_swapped])
 
         if equivalent_amount_token_b <= 0:
@@ -200,7 +200,7 @@ def generate_swap_fixed_output(context: Context, user_account: Account, pair_con
 
         # TODO: switch to getAmountIn
         equivalent_amount_token_b = contract_data_fetcher.get_data("getAmountOut",
-                                                                   ["0x"+tokens[0].encode('utf-8').hex(),
+                                                                   [tokens[0],
                                                                     amount_token_a_max])
         # TODO: apply slippage on token A
         event = SwapFixedOutputEvent(

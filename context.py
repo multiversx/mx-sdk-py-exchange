@@ -60,38 +60,38 @@ class Context:
         # deploy closing
         self.deploy_structure.print_deployed_contracts()
 
-        # self.observable = self.init_observers()
+        self.observable = Observable()
+        # self.init_observers()     # call should be parameterized so that observers can be disabled programmatically
 
     def init_observers(self):
-        observable = Observable()
 
         farm_unlocked_contracts = self.deploy_structure.contracts[config.FARMS_UNLOCKED].deployed_contracts
         for contract in farm_unlocked_contracts:
             contract_dict = contract.get_config_dict()
             observer = FarmEconomics(contract_dict['address'], contract_dict['version'], self.network_provider)
-            observable.subscribe(observer)
+            self.observable.subscribe(observer)
 
         farm_locked_contracts = self.deploy_structure.contracts[config.FARMS_LOCKED].deployed_contracts
         for contract in farm_locked_contracts:
             contract_dict = contract.get_config_dict()
             observer = FarmEconomics(contract_dict['address'], contract_dict['version'], self.network_provider)
-            observable.subscribe(observer)
+            self.observable.subscribe(observer)
 
         for acc in self.accounts.get_all():
             account_observer = FarmAccountEconomics(acc.address, self.network_provider)
-            observable.subscribe(account_observer)
+            self.observable.subscribe(account_observer)
 
         pair_contracts = self.deploy_structure.contracts[config.PAIRS].deployed_contracts
         for contract in pair_contracts:
             contract_dict = contract.get_config_dict()
             observer = PairEconomics(contract_dict['address'], contract.firstToken, contract.secondToken, self.network_provider)
-            observable.subscribe(observer)
+            self.observable.subscribe(observer)
 
         staking_contracts = self.deploy_structure.contracts[config.STAKINGS].deployed_contracts
         for contract in staking_contracts:
             contract_dict = contract.get_config_dict()
             observer = StakingEconomics(contract_dict['address'], self.network_provider)
-            observable.subscribe(observer)
+            self.observable.subscribe(observer)
 
         metastaking_contracts = self.deploy_structure.contracts[config.METASTAKINGS].deployed_contracts
         for contract in metastaking_contracts:
@@ -100,9 +100,7 @@ class Context:
             pair_contract = self.get_pair_contract_by_address(contract_dict['lp_address'])
             observer = MetastakingEconomics(contract_dict['address'], contract_dict['stake_address'],
                                             farm_contract, pair_contract, self.network_provider)
-            observable.subscribe(observer)
-
-        return observable
+            self.observable.subscribe(observer)
 
     def get_slippaged_below_value(self, value: int):
         return value - int(value * self.pair_slippage)

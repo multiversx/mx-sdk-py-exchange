@@ -18,7 +18,7 @@ from events.event_generators import (generate_add_initial_liquidity_event,
 from utils.utils_generic import log_step_pass
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from multiversx_sdk_cli.accounts import Account
+from utils.utils_chain import Account
 
 
 def main(cli_args: List[str]):
@@ -97,8 +97,8 @@ def stress(context: Context, threads: int, repeats: int):
 def stress_per_account(context: Context, account: Account):
     min_time = 2
     max_time = 10
-    deployer_shard = get_shard_of_address(context.deployer_account.address)
-    sleep_time = config.CROSS_SHARD_DELAY if get_shard_of_address(account.address) is not deployer_shard \
+    deployer_shard = context.deployer_account.address.get_shard()
+    sleep_time = config.CROSS_SHARD_DELAY if account.address.get_shard() is not deployer_shard \
         else config.INTRA_SHARD_DELAY
 
     account.sync_nonce(context.network_provider.proxy)

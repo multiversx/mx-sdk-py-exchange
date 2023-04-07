@@ -1,8 +1,10 @@
 from contracts.contract_identities import DEXContractInterface
+from utils.contract_data_fetchers import SimpleLockEnergyContractDataFetcher
+from utils import decoding_structures
 from utils.logger import get_logger
 from utils.utils_tx import multi_esdt_endpoint_call, endpoint_call, deploy, upgrade_call
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 
@@ -455,3 +457,14 @@ class SimpleLockEnergyContract(DEXContractInterface):
         log_substep(f"Locked token: {self.locked_token}")
         log_substep(f"Locked LP token: {self.lp_proxy_token}")
         log_substep(f"Locked Farm token: {self.farm_proxy_token}")
+
+    def get_lock_options(self, proxy: ProxyNetworkProvider):
+        data_fetcher = SimpleLockEnergyContractDataFetcher(Address(self.address), proxy.url)
+        raw_result = data_fetcher.get_data("getLockOptions")
+        if not raw_result:
+            return []
+        decoded_results = []
+        for entry in raw_result:
+            decoded_entry = decode_merged_attributes(entry, decoding_structures.LOCK_OPTIONS)
+            decoded_results.append(decoded_entry)
+        return decoded_results

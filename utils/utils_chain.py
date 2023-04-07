@@ -1,6 +1,6 @@
 import base64
 import time
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 from os import path
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, cast
@@ -102,14 +102,14 @@ class BunchOfAccounts:
         return [account for account in self.accounts if account.address.get_shard() == shard]
 
     def sync_nonces(self, proxy: ProxyNetworkProvider):
-        print("Sync nonces for", len(self.accounts), "accounts")
+        logger.debug(f"Sync nonces for {len(self.accounts)} accounts")
 
         def sync_nonce(account: Account):
             account.sync_nonce(proxy)
 
         Pool(100).map(sync_nonce, self.accounts)
 
-        print("Done")
+        logger.debug("Done")
 
     def store_nonces(self, file: str):
         # We load the previously stored data in order to display a nice delta (for debugging purposes)

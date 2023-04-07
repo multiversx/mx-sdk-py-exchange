@@ -4,8 +4,6 @@ import sys
 import time
 import traceback
 
-import pytest
-from itertools import count
 from typing import List
 from argparse import ArgumentParser
 
@@ -22,20 +20,20 @@ from events.event_generators import (generate_add_initial_liquidity_event,
                                                        generateExitMetastakeEvent, generate_swap_fixed_input)
 from utils.contract_data_fetchers import PairContractDataFetcher, SimpleLockEnergyContractDataFetcher
 from utils.utils_tx import ESDTToken
-from utils.utils_chain import nominated_amount, \
+from utils.utils_chain import Account, nominated_amount, \
     get_token_details_for_address, get_all_token_nonces_details_for_account
 from utils.utils_generic import log_step_fail, log_step_pass, log_condition_assert, TestStepConditions
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.send_egld_from_minter import main as send_egld_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from multiversx_sdk_cli.accounts import Account, Address
+from multiversx_sdk_cli.accounts import Address
 
 
 def main(cli_args: List[str]):
     parser = ArgumentParser()
     parser.add_argument("--threads", required=False, default="2")  # number of concurrent threads to execute operations
     parser.add_argument("--repeats", required=False, default="0")  # number of total operations to execute; 0 - infinite
-    parser.add_argument("--skip-minting", action="store_true", default=False)
+    parser.add_argument("--skip-minting", action="store_true", default=True)
     args = parser.parse_args(cli_args)
 
     context = Context()
@@ -48,14 +46,14 @@ def main(cli_args: List[str]):
 
     create_nonce_file(context)
 
-    # stress generator for adding liquidity, enter farm, enter metastaking, claim metastaking, exit metastaking
+    # stress generator
     scenarios(context, int(args.threads), int(args.repeats))
 
 
 def create_nonce_file(context: Context):
-    context.accounts.sync_nonces(context.proxy)
+    context.accounts.sync_nonces(context.network_provider.proxy)
     context.accounts.store_nonces(context.nonces_file)
-    context.deployer_account.sync_nonce(context.proxy)
+    context.deployer_account.sync_nonce(context.network_provider.proxy)
 
 
 def send_tokens(context: Context):
@@ -137,8 +135,8 @@ def scenarios(context: Context, threads: int, repeats: int):
 def scenarios_per_account(context: Context, account: Account):
     min_time = 10
     max_time = 30
-    deployer_shard = get_shard_of_address(context.deployer_account.address)
-    sleep_time = config.CROSS_SHARD_DELAY if get_shard_of_address(account.address) is not deployer_shard \
+    deployer_shard = context.deployer_account.address.get_shard()
+    sleep_time = config.CROSS_SHARD_DELAY if account.address.get_shard() is not deployer_shard \
         else 6
 
     account.sync_nonce(context.network_provider.proxy)
@@ -151,18 +149,19 @@ def scenarios_per_account(context: Context, account: Account):
 
     simple_lock_energy_contract: SimpleLockEnergyContract
     simple_lock_energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
-    simple_lock_energy_data_fetcher = SimpleLockEnergyContractDataFetcher(Address(simple_lock_energy_contract.address),
-                                                                          context.network_provider.proxy.url)
-    lock_options = simple_lock_energy_data_fetcher.get_data('getLockOptions')
+    lock_options = simple_lock_energy_contract.get_lock_options(context.network_provider.proxy)
+    lock_periods = []
+    for entry in lock_options:
+        lock_periods.append(entry['lock_epochs'])
 
     # lock tokens
     amount = random.randint(1, 10)
-    lock_period = random.choice(lock_options)
+    lock_period = random.choice(lock_periods)
     token = ESDTToken(simple_lock_energy_contract.base_token, 0, nominated_amount(amount))
     args = [[token], lock_period]
     _ = simple_lock_energy_contract.lock_tokens(account, context.network_provider.proxy, args)
     print(f"User: {account.address.bech32()}")
-    print(f"Locked {amount} tokens for {lock_period} epochs.")
+    print(f"Locked {nominated_amount(amount)} tokens for {lock_period} epochs.")
     time.sleep(sleep_time)
 
     # swap tokens

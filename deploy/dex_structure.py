@@ -281,7 +281,7 @@ class DeployStructure:
     def global_start_setups(self, deployer_account: Account, network_provider: NetworkProviders,
                             clean_deploy_override: bool):
         self.set_transfer_role_locked_token(deployer_account, network_provider, clean_deploy_override)
-        # self.set_proxy_v2_in_pairs(deployer_account, network_provider, clean_deploy_override)
+        # self.set_proxy_v2_in_pairs(deployer_account, network_provider, clean_deploy_override)     # used only when not done implicitly
 
     def set_transfer_role_locked_token(self, deployer_account: Account, network_provider: NetworkProviders,
                                        clean_deploy_override: bool):
@@ -305,6 +305,14 @@ class DeployStructure:
             tx_hash = energy_factory.set_transfer_role_locked_token(deployer_account, network_provider.proxy,
                                                                     [address])
             if not network_provider.check_complex_tx_status(tx_hash, "set transfer role for locked asset on contracts"):
+                return
+
+        # set transfer role for self
+        if self.contracts[config.SIMPLE_LOCKS_ENERGY].deploy_clean or clean_deploy_override:
+            tx_hash = energy_factory.set_transfer_role_locked_token(deployer_account, network_provider.proxy,
+                                                                    [])
+            if not network_provider.check_complex_tx_status(tx_hash,
+                                                            "set transfer role for locked asset on factory"):
                 return
 
     def set_proxy_v2_in_pairs(self, deployer_account: Account, network_providers: NetworkProviders,
