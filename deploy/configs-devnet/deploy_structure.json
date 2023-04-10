@@ -1,0 +1,202 @@
+{   
+    "token": 
+        {
+            "token_prefix": "E2ETK7",
+            "number_of_tokens": 3
+        },
+
+    "locked_assets": [
+        {
+            "unlocked_asset": 0,
+            "locked_asset": "LKMEX",
+            "locked_asset_name": "LockedMEX"
+        }
+    ],
+
+    "simple_locks": [
+
+    ],
+
+    "simple_locks_energy": [
+        {
+            "base_token": 0,
+            "locked_token": "ELKMEX",
+            "locked_token_name": "EnergyLockedMEX",
+            "locked_asset_factory": 0,
+            "min_migrated_lock_epochs": 1,
+            "lock_options": [
+                360, 720, 1440
+            ],
+            "penalties": [
+                5000, 7000, 8000
+            ]
+        }
+    ],
+
+    "fees_collectors": [
+        {
+            "energy_factory": 0
+        }
+    ],
+
+    "unstakers": [
+        {
+            "energy_factory": 0,
+            "fees_collector": 0,
+            "unbond_epochs": 1,
+            "fees_burn_percentage": 5000
+        }
+    ],
+
+    "proxies": [
+        {
+            "locked_asset": 0,
+            "proxy_lp": "LKLP",
+            "proxy_lp_name": "LockedLP",
+            "proxy_farm": "LKFARM",
+            "proxy_farm_name": "LockedLPStaked"
+        }
+    ],
+
+    "proxies_v2": [
+        {
+            "locked_asset": 0,
+            "energy_factory": 0,
+            "proxy_lp": "ELKLP",
+            "proxy_lp_name": "EnergyLockedLP",
+            "proxy_farm": "ELKFARM",
+            "proxy_farm_name": "EnergyLockedLPStaked"
+        }
+    ],
+
+    "router": [
+
+    ],
+
+    "router_v2": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "pairs": [
+
+    ],
+
+    "pairs_v2": [
+        {
+            "launched_token": 1,
+            "accepted_token": 0,
+            "lp_token": "EGLDMEX",
+            "lp_token_name": "EGLDMEXLP",
+            "fee_token": 0,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500,
+            "proxy_v2": 0
+        },
+        {
+            "launched_token": 2,
+            "accepted_token": 1,
+            "lp_token": "WEBEGLD",
+            "lp_token_name": "WEBEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        }
+    ],
+
+    "farms_community": [
+
+    ],
+
+    "farms_unlocked": [
+
+    ],
+
+    "farms_locked": [
+
+    ],
+
+    "proxy_deployers": [
+        {
+            "template": "farms_boosted"
+        }
+    ],
+
+    "farms_boosted": [
+        {
+            "deployer": 0,
+            "farming_pool": 0,
+            "farm_token": "EGLDMEXFL",
+            "farm_token_name": "EGLDMEXLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1000000000000000000,
+            "penalty": 100,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 10,
+            "energy_const": 5,
+            "farm_const": 1,
+            "min_energy": 1,
+            "min_farm": 1,
+            "proxy_v2": 0
+        },
+        {
+            "deployer": 0,
+            "farming_pool": 1,
+            "farm_token": "WEBEGLDFL",
+            "farm_token_name": "WEBEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1000000000000000000,
+            "penalty": 100,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 10,
+            "energy_const": 5,
+            "farm_const": 1,
+            "min_energy": 1,
+            "min_farm": 1
+        }
+    ],
+
+    "price_discoveries": [
+
+    ],
+
+    "stakings": [
+
+    ],
+
+    "stakings_v2": [
+        {
+            "staking_token": 2,
+            "stake_token": "SWEB",
+            "stake_token_name": "StakedWEB",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        }
+    ],
+
+    "metastakings": [
+
+    ],
+
+    "metastakings_v2": [
+        {
+            "token": 2,
+            "pool_v2": 1,
+            "farm_boosted": 1,
+            "staking_v2": 0,
+            "metastake_token": "METAWEBLK",
+            "metastake_token_name": "MetaStakedWebLK"
+        }
+    ]
+}

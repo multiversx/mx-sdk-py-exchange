@@ -1,0 +1,13 @@
+[
+    {
+        "token": "MEX-dc289c",
+        "locked_tokens": [
+            "LKMEX-3b7d9a",
+            "ELKMEX-cb6a3e"
+        ],
+        "proxy_farm_token": "ELKFARM-693c1c",
+        "proxy_lp_token": "ELKLP-217e80",
+        "address": "erd1qqqqqqqqqqqqqpgqp33v9y29x384573f8pucemynempfa5uu0n4sg5sfad",
+        "version": 2
+    }
+]

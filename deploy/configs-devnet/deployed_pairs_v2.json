@@ -1,0 +1,16 @@
+[
+    {
+        "firstToken": "WEGLD-d7c6bb",
+        "secondToken": "MEX-dc289c",
+        "lpToken": "EGLDMEX-c29b0e",
+        "address": "erd1qqqqqqqqqqqqqpgquu5rsa4ee6l4azz6vdu4hjp8z4p6tt8m0n4suht3dy",
+        "version": 2
+    },
+    {
+        "firstToken": "WEB-5d08be",
+        "secondToken": "WEGLD-d7c6bb",
+        "lpToken": "WEBEGLD-270db7",
+        "address": "erd1qqqqqqqqqqqqqpgqzn90c8pp6yd97tqvnadeg8gfl7eutmyk0n4s90ylnz",
+        "version": 2
+    }
+]

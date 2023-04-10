@@ -1,0 +1,5 @@
+ipykernel
+multiversx-sdk-cli~=6.1.3
+multiversx-sdk-network-providers~=0.6.7
+toml
+debugpy

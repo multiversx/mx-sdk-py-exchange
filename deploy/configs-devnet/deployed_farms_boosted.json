@@ -1,0 +1,16 @@
+[
+    {
+        "farmingToken": "EGLDMEX-c29b0e",
+        "farmToken": "EGLDMEXFL-9fa39d",
+        "farmedToken": "MEX-dc289c",
+        "address": "erd1qqqqqqqqqqqqqpgq59hlx9lmclzngxfnxwjpzru3ukm3hfvj0n4sh8pkmp",
+        "version": 4
+    },
+    {
+        "farmingToken": "WEBEGLD-270db7",
+        "farmToken": "WEBEGLDFL-6094e8",
+        "farmedToken": "MEX-dc289c",
+        "address": "erd1qqqqqqqqqqqqqpgq835vpevjysz042t3wnp6q5a7skxaerm90n4sg85ekq",
+        "version": 4
+    }
+]
