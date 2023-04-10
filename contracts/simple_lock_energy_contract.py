@@ -1,3 +1,5 @@
+from typing import Dict, List, Any
+
 from contracts.contract_identities import DEXContractInterface
 from utils.contract_data_fetchers import SimpleLockEnergyContractDataFetcher
 from utils import decoding_structures
@@ -458,7 +460,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         log_substep(f"Locked LP token: {self.lp_proxy_token}")
         log_substep(f"Locked Farm token: {self.farm_proxy_token}")
 
-    def get_lock_options(self, proxy: ProxyNetworkProvider):
+    def get_lock_options(self, proxy: ProxyNetworkProvider) -> List[Dict[str, Any]]:
         data_fetcher = SimpleLockEnergyContractDataFetcher(Address(self.address), proxy.url)
         raw_result = data_fetcher.get_data("getLockOptions")
         if not raw_result:
@@ -468,3 +470,12 @@ class SimpleLockEnergyContract(DEXContractInterface):
             decoded_entry = decode_merged_attributes(entry, decoding_structures.LOCK_OPTIONS)
             decoded_results.append(decoded_entry)
         return decoded_results
+
+    def get_energy_for_user(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
+        data_fetcher = SimpleLockEnergyContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getEnergyEntryForUser', [Address(user_address).serialize()])
+        if not raw_results:
+            return ""
+        energy_entry_user = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
+
+        return energy_entry_user
