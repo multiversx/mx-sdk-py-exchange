@@ -475,7 +475,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         data_fetcher = SimpleLockEnergyContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getEnergyEntryForUser', [Address(user_address).serialize()])
         if not raw_results:
-            return ""
+            return {}
         energy_entry_user = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
 
         return energy_entry_user
