@@ -4,7 +4,7 @@ import sys
 
 
 # Example of command:
-# `python3 gen_pair_contract.py pair.abi.json contracts/pair_contract_gen.py`
+# `python3 gen_pair_contract.py abis/pair.abi.json contracts/pair_contract_gen.py`
 
 
 def abi_type_to_decoder_code(type: str):
@@ -47,7 +47,7 @@ with open(sys.argv[1], "r") as file:
 
 code = """from multiversx_sdk_core import Address
 
-from utils.contract_interactor import ContractInteractor
+from utils.contract_interactor import ContractInteractor, Payment
 from utils.decode import d
 
 
@@ -58,27 +58,37 @@ contract_name = data["name"]
 code += f"class {contract_name}ContractInteractor(ContractInteractor):\n"
 
 for e_info in data["endpoints"]:
-  if e_info["mutability"] != "readonly":
-    continue
   e_name = e_info["name"]
-  inputs_code = ""
+  args_args_code = ""
   arg_codes = []
   for i_info in e_info["inputs"]:
-    inputs_code += ", " + i_info["name"]
+    args_args_code += ", " + i_info["name"]
     i_type = i_info["type"]
     if i_type == "TokenIdentifier":
-      inputs_code += ": str"
+      args_args_code += ": str"
     elif i_type == "Address":
-      inputs_code += ": Address"
+      args_args_code += ": Address"
     elif i_type == "BigUint":
-      inputs_code += ": int"
+      args_args_code += ": int"
     arg_codes.append(i_info["name"])
-  args_code = ", ".join(arg_codes)
-  decoder_codes = []
-  for o_info in e_info["outputs"]:
-    decoder_codes.append(abi_type_to_decoder_code(o_info["type"]))
-  decoders_code = ", ".join(decoder_codes)
-  code += f"\tdef {e_name}(self{inputs_code}):\n\t\treturn self._query(\"{e_name}\", [{args_code}], [{decoders_code}])\n\n"
+  args_call_code = ", ".join(arg_codes)
+  if e_info["mutability"] == "readonly":
+    decoder_codes = []
+    for o_info in e_info["outputs"]:
+      decoder_codes.append(abi_type_to_decoder_code(o_info["type"]))
+    decoders_code = ", ".join(decoder_codes)
+    code += f"\tdef query_{e_name}(self{args_args_code}):\n"
+    code += f"\t\treturn self._query(\"{e_name}\", [{args_call_code}], [{decoders_code}])\n\n"
+  elif e_info["mutability"] == "mutable":
+    payment_args_code = ""
+    payment_call_code = ""
+    if "payableInTokens" in e_info:
+      payment_args_code += ", _payment: Payment"
+      payment_call_code += ", _payment"
+    code += f"\tdef call_{e_name}(self{args_args_code}{payment_args_code}):\n"
+    code += f"\t\treturn self._call(\"{e_name}\", [{args_call_code}], 0{payment_call_code})\n\n"
+  else:
+    raise ValueError("Unknown mutability.")
 
 code += "\n"
 
