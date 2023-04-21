@@ -4,6 +4,7 @@
 /.vscode
 /logs/*
 /tools/notebooks/env.py
+/tools/notebooks/*.log
 .venv
 __pycache__
 /deploy/*/tokens.json
