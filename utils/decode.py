@@ -1,4 +1,4 @@
-from typing import Protocol, Any, List, Dict
+from typing import Protocol, Any, List, Dict, Union
 
 
 class ByteReader:
@@ -100,12 +100,12 @@ class OptionDecoder:
 
 
 class TupleDecoder:
-    decoders: List[Decoder] | Dict[str, Decoder]
+    decoders: Union[List[Decoder], Dict[str, Decoder]]
 
-    def __init__(self, decoders: List[Decoder] | Dict[str, Decoder]):
+    def __init__(self, decoders: Union[List[Decoder], Dict[str, Decoder]]):
         self.decoders = decoders
 
-    def top_decode(self, b: ByteReader) -> List[Any] | Dict[str, Any]:
+    def top_decode(self, b: ByteReader) -> Union[List[Any], Dict[str, Any]]:
         if isinstance(self.decoders, list):
             result = []
             for decoder in self.decoders:
@@ -191,6 +191,7 @@ class d:
 
 def top_dec_bytes(b: bytes, decoder: Decoder):
     return decoder.top_decode(ByteReader(b))
+
 
 def top_dec_hex_str(hex_str: str, decoder: Decoder):
     return top_dec_bytes(bytes.fromhex(hex_str), decoder)

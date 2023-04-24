@@ -39,7 +39,7 @@ class ContractInteractor:
     logger.debug(f"Calling {function} at {self.contract.bech32()}")
     logger.debug(f"With args: {args}")
 
-    value: int | None = None
+    value: Union[int, None] = None
     esdt_transfers: Sequence[ESDTToken] = []
     if isinstance(payment, int):
       value = payment
