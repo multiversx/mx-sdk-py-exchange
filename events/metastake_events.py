@@ -25,3 +25,14 @@ class ClaimRewardsMetastakeEvent:
         self.amount = amount
         self.nonce = nonce
         self.farm_token_details = farm_tk_details
+
+
+class MergeMetastakeWithStakeEvent:
+    def __init__(self, metastake_tk: str, metastake_tk_nonce: int, metastake_tk_amount: int,
+                 stake_tk: str, stake_tk_nonce: int, stake_tk_amount: int):
+        self.metastake_tk = metastake_tk
+        self.metastake_tk_nonce = metastake_tk_nonce
+        self.metastake_tk_amount = metastake_tk_amount
+        self.stake_tk = stake_tk
+        self.stake_tk_nonce = stake_tk_nonce
+        self.stake_tk_amount = stake_tk_amount

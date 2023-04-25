@@ -395,7 +395,7 @@ class FarmContract(DEXContractInterface):
         
         gas_limit = 10000000
         sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "end_produce_rewards", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "endProduceRewards", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.start_produce_rewards(deployer, proxy)

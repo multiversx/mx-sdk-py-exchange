@@ -3,7 +3,8 @@ import traceback
 from operator import ne
 
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity
-from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent)
+from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent,
+                                     MergeMetastakeWithStakeEvent)
 from utils.logger import get_logger
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, deploy, upgrade_call, \
     endpoint_call, ESDTToken, multi_esdt_endpoint_call
@@ -187,3 +188,18 @@ class MetaStakingContract(DEXContractInterface):
 
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
                                         user, Address(self.address), claim_fn, tokens)
+
+    def merge_metastaking_with_staking_token(self, network_provider: NetworkProviders, user: Account,
+                                             event: MergeMetastakeWithStakeEvent):
+        function_purpose = f"mergeMetastakingWithStakingToken"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 50000000
+        function = 'mergeMetastakingWithStakingToken'
+
+        tokens = [ESDTToken(self.metastake_token, event.metastake_tk_nonce, event.metastake_tk_amount),
+                  ESDTToken(self.stake_token, event.stake_tk_nonce, event.stake_tk_amount)]
+
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+                                        user, Address(self.address), function, tokens)

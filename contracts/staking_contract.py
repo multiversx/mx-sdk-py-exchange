@@ -76,7 +76,20 @@ class StakingContract(DEXContractInterface):
         return multi_esdt_endpoint_call(unstake_fn, network_provider.proxy, gas_limit, user,
                                         Address(self.address), unstake_fn, args)
 
-    def claimRewards(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsFarmEvent) -> str:
+    def unbond_farm(self, network_provider: NetworkProviders, user: Account, event: ExitFarmEvent) -> str:
+        unbond_fn = 'unbondFarm'
+        logger.info(f"{unbond_fn}")
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 50000000
+
+        tokens = [ESDTToken(event.farm_token, event.nonce, event.amount)]
+        args = [tokens]
+
+        return multi_esdt_endpoint_call(unbond_fn, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), unbond_fn, args)
+
+    def claim_rewards(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsFarmEvent) -> str:
         claim_fn = 'claimRewards'
         logger.info(f"{claim_fn}")
         logger.debug(f"Account: {user.address}")
@@ -117,7 +130,7 @@ class StakingContract(DEXContractInterface):
             self.max_apr,
             self.unbond_epochs
         ]
-        if self.version == StakingContractVersion.V2:
+        if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
             arguments.extend(args)
 
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
@@ -142,7 +155,7 @@ class StakingContract(DEXContractInterface):
             self.max_apr,
             self.unbond_epochs,
         ]
-        if self.version == StakingContractVersion.V2:
+        if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
             arguments.extend(args)
 
         return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
@@ -197,6 +210,48 @@ class StakingContract(DEXContractInterface):
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, deployer,
                                         Address(self.address), "topUpRewards", sc_args)
 
+    def set_boosted_yields_factors(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """Only V3Boosted.
+        Expecting as args:
+        type[int]: max_rewards_factor
+        type[int]: user_rewards_energy_const
+        type[int]: user_rewards_farm_const
+        type[int]: min_energy_amount
+        type[int]: min_farm_amount
+        """
+        function_purpose = "Set boosted yield factors"
+        logger.info(function_purpose)
+
+        if len(args) != 5:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 70000000
+        sc_args = args
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setBoostedYieldsFactors", sc_args)
+
+    def set_boosted_yields_rewards_percentage(self, deployer: Account, proxy: ProxyNetworkProvider, percentage: int):
+        """Only V3Boosted.
+        """
+        function_purpose = "Set boosted yield rewards percentage"
+        logger.info(function_purpose)
+
+        gas_limit = 70000000
+        sc_args = [percentage]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setBoostedYieldsRewardsPercentage",
+                             sc_args)
+
+    def collect_undistributed_boosted_rewards(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Resume stake contract"
+        logger.info(function_purpose)
+
+        gas_limit = 30000000
+        sc_args = []
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "collectUndistributedBoostedRewards",
+                             sc_args)
+
     def resume(self, deployer: Account, proxy: ProxyNetworkProvider):
         function_purpose = f"Resume stake contract"
         logger.info(function_purpose)
@@ -220,6 +275,14 @@ class StakingContract(DEXContractInterface):
         gas_limit = 10000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "startProduceRewards", sc_args)
+
+    def end_produce_rewards(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Stop producing rewards in stake contract"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = []
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "endProduceRewards", sc_args)
 
     def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
         function_purpose = f"Whitelist contract in staking"
