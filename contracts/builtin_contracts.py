@@ -60,3 +60,24 @@ class ESDTContract:
             role
         ]
         return endpoint_call(proxy, gas_limit, token_owner, Address(self.address), "unsetSpecialRole", sc_args)
+
+
+class SFControlContract:
+    def __init__(self, sf_control_address: str):
+        self.address = sf_control_address
+
+    def epoch_fast_forward(self, caller: Account, proxy: ProxyNetworkProvider, epochs: int, blocks_per_epoch: int):
+        function_purpose = "fast forward epoch"
+        logger.info(function_purpose)
+        logger.info(f"Fast forwarding {epochs} epochs")
+        gas_limit = 13000000
+
+        if blocks_per_epoch < 20:
+            logger.warning("Blocks per epoch is less than 20; defaulting to 20.")
+            blocks_per_epoch = 20
+
+        sc_args = [
+            epochs,
+            blocks_per_epoch
+        ]
+        return endpoint_call(proxy, gas_limit, caller, Address(self.address), "epochfastforward", sc_args)

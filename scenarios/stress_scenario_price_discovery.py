@@ -18,8 +18,8 @@ def main():
     price_discovery_contract: PriceDiscoveryContract
     price_discovery_contract = context.get_random_price_discovery_contract()
 
-    print(f"Started waiting for deposit start epoch: {price_discovery_contract.start_block}")
-    context.extended_proxy.wait_for_nonce_in_shard(1, price_discovery_contract.start_block)  # TODO: nice shard
+    print(f"Started waiting for deposit start block: {price_discovery_contract.start_block}")
+    context.network_provider.wait_for_nonce_in_shard(1, price_discovery_contract.start_block)  # TODO: nice shard
 
     for i in range(1, context.numEvents):
         # generate_random_event(context)
@@ -28,8 +28,13 @@ def main():
         generate_withdraw_pd_liquidity_event(context, context.accounts.get_all()[0], price_discovery_contract)
         time.sleep(6)
 
-    print(f"Started waiting for deposit end epoch: {price_discovery_contract.deposit_end_epoch}")
-    context.extended_proxy.wait_for_epoch(price_discovery_contract.deposit_end_epoch)
+    deposit_end_block = price_discovery_contract.start_block + \
+        price_discovery_contract.no_limit_phase_duration_blocks + \
+        price_discovery_contract.linear_penalty_phase_duration_blocks + \
+        price_discovery_contract.fixed_penalty_phase_duration_blocks
+
+    print(f"Started waiting for deposit end period: {deposit_end_block}")
+    context.network_provider.wait_for_nonce_in_shard(deposit_end_block)
 
     for i in range(1, context.numEvents):
         generate_redeem_pd_liquidity_event(context, context.accounts.get_all()[0], price_discovery_contract)
@@ -38,7 +43,7 @@ def main():
 def create_nonce_file(context: Context):
     accounts = context.accounts.get_all()
     for account in accounts:
-        account.sync_nonce(context.proxy)
+        account.sync_nonce(context.network_provider.proxy)
     context.accounts.store_nonces(context.nonces_file)
 
 

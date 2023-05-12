@@ -81,8 +81,8 @@ class MetastakingEconomics(Subscriber):
         """Farm Token Supply check might fail, the fix should come in a later PR"""
 
         claim_farm_rewards_event = ClaimRewardsFarmEvent(
-            int(publisher.event.farm_token_details['supply']), publisher.event.farm_token_details['nonce'],
-            base64_to_hex(publisher.event.farm_token_details['attributes'])
+            int(publisher.event.farm_token_details.supply), publisher.event.farm_token_details.nonce,
+            base64_to_hex(publisher.event.farm_token_details.attributes)
         )
 
         self.staking_tracker.check_claim_rewards_data(publisher.tx_hash)
@@ -113,8 +113,8 @@ class MetastakingEconomics(Subscriber):
 
         exit_farm_event = ExitFarmEvent(publisher.contract.farm_token,
                                         farm_token_amount,
-                                        publisher.event.farm_token_details['nonce'],
-                                        base64_to_hex(publisher.event.farm_token_details['attributes']))
+                                        publisher.event.farm_token_details.nonce,
+                                        base64_to_hex(publisher.event.farm_token_details.attributes))
         self.farm_tracker.exit_farm_event_tracking(publisher.user, exit_farm_event, publisher.tx_hash)
 
         lp_amount = farm_token_amount

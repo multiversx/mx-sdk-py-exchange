@@ -2,12 +2,14 @@ import concurrent.futures
 import random
 import sys
 import time
+import traceback
 from itertools import count
 from typing import List
 from argparse import ArgumentParser
 
 import config
 from context import Context
+from contracts.pair_contract import PairContract, AddLiquidityEvent
 from events.event_generators import (generate_add_initial_liquidity_event,
                                                        generate_add_liquidity_event,
                                                        generateEnterFarmEvent,
@@ -15,10 +17,11 @@ from events.event_generators import (generate_add_initial_liquidity_event,
                                                        generateClaimMetastakeRewardsEvent,
                                                        generateExitMetastakeEvent,
                                                        generateExitFarmEvent)
-from utils.utils_generic import log_step_pass
+from utils.contract_data_fetchers import PairContractDataFetcher
+from utils.utils_generic import log_step_pass, log_step_fail
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from utils.utils_chain import Account
+from utils.utils_chain import Account, WrapperAddress as Address, nominated_amount
 
 
 def main(cli_args: List[str]):
@@ -62,36 +65,59 @@ def send_tokens(context: Context):
         time.sleep(7)
 
 
+def add_initial_liquidity(context: Context):
+    # add initial liquidity
+    pair_contract: PairContract
+    for pair_contract in context.get_contracts(config.PAIRS_V2):
+        pair_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
+        first_token_liquidity = pair_data_fetcher.get_token_reserve(pair_contract.firstToken)
+        if first_token_liquidity == 0:
+            event = AddLiquidityEvent(
+                pair_contract.firstToken, nominated_amount(1000000), 1,
+                pair_contract.secondToken, nominated_amount(1000000), 1
+            )
+            pair_contract.add_liquidity(context.network_provider, context.deployer_account, event)
+            time.sleep(6)
+
+
 def stress(context: Context, threads: int, repeats: int):
-    # set initial liquidity and start pair contract
-    # TODO: should be done only once
-    """
-    for pair_contract in context.get_contracts(config.PAIRS):
-        generate_add_initial_liquidity_event(context, context.deployer_account, pair_contract)
-        time.sleep(config.INTRA_SHARD_DELAY)
-        pair_contract.resume(context.deployer_account, context.network_provider.proxy)
-        time.sleep(config.INTRA_SHARD_DELAY)
-    """
-    accounts = context.accounts.get_all()
+    accounts = context.accounts.get_in_shard(1)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-        jobs = min(threads, repeats) if repeats != 0 else threads
-        finished_jobs = 0
-        futures = [[executor.submit(stress_per_account, context, random.choice(accounts))
-                    for _ in range(jobs)]]
+    context.swap_min_tokens_to_spend = 0.0001
+    context.swap_max_tokens_to_spend = 0.001
 
-        # feed the thread workers as they complete each job
-        while finished_jobs < repeats or repeats == 0:
-            try:
-                for _ in concurrent.futures.as_completed(futures):
-                    finished_jobs += 1
-                    log_step_pass(f"Finished {finished_jobs} repeats.")
+    # add initial liquidity in contract if necessary
+    add_initial_liquidity(context)
 
-                    if repeats == 0 or repeats > finished_jobs:
+    if threads == 1:
+        """Sequential run"""
+        for _ in range(repeats if repeats != 0 else 99999999):
+            stress_per_account(context, random.choice(accounts))
+    elif threads > 1:
+        """ Concurential run """
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+            jobs = min(threads, repeats) if repeats != 0 else threads
+            finished_jobs = 0
+            futures = [executor.submit(stress_per_account, context, random.choice(accounts))
+                       for _ in range(jobs)]
+
+            # feed the thread workers as they complete each job
+            while finished_jobs < repeats or repeats == 0:
+                try:
+                    for future in concurrent.futures.as_completed(futures):
+                        finished_jobs += 1
+                        log_step_pass(f"Finished {finished_jobs} repeats.")
+                        futures.remove(future)
                         # spawn a new job
                         futures.append(executor.submit(stress_per_account, context, random.choice(accounts)))
-            except Exception as ex:
-                pass
+                        if future.exception() is not None:
+                            log_step_fail(f"Thread failed: {future.exception()}")
+                except Exception as ex:
+                    traceback.print_exception(*sys.exc_info())
+                    log_step_fail(f"Something failed: {ex}")
+    else:
+        log_step_fail(f"Number of threads must be minimum 1!")
+        return
 
 
 def stress_per_account(context: Context, account: Account):
@@ -103,22 +129,24 @@ def stress_per_account(context: Context, account: Account):
 
     account.sync_nonce(context.network_provider.proxy)
 
-    for metastaking_contract in context.get_contracts(config.METASTAKINGS):
+    for metastaking_contract in context.get_contracts(config.METASTAKINGS_BOOSTED):
         farm_contract = context.get_farm_contract_by_address(metastaking_contract.farm_address)
         pair_contract = context.get_pair_contract_by_address(metastaking_contract.lp_address)
 
-        generate_add_liquidity_event(context, account, pair_contract)
-        time.sleep(sleep_time)
-
         for _ in range(1):
-            if generateEnterFarmEvent(context, account, farm_contract):
-                time.sleep(sleep_time)
-            if generateEnterMetastakeEvent(context, account, metastaking_contract):
-                time.sleep(sleep_time)
-            if generateClaimMetastakeRewardsEvent(context, account, metastaking_contract):
-                time.sleep(sleep_time)
-            if generateExitMetastakeEvent(context, account, metastaking_contract):
-                time.sleep(sleep_time)
+            if random.randint(0, 100) <= 40:    # 40% chance
+                if generate_add_liquidity_event(context, account, pair_contract):
+                    time.sleep(sleep_time)
+                if generateEnterFarmEvent(context, account, farm_contract):
+                    time.sleep(sleep_time)
+                if generateEnterMetastakeEvent(context, account, metastaking_contract):
+                    time.sleep(sleep_time)
+            if random.randint(0, 100) <= 70:    # 70% chance
+                if generateClaimMetastakeRewardsEvent(context, account, metastaking_contract):
+                    time.sleep(sleep_time)
+            if random.randint(0, 100) <= 20:    # 20% chance
+                if generateExitMetastakeEvent(context, account, metastaking_contract):
+                    time.sleep(sleep_time)
 
         wait_time = random.randint(min_time, max_time)
         print(f'Finished repeat execution. Waiting for {wait_time}s.')

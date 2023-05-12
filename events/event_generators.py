@@ -466,9 +466,8 @@ def generateExitMetastakeEvent(context: Context, user: Account, metastake_contra
 
         decoded_metastake_tk_attributes = get_lp_from_metastake_token_attributes(metastake_token_attributes)
 
-        farm_tk_details = context.api.get_nft_data(
-            metastake_contract.farm_token + '-' +
-            dec_to_padded_hex(decoded_metastake_tk_attributes['lp_farm_token_nonce'])
+        farm_tk_details = context.network_provider.api.get_non_fungible_token(
+            metastake_contract.farm_token, decoded_metastake_tk_attributes['lp_farm_token_nonce']
         )
 
         full_metastake_amount = metastake_token_amount
@@ -551,7 +550,7 @@ def generateClaimStakingRewardsEvent(context: Context, user: Account, staking_co
 
         event = ClaimRewardsFarmEvent(stake_token_amount, stake_token_nonce, attributes)
 
-        tx_hash = staking_contract.claimRewards(context.network_provider, user, event)
+        tx_hash = staking_contract.claim_rewards(context.network_provider, user, event)
         context.observable.set_event(staking_contract, user, event, tx_hash)
 
     except Exception as ex:
@@ -579,8 +578,8 @@ def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastak
         context.observable.set_event(None, user, set_token_balance_event, '')
 
         farm_position = get_lp_from_metastake_token_attributes(metastake_token_attributes)
-        farm_token_details = context.api.get_nft_data(
-            metastake_contract.farm_token + '-' + dec_to_padded_hex(farm_position['lp_farm_token_nonce'])
+        farm_token_details = context.network_provider.api.get_non_fungible_token(
+            metastake_contract.farm_token, farm_position['lp_farm_token_nonce']
         )
 
         # update data for staking, farm and pair trackers inside metastaking tracker
@@ -859,11 +858,12 @@ def generate_deposit_pd_liquidity_event(context: Context, user_account: Account,
     tx_hash = pd_contract.deposit_liquidity(context.network_provider, user_account, event)
 
     # track and check event results
-    if hasattr(context, 'price_discovery_trackers'):
-        index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-        context.price_discovery_trackers[index].deposit_event_tracking(
-            event, user_account.address, tx_hash
-        )
+    # TODO: has to be reworked
+    # if hasattr(context, 'price_discovery_trackers'):
+    #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
+    #     context.price_discovery_trackers[index].deposit_event_tracking(
+    #         event, user_account.address, tx_hash
+    #     )
 
 
 def generate_random_deposit_pd_liquidity_event(context: Context):
@@ -888,11 +888,12 @@ def generate_withdraw_pd_liquidity_event(context: Context, user_account: Account
     tx_hash = pd_contract.withdraw_liquidity(context.network_provider, user_account, event)
 
     # track and check event results
-    if hasattr(context, 'price_discovery_trackers'):
-        index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-        context.price_discovery_trackers[index].withdraw_event_tracking(
-            event, user_account.address, tx_hash
-        )
+    # TODO: has to be reworked
+    # if hasattr(context, 'price_discovery_trackers'):
+    #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
+    #     context.price_discovery_trackers[index].withdraw_event_tracking(
+    #         event, user_account.address, tx_hash
+    #     )
 
 
 def generate_random_withdraw_pd_liquidity_event(context: Context):
@@ -917,11 +918,12 @@ def generate_redeem_pd_liquidity_event(context: Context, user_account: Account, 
     tx_hash = pd_contract.redeem_liquidity_position(context.network_provider, user_account, event)
 
     # track and check event results
-    if hasattr(context, 'price_discovery_trackers'):
-        index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-        context.price_discovery_trackers[index].redeem_event_tracking(
-            event, user_account.address, tx_hash
-        )
+    # TODO: has to be reworked
+    # if hasattr(context, 'price_discovery_trackers'):
+    #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
+    #     context.price_discovery_trackers[index].redeem_event_tracking(
+    #         event, user_account.address, tx_hash
+    #     )
 
 
 def generate_random_redeem_pd_liquidity_event(context: Context):

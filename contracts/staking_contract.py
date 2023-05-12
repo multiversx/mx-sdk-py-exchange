@@ -297,6 +297,30 @@ class StakingContract(DEXContractInterface):
             else "addSCAddressToWhitelist"
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
 
+    def set_burn_role_for_address(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
+        function_purpose = f"Set burn role for address"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            Address(contract_to_whitelist)
+        ]
+
+        endpoint_name = "setBurnRoleForAddress"
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
+
+    def add_admin(self, deployer: Account, proxy: ProxyNetworkProvider, address_to_whitelist: str):
+        function_purpose = f"Add admin"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            Address(address_to_whitelist)
+        ]
+
+        endpoint_name = "addAdmin"
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
+
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.start_produce_rewards(deployer, proxy)
         _ = self.resume(deployer, proxy)

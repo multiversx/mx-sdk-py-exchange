@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 from deploy.dex_structure import DeployStructure
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import Account
+from utils.utils_chain import Account, WrapperAddress as Address
 import config
 
 
@@ -27,6 +27,8 @@ def main(cli_args: List[str]):
 
     deploy_structure = DeployStructure()
     deployer_account = Account(pem_file=config.DEFAULT_OWNER)
+    if config.DEX_OWNER_ADDRESS:  # manual override only for shadowfork
+        deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
 
     dex_infra = DexInfrastructure(deploy_structure, deployer_account, config.DEFAULT_PROXY, config.DEFAULT_API)
 

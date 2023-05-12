@@ -1,0 +1,50 @@
+[
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqs86sq635ypskzek6rjwk8z0z04gnzcmd295q6dr0rz",
+        "metastake_token": "METARIDELK-ca8c4c",
+        "staking_token": "RIDE-3954e7",
+        "lp_token": "EGLDRIDE-88d0b3",
+        "farm_token": "EGLDRIDEFL-28d8fe",
+        "stake_token": "SRIDE-471ed5",
+        "lp_address": "erd1qqqqqqqqqqqqqpgq5dkvkrn56yrgavwx8fm9ld9eqj07g7ps295qchle4z",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqjm07lvdzdz8j73wx4da998kw5nx68uyj295qfw8gtg",
+        "stake_address": "erd1qqqqqqqqqqqqqpgq8q78r2sm5nj5g488nt20dgx03ws3pq4k295qwcyv9t",
+        "version": 2
+    },
+    {
+        "address": "erd1qqqqqqqqqqqqqpgq7sy6m5j8y9udefcw6zx6j8y6g28kmnp6295q8e8ey2",
+        "metastake_token": "METAITHLK-f52488",
+        "staking_token": "ITHEUM-471743",
+        "lp_token": "ITHWEGLD-91eb49",
+        "farm_token": "ITHWEGLDFL-e1848a",
+        "stake_token": "SITHEUM-f18936",
+        "lp_address": "erd1qqqqqqqqqqqqqpgqkdxw8ewquxtt64t8rmdgqz3ja0zjycfm295qpdm8at",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqaathw30vz468zxukyjzxc4aqnzrd2n5u295q4l9ycs",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqjjv6qu7g2y0rtrj7eusqqj0csy96ufwe295qfz8rmx",
+        "version": 2
+    },
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqpyd3zz9jdjymk20pjqh4u3lkttayky86295qkgzw7c",
+        "metastake_token": "METAUTKLK-eff51a",
+        "staking_token": "UTK-b97480",
+        "lp_token": "UTKWEGLD-8274dd",
+        "farm_token": "UTKWEGLDFL-8fca06",
+        "stake_token": "SUTK-21a268",
+        "lp_address": "erd1qqqqqqqqqqqqqpgqtpmxc0e2snvns20hh8fs6udadpewhdr4295qzaln0d",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqklt6n96ljjtr6vr8vqjjqcn9an46ylfj295qzu44uk",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqa6hl0nt02qql6lk0tvpkx34ltdvstrka295q9qwe5m",
+        "version": 2
+    },
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqpy3j36t5nkkpp5sen5e9at5m2vwlsxqj295q4pzp8e",
+        "metastake_token": "METACRTLK-f8dd1d",
+        "staking_token": "CRT-a2c008",
+        "lp_token": "CRTWEGLD-c98d7b",
+        "farm_token": "CRTWEGLDFL-f26161",
+        "stake_token": "SCRT-0d3438",
+        "lp_address": "erd1qqqqqqqqqqqqqpgq44x5r0zqskypepmv6csxr2q5027vj0rw295q97v2ek",
+        "farm_address": "erd1qqqqqqqqqqqqqpgq6nu45zq54wg6x85n2cfwq8zmh7asdu2n295qwpsrt6",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqrwk3a2q4uqp5aulskd07w80cvddqqsc6295qmv35f9",
+        "version": 2
+    }
+]

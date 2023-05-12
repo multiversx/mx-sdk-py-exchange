@@ -2,7 +2,7 @@ import sys
 import traceback
 from operator import ne
 
-from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity
+from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity, MetaStakingContractVersion
 from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent,
                                      MergeMetastakeWithStakeEvent)
 from utils.logger import get_logger
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 class MetaStakingContract(DEXContractInterface):
     def __init__(self, staking_token: str, lp_token: str, farm_token: str, stake_token: str,
                  lp_address: str, farm_address: str, stake_address: str,
-                 metastake_token: str = "", address: str = ""):
+                 version: MetaStakingContractVersion, metastake_token: str = "", address: str = ""):
         self.address = address
         self.metastake_token = metastake_token
         self.staking_token = staking_token
@@ -31,6 +31,7 @@ class MetaStakingContract(DEXContractInterface):
         self.lp_address = lp_address
         self.farm_address = farm_address
         self.stake_address = stake_address
+        self.version = version
 
     def get_config_dict(self) -> dict:
         output_dict = {
@@ -42,7 +43,8 @@ class MetaStakingContract(DEXContractInterface):
             "stake_token": self.stake_token,
             "lp_address": self.lp_address,
             "farm_address": self.farm_address,
-            "stake_address": self.stake_address
+            "stake_address": self.stake_address,
+            "version": self.version.value,
         }
         return output_dict
 
@@ -56,7 +58,8 @@ class MetaStakingContract(DEXContractInterface):
                                    stake_token=config_dict['stake_token'],
                                    lp_address=config_dict['lp_address'],
                                    farm_address=config_dict['farm_address'],
-                                   stake_address=config_dict['stake_address'])
+                                   stake_address=config_dict['stake_address'],
+                                   version=MetaStakingContractVersion(config_dict['version']))
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         function_purpose = f"Deploy metastaking contract"
@@ -130,12 +133,25 @@ class MetaStakingContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.metastake_token),
                              "setLocalRolesDualYieldToken", sc_args)
 
+    def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
+        function_purpose = f"Whitelist contract in metastaking"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            Address(contract_to_whitelist)
+        ]
+
+        endpoint_name = "addSCAddressToWhitelist"
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
+
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
 
     def print_contract_info(self):
         log_step_pass(f"Deployed metastaking contract: {self.address}")
         log_substep(f"Staking token: {self.staking_token}")
+        log_substep(f"Metastake token: {self.metastake_token}")
         log_substep(f"Stake address: {self.stake_address}")
         log_substep(f"Farm address: {self.farm_address}")
         log_substep(f"LP address: {self.lp_address}")

@@ -43,27 +43,64 @@ class SimpleLockContract(DEXContractInterface):
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def issue_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, locked_lp_token: str):
+    def issue_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: token display name
+            type[str]: token ticker
+        """
         function_purpose = f"Issue locked LP token"
         logger.info(function_purpose)
 
+        if len(args) != 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
         gas_limit = 100000000
         sc_args = [
-            locked_lp_token,
-            locked_lp_token,
+            args[0],
+            args[1],
             18
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueLpProxyToken", sc_args,
                              value=config.DEFAULT_ISSUE_TOKEN_PRICE)
 
-    def issue_locked_token(self, deployer: Account, proxy: ProxyNetworkProvider, locked_token: str):
-        function_purpose = f"Issue locked token"
+    def issue_locked_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: token display name
+            type[str]: token ticker
+        """
+        function_purpose = f"Issue locked farm token"
         logger.info(function_purpose)
+
+        if len(args) != 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
 
         gas_limit = 100000000
         sc_args = [
-            locked_token,
-            locked_token,
+            args[0],
+            args[1],
+            18
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueFarmProxyToken", sc_args,
+                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+
+    def issue_locked_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: token display name
+            type[str]: token ticker
+        """
+        function_purpose = f"Issue locked token"
+        logger.info(function_purpose)
+
+        if len(args) != 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 100000000
+        sc_args = [
+            args[0],
+            args[1],
             18
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueLockedToken", sc_args,
@@ -105,6 +142,27 @@ class SimpleLockContract(DEXContractInterface):
             args[2]
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addLpToWhitelist", sc_args)
+
+    def add_farm_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: farm address
+            type[str]: farming token identifier
+            type[str]: farm type: 0 - simple, 1 - locked, 2 - boosted
+        """
+        function_purpose = f"Add Farm to Whitelist in simple lock contract"
+        logger.info(function_purpose)
+
+        if len(args) != 3:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 100000000
+        sc_args = [
+            Address(args[0]),
+            args[1],
+            args[2]
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addFarmToWhitelist", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
