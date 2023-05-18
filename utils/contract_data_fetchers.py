@@ -35,7 +35,7 @@ class DataFetcher:
     def _get_int_view(self, view_name: str, attrs) -> int:
         try:
             result = self._query_contract(view_name, attrs)
-            if result.return_data == '':
+            if result.return_data[0] == '':
                 return 0
             return int(base64_to_hex(result.return_data[0]), base=16)
         except Exception as ex:

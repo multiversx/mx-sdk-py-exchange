@@ -1417,11 +1417,16 @@ class DeployStructure:
                 log_step_fail(f"Failed to set up energy contract in farm. Energy contract not available!")
                 return
 
-            # Set locking contract
             if locking_contract is not None:
+                # Set locking contract
                 tx_hash = deployed_contract.set_locking_address(deployer_account, network_providers.proxy,
                                                                 locking_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash, "set locking address in farm"): return
+
+                # Whitelist farm in locking contract
+                tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
+                                                               deployed_contract.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in locking contract"): return
             else:
                 log_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
                 return
@@ -1771,7 +1776,7 @@ class DeployStructure:
 
             # topup rewards
             tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
-            if not network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract"): return
+            _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
 
             deployed_contracts.append(deployed_staking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts

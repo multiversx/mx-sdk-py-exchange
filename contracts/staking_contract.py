@@ -72,6 +72,8 @@ class StakingContract(DEXContractInterface):
 
         tokens = [ESDTToken(event.farm_token, event.nonce, event.amount)]
         args = [tokens]
+        if self.version == StakingContractVersion.V3Boosted:
+            args.append(event.exit_amount)
 
         return multi_esdt_endpoint_call(unstake_fn, network_provider.proxy, gas_limit, user,
                                         Address(self.address), unstake_fn, args)
@@ -250,6 +252,16 @@ class StakingContract(DEXContractInterface):
         gas_limit = 30000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "collectUndistributedBoostedRewards",
+                             sc_args)
+    
+    def set_max_apr(self, deployer: Account, proxy: ProxyNetworkProvider, percentage: int):
+        function_purpose = "Set max APR"
+        logger.info(function_purpose)
+
+        gas_limit = 70000000
+        sc_args = [percentage]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setMaxApr",
                              sc_args)
 
     def resume(self, deployer: Account, proxy: ProxyNetworkProvider):

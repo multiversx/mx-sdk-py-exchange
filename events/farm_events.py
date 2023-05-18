@@ -13,11 +13,12 @@ class EnterFarmEvent:
 
 
 class ExitFarmEvent:
-    def __init__(self, farm_token: str, amount: int, nonce: int, attributes: str):
+    def __init__(self, farm_token: str, amount: int, nonce: int, attributes: str, exit_amount: int = 0):
         self.farm_token = farm_token
         self.amount = amount
         self.nonce = nonce
         self.attributes = attributes    # hex
+        self.exit_amount = exit_amount
 
 
 class ClaimRewardsFarmEvent:
