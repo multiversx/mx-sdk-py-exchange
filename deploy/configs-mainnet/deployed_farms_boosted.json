@@ -47,5 +47,19 @@
         "farmedToken": "MEX-455c57",
         "address": "erd1qqqqqqqqqqqqqpgq6v5ta4memvrhjs4x3gqn90c3pujc77takp2sqhxm9j",
         "version": 4
+    },
+    {
+        "farmingToken": "ZPAYWEGLD-34e5c1",
+        "farmToken": "ZPAYEGLDFL-4faf85",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqqqckvlhd3n7ntt5w3vln4xh3tsfpj0hr2jpsxlzgcj",
+        "version": 4
+    },
+    {
+        "farmingToken": "BHATWEGLD-f45935",
+        "farmToken": "BHATEGLDFL-259b84",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqcfkmz2j0e8pj0nzuk9j6mzcav0wpthq52jpsg546ch",
+        "version": 4
     }
 ]
