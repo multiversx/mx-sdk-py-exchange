@@ -29,7 +29,7 @@ from utils.utils_tx import NetworkProviders
 from utils.utils_chain import hex_to_string
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils.utils_generic import write_json_file, read_json_file, log_step_fail, log_step_pass, \
-    log_warning
+    log_warning, get_continue_confirmation
 from deploy import populate_deploy_lists
 
 
@@ -269,6 +269,15 @@ class DeployStructure:
                 contracts.load_deployed_contracts()
             else:
                 log_step_pass(f"Starting setup process for {contract_label}:")
+
+                # if aborted deploy & setup, maybe attempt load instead
+                if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
+                    log_step_pass(f"Attempting load for {contract_label}:")
+                    if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
+                        return
+                    contracts.load_deployed_contracts()
+                    return
+
                 contracts.deploy_function(contract_label, deployer_account, network_provider)
                 if len(contracts.deployed_contracts) > 0:
                     contracts.print_deployed_contracts()

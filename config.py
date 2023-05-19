@@ -21,6 +21,8 @@ DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
 DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
+FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations
+
 # DEX contract bytecode paths
 EGLD_WRAP_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-bridge-elrond" / "egld-esdt-swap" / "output" / "egld-wrap.wasm"
 LOCKED_ASSET_FACTORY_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "factory" / "factory.wasm"
