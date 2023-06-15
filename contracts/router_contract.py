@@ -72,6 +72,42 @@ class RouterContract(DEXContractInterface):
 
         return tx_hash
 
+    def add_common_tokens_for_user_pairs(self, owner: Account, proxy: ProxyNetworkProvider, *tokens):
+        """Expecting as args:
+            type[str..]: common token IDs
+        """
+        function_purpose = f"Add common tokens for user pairs"
+        logger.info(function_purpose)
+
+        gas_limit = 100000000
+
+        sc_args = []
+        for token in tokens:
+            sc_args.append(token)
+
+        return endpoint_call(proxy, gas_limit, owner, Address(self.address), "addCommonTokensForUserPairs", sc_args)
+
+    def config_enable_by_user_parameters(self, deployer: Account, proxy: ProxyNetworkProvider, **kargs):
+        """Expecting as args:
+            type[str]: common_token_id
+            type[str]: locked_token_id
+            type[int]: min_locked_token_value
+            type[int]: min_lock_period_epochs
+        """
+        function_purpose = f"Add enable config for common token"
+        logger.info(function_purpose)
+
+        gas_limit = 100000000
+
+        sc_args = [
+            kargs['common_token_id'],
+            kargs['locked_token_id'],
+            kargs['min_locked_token_value'],
+            kargs['min_lock_period_epochs']
+        ]
+
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "configEnableByUserParameters", sc_args)
+
     def pair_contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """Expecting as args:
             type[str]: first pair token
