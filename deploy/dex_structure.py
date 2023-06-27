@@ -307,7 +307,7 @@ class DeployStructure:
         energy_factory: Optional[SimpleLockEnergyContract] = None
         energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
         whitelist = [config.PROXIES_V2, config.FEES_COLLECTORS,
-                     config.UNSTAKERS, config.METASTAKINGS_V2]
+                     config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED]
 
         # gather contract addresses to whitelist
         addresses = []

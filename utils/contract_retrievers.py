@@ -1,7 +1,7 @@
 from typing import Optional
 
 from contracts.contract_identities import PairContractVersion, RouterContractVersion, \
-    FarmContractVersion, StakingContractVersion, ProxyContractVersion
+    FarmContractVersion, StakingContractVersion, ProxyContractVersion, MetaStakingContractVersion
 from contracts.dex_proxy_contract import DexProxyContract
 from contracts.farm_contract import FarmContract
 from contracts.fees_collector_contract import FeesCollectorContract
@@ -82,17 +82,34 @@ def retrieve_fees_collector_by_address(address: str) -> Optional[FeesCollectorCo
     return contract
 
 
-def retrieve_staking_by_address(address: str) -> Optional[StakingContract]:
+def retrieve_staking_by_address(address: str, version: StakingContractVersion) -> Optional[StakingContract]:
     data_fetcher = StakingContractDataFetcher(Address(address), config.DEFAULT_PROXY)
     farming_token = hex_to_string(data_fetcher.get_data("getFarmingTokenId"))
     farm_token = hex_to_string(data_fetcher.get_data("getFarmTokenId"))
-    division_constant = data_fetcher.get_data("getDivisionSafetyConstant")
     max_apr = data_fetcher.get_data("getAnnualPercentageRewards")
     unbond_epochs = data_fetcher.get_data("getMinUnbondEpochs")
     rewards_per_block = data_fetcher.get_data("getPerBlockRewardAmount")
 
-    contract = StakingContract(farming_token, max_apr, rewards_per_block, unbond_epochs, StakingContractVersion.V1,
+    contract = StakingContract(farming_token, max_apr, rewards_per_block, unbond_epochs, version,
                                farm_token, address)
+    return contract
+
+
+def retrieve_proxy_staking_by_address(address: str,
+                                      version: MetaStakingContractVersion) -> Optional[MetaStakingContract]:
+    data_fetcher = MetaStakingContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+
+    staking_token = hex_to_string(data_fetcher.get_data("getStakingTokenId"))
+    lp_token = hex_to_string(data_fetcher.get_data("getLpTokenId"))
+    farm_token = hex_to_string(data_fetcher.get_data("getLpFarmTokenId"))
+    stake_token = hex_to_string(data_fetcher.get_data("getFarmTokenId"))
+    lp_address = Address.from_hex(data_fetcher.get_data("getPairAddress")).bech32()
+    farm_address = Address.from_hex(data_fetcher.get_data("getLpFarmAddress")).bech32()
+    stake_address = Address.from_hex(data_fetcher.get_data("getStakingFarmAddress")).bech32()
+    metastake_token = hex_to_string(data_fetcher.get_data("getDualYieldTokenId"))
+
+    contract = MetaStakingContract(staking_token, lp_token, farm_token, stake_token, lp_address,
+                                   farm_address, stake_address, version, metastake_token, address)
     return contract
 
 

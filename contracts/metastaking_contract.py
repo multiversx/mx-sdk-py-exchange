@@ -180,30 +180,36 @@ class MetaStakingContract(DEXContractInterface):
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
-        gas_limit = 50000000
+        gas_limit = 70000000
         exit_metastake_fn = 'unstakeFarmTokens'
 
-        tokens = [ESDTToken(self.metastake_token, event.nonce, event.amount)]
+        if self.version == MetaStakingContractVersion.V3Boosted:
+            tokens = [ESDTToken(self.metastake_token, event.nonce, event.whole_metastake_token_amount)]
+        else:
+            tokens = [ESDTToken(self.metastake_token, event.nonce, event.amount)]
         sc_args = [tokens,
                    1,   # first token slippage
                    1    # second token slippage
                    ]
+        if self.version == MetaStakingContractVersion.V3Boosted:
+            sc_args.append(event.amount)
 
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
                                         user, Address(self.address), exit_metastake_fn, sc_args)
 
-    def claim_rewards_metastaking(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsMetastakeEvent):
+    def claim_rewards_metastaking(self, network_provider: NetworkProviders, user: Account,
+                                  event: ClaimRewardsMetastakeEvent):
         function_purpose = f"claimDualYield"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
-        gas_limit = 50000000
+        gas_limit = 70000000
         claim_fn = 'claimDualYield'
 
         tokens = [ESDTToken(self.metastake_token, event.nonce, event.amount)]
 
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), claim_fn, tokens)
+                                        user, Address(self.address), claim_fn, [tokens])
 
     def merge_metastaking_with_staking_token(self, network_provider: NetworkProviders, user: Account,
                                              event: MergeMetastakeWithStakeEvent):

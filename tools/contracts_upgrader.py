@@ -7,10 +7,11 @@ import requests
 from argparse import ArgumentParser
 from typing import List
 
+from context import Context
 from ported_arrows.AutomaticTests.ElasticIndexer import ElasticIndexer
 from ported_arrows.AutomaticTests.ProxyExtension import ProxyExtension
 from contracts.contract_identities import RouterContractVersion, PairContractVersion, \
-    StakingContractVersion, ProxyContractVersion, FarmContractVersion
+    StakingContractVersion, ProxyContractVersion, FarmContractVersion, MetaStakingContractVersion
 from contracts.dex_proxy_contract import DexProxyContract
 from contracts.farm_contract import FarmContract
 from contracts.fees_collector_contract import FeesCollectorContract
@@ -19,29 +20,30 @@ from contracts.metastaking_contract import MetaStakingContract
 from contracts.staking_contract import StakingContract
 from tools.account_state import get_account_keys_online, report_key_files_compare
 from utils.contract_retrievers import retrieve_router_by_address, retrieve_pair_by_address, \
-    retrieve_staking_by_address, retrieve_simple_lock_energy_by_address
+    retrieve_staking_by_address, retrieve_proxy_staking_by_address
 from utils.contract_data_fetchers import RouterContractDataFetcher, PairContractDataFetcher, \
     StakingContractDataFetcher, FarmContractDataFetcher
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import base64_to_hex
+from utils.utils_chain import base64_to_hex, Account
 from utils.utils_generic import log_step_fail
-from tools import config_contracts_upgrader as config
-from multiversx_sdk_cli.accounts import Address, Account
+import config
+from multiversx_sdk_cli.accounts import Address
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from pathlib import Path
 
 PROXY = config.DEFAULT_PROXY
 API = config.DEFAULT_API
-
 GRAPHQL = config.GRAPHQL
 
-PROXY_DEX_CONTRACT = config.PROXY_DEX_CONTRACT
-LOCKED_ASSET_FACTORY_CONTRACT = config.LOCKED_ASSET_FACTORY_CONTRACT
-ROUTER_CONTRACT = config.ROUTER_CONTRACT
-FEES_COLLECTOR_CONTRACT = config.FEES_COLLECTOR_CONTRACT
-DEX_OWNER = config.DEX_OWNER  # only needed for shadowfork
+CONTEXT = Context()
 
-OUTPUT_FOLDER = config.OUTPUT_FOLDER
+PROXY_DEX_CONTRACT = CONTEXT.get_contracts(config.PROXIES_V2)[0].address
+LOCKED_ASSET_FACTORY_CONTRACT = CONTEXT.get_contracts(config.LOCKED_ASSETS)[0].address
+ROUTER_CONTRACT = CONTEXT.get_contracts(config.ROUTER_V2)[0].address
+FEES_COLLECTOR_CONTRACT = CONTEXT.get_contracts(config.FEES_COLLECTORS)[0].address
+DEX_OWNER = config.DEX_OWNER_ADDRESS  # only needed for shadowfork
+
+OUTPUT_FOLDER = config.UPGRADER_OUTPUT_FOLDER
 
 
 LOCKED_ASSET_LABEL = "locked_asset"
@@ -67,7 +69,10 @@ SHADOWFORK = False if "shadowfork" not in PROXY else True
 
 def main(cli_args: List[str]):
     parser = ArgumentParser()
-    parser.add_argument("--fetch-contracts", action="store_true", default=False)
+    parser.add_argument("--fetch-pairs", action="store_true", default=False)
+    parser.add_argument("--fetch-stakings", action="store_true", default=False)
+    parser.add_argument("--fetch-metastakings", action="store_true", default=False)
+    parser.add_argument("--fetch-farms", action="store_true", default=False)
     parser.add_argument("--fetch-pause-state", action="store_true", default=False)
     parser.add_argument("--pause-pairs", action="store_true", default=False)
     parser.add_argument("--resume-pairs", action="store_true", default=False)
@@ -93,26 +98,24 @@ def main(cli_args: List[str]):
     parser.add_argument("--set-fees-collector-in-pairs", action="store_true", default=False)
     parser.add_argument("--update-fees-in-pairs", action="store_true", default=False)
     parser.add_argument("--fetch-state", required=False, default="")
+    parser.add_argument("--compare-state", action="store_true", default=False)
     args = parser.parse_args(cli_args)
 
-    api = ElasticIndexer(API)
-    proxy = ProxyNetworkProvider(PROXY)
-    extended_proxy = ProxyExtension(PROXY)
-    network_providers = NetworkProviders(api, proxy, extended_proxy)
+    network_providers = NetworkProviders(API, PROXY)
 
     owner = Account(pem_file=config.DEFAULT_OWNER)
     if SHADOWFORK:
         owner.address = Address(DEX_OWNER)      # ONLY FOR SHADOWFORK
     owner.sync_nonce(network_providers.proxy)
 
-    if args.fetch_contracts:
-        fetch_and_save_pairs_from_chain(proxy)
-        time.sleep(3)
-        # fetch_and_save_stakings_from_chain(proxy)
-        time.sleep(3)
-        # fetch_and_save_metastakings_from_chain(proxy)
-        time.sleep(3)
-        # fetch_and_save_farms_from_chain(proxy)
+    if args.fetch_pairs:
+        fetch_and_save_pairs_from_chain(network_providers.proxy)
+    if args.fetch_stakings:
+        fetch_and_save_stakings_from_chain(network_providers.proxy)
+    if args.fetch_metastakings:
+        fetch_and_save_metastakings_from_chain(network_providers.proxy)
+    if args.fetch_farms:
+        fetch_and_save_farms_from_chain(network_providers.proxy)
 
     elif args.fetch_pause_state:
         fetch_and_save_pause_state(network_providers)
@@ -157,13 +160,13 @@ def main(cli_args: List[str]):
         set_transfer_role_farmv13_contracts(owner, network_providers)
 
     elif args.upgrade_stakings:
-        upgrade_staking_contracts(owner, network_providers)
+        upgrade_staking_contracts(owner, network_providers, args.compare_state)
 
     elif args.upgrade_stakings_fix:
         upgrade_fix_staking_contracts(owner, network_providers)
 
     elif args.upgrade_metastakings:
-        upgrade_metastaking_contracts(owner, network_providers)
+        upgrade_metastaking_contracts(owner, network_providers, args.compare_state)
 
     elif args.set_pairs_in_fees_collector:
         set_pairs_in_fees_collector(owner, network_providers)
@@ -187,7 +190,7 @@ def main(cli_args: List[str]):
         update_fees_percentage(owner, network_providers)
 
     if args.fetch_state:
-        fetch_contract_states(args.fetch_state, network_providers)
+        fetch_all_contracts_states(args.fetch_state, network_providers)
 
 
 def save_wasm(code_data_hex: str, code_hash: str):
@@ -208,14 +211,14 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
     for address in contract_addresses:
         contract_addr = Address(address)
         account_data = proxy.get_account(contract_addr)
-        code_hash = base64_to_hex(account_data['codeHash'])
+        code_hash = base64_to_hex(account_data.code_hash)
 
         if code_hash not in pairs_data:
             pairs_data[code_hash] = {
                 contract_label: [],
-                "code": account_data['code']
+                "code": account_data.code.hex()
             }
-            save_wasm(account_data['code'], code_hash)
+            save_wasm(account_data.code.hex(), code_hash)
         pairs_data[code_hash][contract_label].append(contract_addr.bech32())
 
     with open(save_path, "w") as writer:
@@ -336,11 +339,13 @@ def get_saved_contracts_data(saved_file: Path) -> dict:
     return contracts_data
 
 
-def get_saved_contract_addresses(contract_label: str, saved_file: Path) -> list:
+def get_saved_contract_addresses(contract_label: str, saved_file: Path, searched_bytecode_hash: str = '') -> list:
     contracts_data = get_saved_contracts_data(saved_file)
     contracts_addresses = []
-    for bytecode_version in contracts_data.values():
-        contracts_addresses.extend(bytecode_version[contract_label])
+    for bytecode_hash, contracts in contracts_data.items():
+        if searched_bytecode_hash and bytecode_hash != searched_bytecode_hash:
+            continue
+        contracts_addresses.extend(contracts[contract_label])
     return contracts_addresses
 
 
@@ -384,8 +389,9 @@ def get_all_staking_addresses() -> list:
     return get_saved_contract_addresses(STAKINGS_LABEL, OUTPUT_STAKING_CONTRACTS_FILE)
 
 
-def get_all_metastaking_addresses() -> list:
-    return get_saved_contract_addresses(METASTAKINGS_LABEL, OUTPUT_METASTAKING_CONTRACTS_FILE)
+def get_all_metastaking_addresses(searched_bytecode_hash: str = '') -> list:
+    return get_saved_contract_addresses(METASTAKINGS_LABEL, OUTPUT_METASTAKING_CONTRACTS_FILE,
+                                        searched_bytecode_hash)
 
 
 def fetch_and_save_pause_state(network_providers: NetworkProviders):
@@ -691,23 +697,37 @@ def upgrade_energy_contract(dex_owner: Account, network_providers: NetworkProvid
     pass
 
 
-def upgrade_staking_contracts(dex_owner: Account, network_providers: NetworkProviders):
+def upgrade_staking_contracts(dex_owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
     staking_addresses = get_all_staking_addresses()
+    if not staking_addresses:
+        print("No staking contracts available!")
+        return
+
+    if compare_states:
+        print(f"Fetching contracts states before upgrade...")
+        fetch_contracts_states("pre", network_providers, staking_addresses, STAKINGS_LABEL)
+
+        if not get_user_continue():
+            return
 
     count = 1
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        staking_contract = retrieve_staking_by_address(staking_address)
+        if not get_user_continue():
+            return
 
-        staking_contract.version = StakingContractVersion.V2
-        tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, config.STAKING_V2_BYTECODE_PATH,
+        staking_contract = retrieve_staking_by_address(staking_address, StakingContractVersion.V2)
+
+        staking_contract.version = StakingContractVersion.V3Boosted
+        tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, config.STAKING_V3_BYTECODE_PATH,
                                                     [dex_owner.address.bech32()])
 
         if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
             if not get_user_continue():
                 return
 
-        fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
+        if compare_states:
+            fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
 
         if not get_user_continue():
             return
@@ -721,9 +741,7 @@ def upgrade_fix_staking_contracts(dex_owner: Account, network_providers: Network
     count = 1
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        staking_contract = retrieve_staking_by_address(staking_address)
-
-        staking_contract.version = StakingContractVersion.V2
+        staking_contract = retrieve_staking_by_address(staking_address, StakingContractVersion.V2)
 
         print(f"Processing contract for: {staking_contract.farming_token}")
         block_number = input(f"Previous upgrade block number:\n")
@@ -746,23 +764,38 @@ def upgrade_fix_staking_contracts(dex_owner: Account, network_providers: Network
         count += 1
 
 
-def upgrade_metastaking_contracts(dex_owner: Account, network_providers: NetworkProviders):
-    metastaking_addresses = get_all_metastaking_addresses()
+def upgrade_metastaking_contracts(dex_owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
+    metastaking_addresses = get_all_metastaking_addresses('56468a6ae726693a71edcf96cf44673466dd980412388e1e4b073a0b4ee592d7')
+    if not metastaking_addresses:
+        print("No metastaking contracts available!")
+        return
+
+    if compare_states:
+        print(f"Fetching contracts states before upgrade...")
+        fetch_contracts_states("pre", network_providers, metastaking_addresses, METASTAKINGS_LABEL)
+
+        if not get_user_continue():
+            return
 
     count = 1
     for metastaking_address in metastaking_addresses:
         print(f"Processing contract {count} / {len(metastaking_addresses)}: {metastaking_address}")
-        metastaking_contract = MetaStakingContract("", "", "", "", "", "", "", "", metastaking_address)
+        if not get_user_continue():
+            return
 
+        metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, MetaStakingContractVersion.V2)
+
+        metastaking_contract.version = MetaStakingContractVersion.V3Boosted
         tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                                        config.STAKING_PROXY_BYTECODE_PATH, [],
-                                                        no_init=True)
+                                                        config.STAKING_PROXY_BYTECODE_PATH, [])
 
-        if not network_providers.check_complex_tx_status(tx_hash, f"upgrade metastaking contract: {metastaking_address}"):
+        if not network_providers.check_complex_tx_status(tx_hash,
+                                                         f"upgrade metastaking contract: {metastaking_address}"):
             if not get_user_continue():
                 return
 
-        fetch_new_and_compare_contract_states(METASTAKINGS_LABEL, metastaking_address, network_providers)
+        if compare_states:
+            fetch_new_and_compare_contract_states(METASTAKINGS_LABEL, metastaking_address, network_providers)
 
         if not get_user_continue():
             return
@@ -1008,7 +1041,19 @@ def set_fees_collector_in_pairs(dex_owner: Account, network_providers: NetworkPr
         count += 1
 
 
-def fetch_contract_states(prefix: str, network_providers: NetworkProviders):
+def fetch_contracts_states(prefix: str, network_providers: NetworkProviders, contract_addresses: List[str], label: str):
+    for contract_address in contract_addresses:
+        filename = get_contract_save_name(label, contract_address, prefix)
+        get_account_keys_online(contract_address, network_providers.proxy.url,
+                                with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
+
+
+def fetch_contract_state(contract_address: str, save_name: str, network_providers: NetworkProviders):
+    get_account_keys_online(contract_address, network_providers.proxy.url,
+                            with_save_in=str(OUTPUT_FOLDER / f"{save_name}.json"))
+
+
+def fetch_all_contracts_states(prefix: str, network_providers: NetworkProviders):
     # get locked asset state
     if LOCKED_ASSET_FACTORY_CONTRACT:
         filename = get_contract_save_name(LOCKED_ASSET_LABEL, LOCKED_ASSET_FACTORY_CONTRACT, prefix)
@@ -1039,43 +1084,23 @@ def fetch_contract_states(prefix: str, network_providers: NetworkProviders):
 
     # get pairs contract states
     pair_addresses = get_all_pair_addresses()
-    for pair_address in pair_addresses:
-        filename = get_contract_save_name(PAIRS_LABEL, pair_address, prefix)
-        get_account_keys_online(pair_address, network_providers.proxy.url,
-                                with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
+    fetch_contracts_states(prefix, network_providers, pair_addresses, PAIRS_LABEL)
 
     # get staking states
     staking_addresses = get_all_staking_addresses()
-    for staking_address in staking_addresses:
-        filename = get_contract_save_name(STAKINGS_LABEL, staking_address, prefix)
-        get_account_keys_online(staking_address, network_providers.proxy.url,
-                                with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
+    fetch_contracts_states(prefix, network_providers, staking_addresses, STAKINGS_LABEL)
 
     # get metastaking states
     metastaking_addresses = get_all_metastaking_addresses()
-    for metastaking_address in metastaking_addresses:
-        filename = get_contract_save_name(METASTAKINGS_LABEL, metastaking_address, prefix)
-        get_account_keys_online(metastaking_address, network_providers.proxy.url,
-                                with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
+    fetch_contracts_states(prefix, network_providers, metastaking_addresses, METASTAKINGS_LABEL)
 
     # get farm v12 states
     farm_v12_addresses = get_all_farm_v12_addresses()
-    for farm_address in farm_v12_addresses:
-        filename = get_contract_save_name(FARMSV12_LABEL, farm_address, prefix)
-        get_account_keys_online(farm_address, network_providers.proxy.url,
-                                with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
+    fetch_contracts_states(prefix, network_providers, farm_v12_addresses, FARMSV12_LABEL)
 
     # get farm v13 states
     farm_v13_addresses = get_all_farm_v13_addresses()
-    for farm_address in farm_v13_addresses:
-        filename = get_contract_save_name(FARMSV13_LABEL, farm_address, prefix)
-        get_account_keys_online(farm_address, network_providers.proxy.url,
-                                with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
-
-
-def fetch_contract_state(contract_address: str, save_name: str, network_providers: NetworkProviders):
-    get_account_keys_online(contract_address, network_providers.proxy.url,
-                            with_save_in=str(OUTPUT_FOLDER / f"{save_name}.json"))
+    fetch_contracts_states(prefix, network_providers, farm_v13_addresses, FARMSV13_LABEL)
 
 
 def get_contract_save_name(contract_type: str, address: str, prefix: str):

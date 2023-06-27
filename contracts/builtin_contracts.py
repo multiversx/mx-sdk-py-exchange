@@ -18,6 +18,62 @@ class ESDTContract:
     def __init__(self, esdt_address):
         self.address = esdt_address
 
+    def issue_fungible_token(self, token_owner: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                type[str]: token name
+                type[str]: token ticker
+                type[int]: supply
+                type[int]: decimals
+                type[str...]: properties
+        """
+        function_purpose = "issue token"
+        logger.info(function_purpose)
+        if len(args) < 4:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 100000000
+        sc_args = args
+        return endpoint_call(proxy, gas_limit, token_owner, Address(self.address), "issue", sc_args, value="50000000000000000")
+    
+    def issue_meta_esdt_token(self, token_owner: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                type[str]: token name
+                type[str]: token ticker
+                type[int]: supply
+                type[int]: decimals
+                type[str...]: properties
+        """
+        function_purpose = "issue meta esdt token"
+        logger.info(function_purpose)
+        if len(args) < 4:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 100000000
+        sc_args = args
+        return endpoint_call(proxy, gas_limit, token_owner, Address(self.address), "registerMetaESDT", sc_args, value="50000000000000000")
+    
+    def create_token(self, token_owner: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                type[str]: token id
+                type[int]: initial quantity
+                type[str]: name
+                type[int]: royalties
+                type[str]: hash
+                type[str]: attributes
+                type[str...]: uri
+        """
+        function_purpose = "create token"
+        logger.info(function_purpose)
+        if len(args) < 3:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 50000000
+        sc_args = args
+        return endpoint_call(proxy, gas_limit, token_owner, Address(self.address), "ESDTNFTCreate", sc_args)
+
     def set_special_role_token(self, token_owner: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str]: token_id

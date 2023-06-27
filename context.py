@@ -23,6 +23,7 @@ class Context:
         self.deployer_account = Account(pem_file=config.DEFAULT_OWNER)
         if config.DEX_OWNER_ADDRESS:    # manual override only for shadowforks
             self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
+        self.admin_account = Account(pem_file=config.DEFAULT_ADMIN)
         self.accounts = BunchOfAccounts.load_accounts_from_files([config.DEFAULT_ACCOUNTS])
         self.nonces_file = config.DEFAULT_WORKSPACE / "_nonces.json"
         self.debug_level = 1
@@ -48,6 +49,7 @@ class Context:
 
         # BEGIN DEPLOY
         self.deployer_account.sync_nonce(self.network_provider.proxy)
+        self.admin_account.sync_nonce(self.network_provider.proxy)
 
         # TOKENS HANDLING
         self.deploy_structure.deploy_tokens(self.deployer_account, self.network_provider, False)
