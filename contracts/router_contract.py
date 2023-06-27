@@ -229,6 +229,21 @@ class RouterContract(DEXContractInterface):
             args[2]
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setFeeOn", sc_args)
+    
+    def set_pair_creation_enabled(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[int]: status
+        """
+        function_purpose = f"Set fee on for pool"
+        logger.info(function_purpose)
+
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 10000000
+        sc_args = args
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPairCreationEnabled", sc_args)
 
     def pair_contract_pause(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contract: str):
         function_purpose = f"Pause pair contract"

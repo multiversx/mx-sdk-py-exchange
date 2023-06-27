@@ -4,6 +4,7 @@ import traceback
 from os import read
 from pathlib import Path
 from typing import List, Dict, Union, Tuple
+import config
 
 from multiversx_sdk_core import Transaction, TokenPayment, Address
 from multiversx_sdk_core.interfaces import ICodeMetadata
@@ -285,6 +286,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
 
     tx = builder.build()
     tx.signature = deployer.sign_transaction(tx)
+    logger.debug(f"Upgrade tx: {tx.to_dictionary()}")
 
     return tx
 
@@ -399,6 +401,7 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
     ep_args = args[1:] if len(args) != 1 else []
     tx = prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract, user, network_config,
                                                           gas, endpoint, ep_args, args[0])
+    get_continue_confirmation(config.SKIP_USER_CONFIRMATION)
     tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 
@@ -419,6 +422,7 @@ def multi_esdt_transfer(proxy: ProxyNetworkProvider, gas: int, user: Account, de
         return tx_hash
 
     tx = prepare_multiesdtnfttransfer_tx(dest, user, network_config, gas, args)
+    get_continue_confirmation(config.SKIP_USER_CONFIRMATION)
     tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 
@@ -435,6 +439,7 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
 
     tx = prepare_contract_call_tx(contract, user, network_config, gas, endpoint, args, value)
+    get_continue_confirmation(config.SKIP_USER_CONFIRMATION)
     tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 
@@ -448,6 +453,7 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
     tx_hash, contract_address = "", ""
 
     tx = prepare_deploy_tx(owner, network_config, gas, Path(bytecode_path), metadata, args)
+    get_continue_confirmation(config.SKIP_USER_CONFIRMATION)
     tx_hash = send_deploy_tx(tx, proxy)
 
     if tx_hash:
@@ -464,6 +470,7 @@ def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
 
     tx = prepare_upgrade_tx(owner, contract, network_config, gas, Path(bytecode_path), metadata, args)
+    get_continue_confirmation(config.SKIP_USER_CONFIRMATION)
     tx_hash = send_contract_call_tx(tx, proxy)
     owner.nonce += 1 if tx_hash != "" else 0
 

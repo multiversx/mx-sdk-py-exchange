@@ -20,6 +20,8 @@ DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1_1.pem"       # DE
 DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
+SKIP_USER_CONFIRMATION = False
+
 # DEX contract bytecode paths
 LOCKED_ASSET_FACTORY_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "factory.wasm"
 SIMPLE_LOCK_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "locked-asset" / "simple-lock" / "output" / "simple-lock.wasm"
@@ -38,7 +40,7 @@ STAKING_PROXY_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" /
 SIMPLE_LOCK_ENERGY_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "energy-factory.wasm"
 UNSTAKER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "token-unstake.wasm"
 FEES_COLLECTOR_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "fees-collector.wasm"
-ROUTER_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "router.wasm"
+ROUTER_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "dex" / "router" / "output" / "router.wasm"
 PAIR_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "pair.wasm"
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
 FARM_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "farm-with-locked-rewards.wasm"
