@@ -331,7 +331,7 @@ def get_metastaking_addresses_from_chain() -> list:
 
 def get_saved_contracts_data(saved_file: Path) -> dict:
     if not os.path.exists(saved_file):
-        raise f"Saved contract data from mainnet not available!"
+        raise FileNotFoundError("Saved contract data from mainnet not available!")
 
     print("Reading data...")
     with open(saved_file) as reader:
@@ -340,7 +340,13 @@ def get_saved_contracts_data(saved_file: Path) -> dict:
 
 
 def get_saved_contract_addresses(contract_label: str, saved_file: Path, searched_bytecode_hash: str = '') -> list:
-    contracts_data = get_saved_contracts_data(saved_file)
+    contracts_data = {}
+
+    try:
+        contracts_data = get_saved_contracts_data(saved_file)
+    except FileNotFoundError as e:
+        print(f"Error encountered for {contract_label}: {e}")
+
     contracts_addresses = []
     for bytecode_hash, contracts in contracts_data.items():
         if searched_bytecode_hash and bytecode_hash != searched_bytecode_hash:
@@ -401,17 +407,17 @@ def fetch_and_save_pause_state(network_providers: NetworkProviders):
 
     contract_states = {}
     for pair_address in pair_addresses:
-        data_fetcher = PairContractDataFetcher(pair_address, network_providers.proxy.url)
+        data_fetcher = PairContractDataFetcher(Address(pair_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[pair_address] = contract_state
 
     for staking_address in staking_addresses:
-        data_fetcher = StakingContractDataFetcher(staking_address, network_providers.proxy.url)
+        data_fetcher = StakingContractDataFetcher(Address(staking_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[staking_address] = contract_state
 
     for farm_address in farm_addresses:
-        data_fetcher = FarmContractDataFetcher(farm_address, network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address(farm_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[farm_address] = contract_state
 
@@ -428,7 +434,7 @@ def pause_pair_contracts(dex_owner: Account, network_providers: NetworkProviders
     count = 1
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
-        data_fetcher = PairContractDataFetcher(pair_address, network_providers.proxy.url)
+        data_fetcher = PairContractDataFetcher(Address(pair_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
@@ -477,7 +483,7 @@ def pause_staking_contracts(dex_owner: Account, network_providers: NetworkProvid
     count = 1
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        data_fetcher = StakingContractDataFetcher(staking_address, network_providers.proxy.url)
+        data_fetcher = StakingContractDataFetcher(Address(staking_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
         if contract_state != 0:
@@ -528,7 +534,7 @@ def pause_farm_contracts(dex_owner: Account, network_providers: NetworkProviders
     count = 1
     for farm_address in farm_addresses:
         print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
-        data_fetcher = FarmContractDataFetcher(farm_address, network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address(farm_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract = FarmContract("", "", "", farm_address, FarmContractVersion.V14Locked)
         if contract_state != 0:
