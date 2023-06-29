@@ -1,0 +1,65 @@
+[
+    {
+        "farming_token": "RIDE-3954e7",
+        "farm_token": "SRIDE-471ed5",
+        "address": "erd1qqqqqqqqqqqqqpgq8q78r2sm5nj5g488nt20dgx03ws3pq4k295qwcyv9t",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "ZPAY-8996cf",
+        "farm_token": "SZPAY-80614b",
+        "address": "erd1qqqqqqqqqqqqqpgqlezvckssz546vvpcuuyh0lx9sgj8xjkj295q9tckfl",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "ITHEUM-471743",
+        "farm_token": "SITHEUM-f18936",
+        "address": "erd1qqqqqqqqqqqqqpgqjjv6qu7g2y0rtrj7eusqqj0csy96ufwe295qfz8rmx",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "BHAT-c247be",
+        "farm_token": "SBHAT-c48a97",
+        "address": "erd1qqqqqqqqqqqqqpgqv4h076qlksxnqz0ye635srx2km6z7ym3295qxkz2w0",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "UTK-b97480",
+        "farm_token": "SUTK-21a268",
+        "address": "erd1qqqqqqqqqqqqqpgqa6hl0nt02qql6lk0tvpkx34ltdvstrka295q9qwe5m",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "CRT-a2c008",
+        "farm_token": "SCRT-0d3438",
+        "address": "erd1qqqqqqqqqqqqqpgqrwk3a2q4uqp5aulskd07w80cvddqqsc6295qmv35f9",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "ASH-3538e0",
+        "farm_token": "SASH-2b7579",
+        "address": "erd1qqqqqqqqqqqqqpgqjk4na60qv9mcy4ugjd6ce6l40u6k4dgn295qd50zh0",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    }
+]

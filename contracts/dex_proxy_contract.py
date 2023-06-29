@@ -335,6 +335,28 @@ class DexProxyContract(DEXContractInterface):
         gas_limit = 50000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addPairToIntermediate", [pair_address])
 
+    def set_transfer_role_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
+        function_purpose = "Set transfer role on address for lp token"
+        logger.info(function_purpose)
+
+        if address == "":
+            log_unexpected_args(function_purpose, address)
+            return ""
+
+        gas_limit = 100000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleLockedLpToken", [address])
+    
+    def set_transfer_role_locked_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
+        function_purpose = "Set transfer role on address for farm token"
+        logger.info(function_purpose)
+
+        if address == "":
+            log_unexpected_args(function_purpose, address)
+            return ""
+
+        gas_limit = 100000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleLockedFarmToken", [address])
+    
     def add_farm_to_intermediate(self, deployer: Account, proxy: ProxyNetworkProvider, farm_address: str):
         function_purpose = "Add farm to intermediate in proxy contract"
         logger.info(function_purpose)

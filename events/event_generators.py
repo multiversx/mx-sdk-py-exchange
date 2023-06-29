@@ -21,6 +21,7 @@ from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent,
 from events.price_discovery_events import (DepositPDLiquidityEvent, RedeemPDLPTokensEvent,
                                                              WithdrawPDLiquidityEvent)
 from utils.contract_data_fetchers import PairContractDataFetcher
+from utils.logger import get_logger
 from utils.results_logger import FarmEventResultLogData
 from utils.utils_chain import (prevent_spam_crash_elrond_proxy_go,
                                get_token_details_for_address, get_all_token_nonces_details_for_account,
@@ -29,8 +30,11 @@ from utils.utils_generic import log_step_fail
 from utils.utils_chain import Account, WrapperAddress as Address
 
 
+logger = get_logger(__name__)
+
+
 def generate_add_liquidity_event(context: Context, user_account: Account, pair_contract: PairContract):
-    print('Attempt addLiquidityEvent')
+    logger.info(f'Attempt addLiquidityEvent for {user_account.address.bech32()} on {pair_contract.address}')
     txhash = ''
     try:
         contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
@@ -41,7 +45,8 @@ def generate_add_liquidity_event(context: Context, user_account: Account, pair_c
         _, amount_token_b, _ = get_token_details_for_address(tokens[1], user_account.address.bech32(), context.network_provider.proxy)
 
         if amount_token_a <= 0 or amount_token_b <= 0:
-            log_step_fail(f"Skipped add liquidity because needed tokens NOT found in account.")
+            log_step_fail(f"Skipped add liquidity because needed tokens "
+                          f"NOT found in account {user_account.address.bech32()}.")
             return
 
         max_amount_a = int(amount_token_a * context.add_liquidity_max_amount)
@@ -91,7 +96,7 @@ def generate_add_initial_liquidity_event(context: Context, user_account: Account
 
 
 def generate_remove_liquidity_event(context: Context, user_account: Account, pair_contract: PairContract):
-    print('Attempt removeLiquidityEvent')
+    logger.info(f'Attempt removeLiquidityEvent for {user_account.address.bech32()} on {pair_contract.address}')
     txhash = ''
     try:
         contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
@@ -100,7 +105,8 @@ def generate_remove_liquidity_event(context: Context, user_account: Account, pai
 
         _, amount_lp_token, _ = get_token_details_for_address(pair_contract.lpToken, user_account.address.bech32(), context.network_provider.proxy)
         if amount_lp_token <= 0:
-            print(f"Skipped swap because no {pair_contract.lpToken} found in account.")
+            logger.warning(f"Skipped swap because no {pair_contract.lpToken} "
+                           f"found in account {user_account.address.bech32()}")
             return
 
         amount = random.randrange(int(amount_lp_token * context.remove_liquidity_max_amount))
@@ -136,7 +142,7 @@ def generate_remove_liquidity_event(context: Context, user_account: Account, pai
 
 
 def generate_swap_fixed_input(context: Context, user_account: Account, pair_contract: PairContract):
-    print('Attempt swapFixedInputEvent')
+    logger.info(f'Attempt swapFixedInputEvent for {user_account.address.bech32()} on {pair_contract.address}')
     txhash = ''
     try:
         contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
@@ -146,7 +152,8 @@ def generate_swap_fixed_input(context: Context, user_account: Account, pair_cont
 
         _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.network_provider.proxy)
         if amount_token_a <= 0:
-            print(f"Skipped swap because no {tokens[0]} found in account.")
+            logger.warning(f"Skipped swap because no {tokens[0]} "
+                           f"found in account {user_account.address.bech32()}.")
             return
         amount_token_a_swapped = random.randrange(int(amount_token_a * context.swap_min_tokens_to_spend),
                                                   int(amount_token_a * context.swap_max_tokens_to_spend))
@@ -172,7 +179,7 @@ def generate_swap_fixed_input(context: Context, user_account: Account, pair_cont
         context.observable.set_event(pair_contract, user_account, event, txhash)
 
     except Exception as ex:
-        print(f'Exception encountered: {ex}')
+        logger.error(f'Exception encountered: {ex}')
 
     return txhash
 
@@ -184,7 +191,7 @@ def generate_random_swap_fixed_input(context: Context):
 
 
 def generate_swap_fixed_output(context: Context, user_account: Account, pair_contract: PairContract):
-    print('Attempt swapFixedOutputEvent')
+    logger.info(f'Attempt swapFixedOutputEvent for {user_account.address.bech32()} on {pair_contract.address}')
     txhash = ''
     try:
         contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
@@ -194,7 +201,8 @@ def generate_swap_fixed_output(context: Context, user_account: Account, pair_con
 
         _, amount_token_a, _ = get_token_details_for_address(tokens[0], user_account.address.bech32(), context.network_provider.proxy)
         if amount_token_a <= 0:
-            print(f"Skipped swap because no {tokens[0]} found in account.")
+            logger.warning(f"Skipped swap because no {tokens[0]} "
+                           f"found in account {user_account.address.bech32()}.")
             return
         amount_token_a_max = random.randrange(int(amount_token_a * context.swap_max_tokens_to_spend))
 
@@ -214,7 +222,7 @@ def generate_swap_fixed_output(context: Context, user_account: Account, pair_con
         context.observable.set_event(pair_contract, user_account, event, txhash)
 
     except Exception as ex:
-        print(f'Exception encountered: {ex}')
+        logger.error(f'Exception encountered: {ex}')
 
     return txhash
 
@@ -227,7 +235,7 @@ def generate_random_swap_fixed_output(context: Context):
 
 def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract: FarmContract, lockRewards: int = 0):
     """lockRewards: -1 - random; 0 - unlocked rewards; 1 - locked rewards;"""
-    print("Attempt generateEnterFarmEvent")
+    logger.info(f"Attempt generateEnterFarmEvent for {userAccount.address.bech32()} on {farmContract.address}")
     tx_hash = ""
     try:
         farmToken = farmContract.farmToken
@@ -237,7 +245,7 @@ def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract:
         farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmToken, userAccount.address, context.network_provider.proxy)
 
         if farmingTkNonce == 0 and farmingTkAmount == 0:
-            log_step_fail(f"SKIPPED: No tokens found!")
+            logger.warning(f"SKIPPED: No {farming_token} found for {userAccount.address.bech32()}!")
             return
 
         initial = True if farmTkNonce == 0 else False
@@ -265,14 +273,14 @@ def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract:
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
-        print("Exception encountered:", ex)
+        logger.error("Exception encountered:", ex)
         traceback.print_exception(*sys.exc_info())
 
     return tx_hash
 
 
 def generateEnterStakingEvent(context: Context, user: Account, staking_contract: StakingContract):
-    print('Attempt generateEnterStakingEvent')
+    logger.info(f'Attempt generateEnterStakingEvent for {user.address.bech32()} on {staking_contract.address}')
     tx_hash = ''
     try:
         staking_token = staking_contract.farming_token
@@ -285,7 +293,7 @@ def generateEnterStakingEvent(context: Context, user: Account, staking_contract:
                                                                                user.address,
                                                                                context.network_provider.proxy)
         if not staking_token_amount:
-            log_step_fail('SKIPPED enterStakingEvent: No tokens found!')
+            logger.warning(f'SKIPPED enterStakingEvent: No {staking_token} found for {user.address.bech32()}!')
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -303,13 +311,13 @@ def generateEnterStakingEvent(context: Context, user: Account, staking_contract:
         context.observable.set_event(staking_contract, user, event, tx_hash)
 
     except Exception as ex:
-        print(f'Exception encountered: {ex}')
+        logger.error(f'Exception encountered: {ex}')
 
     return tx_hash
 
 
 def generateEnterMetastakeEvent(context: Context, user: Account, metastake_contract: MetaStakingContract):
-    print('Attempt generateEnterMetastakeEvent')
+    logger.info(f'Attempt generateEnterMetastakeEvent for {user.address.bech32()} on {metastake_contract.address}')
     tx_hash = ""
     try:
         metastake_token = metastake_contract.metastake_token
@@ -323,7 +331,7 @@ def generateEnterMetastakeEvent(context: Context, user: Account, metastake_contr
                                                                                          context.network_provider.proxy)
 
         if staking_token_nonce == 0 and staking_token_amount == 0:
-            log_step_fail(f"SKIPPED: No tokens found!")
+            logger.warning(f"SKIPPED: No {staking_token} found on {user.address.bech32()}!")
             return
 
         initial = True if metastake_token_nonce == 0 else False
@@ -346,7 +354,7 @@ def generateEnterMetastakeEvent(context: Context, user: Account, metastake_contr
         context.observable.set_event(metastake_contract, user, event, tx_hash)
 
     except Exception as ex:
-        print('Exception encountered: ', ex)
+        logger.error('Exception encountered: ', ex)
 
     return tx_hash
 
@@ -363,13 +371,14 @@ def generateRandomEnterFarmEvent(context: Context):
 
 
 def generateExitFarmEvent(context: Context, userAccount: Account, farmContract: FarmContract):
-    print("Attempt generateExitFarmEvent")
+    logger.info(f"Attempt generateExitFarmEvent for {userAccount.address.bech32()} on {farmContract.address}")
     tx_hash = ""
     try:
         farmTkNonce, farmTkAmount, farmTkAttr = get_token_details_for_address(farmContract.farmToken,
                                                                               userAccount.address, context.network_provider.proxy)
         if farmTkNonce == 0:
-            print(f"Skipped exit farm event. No token retrieved.")
+            logger.warning(f"Skipped exit farm event. No {farmContract.farmToken} "
+                           f"found on {userAccount.address.bech32()}!")
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -393,14 +402,14 @@ def generateExitFarmEvent(context: Context, userAccount: Account, farmContract: 
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
-        print("Exception encountered:", ex)
+        logger.error("Exception encountered:", ex)
         traceback.print_exception(*sys.exc_info())
 
     return tx_hash
 
 
 def generateUnstakeEvent(context: Context, user: Account, staking_contract: StakingContract):
-    print('Attempt unstakingEvent')
+    logger.info(f'Attempt unstakingEvent for {user.address.bech32()} on {staking_contract.address}')
     tx_hash = ''
     try:
         stake_token = staking_contract.farm_token
@@ -408,7 +417,7 @@ def generateUnstakeEvent(context: Context, user: Account, staking_contract: Stak
                                                                                                 user.address,
                                                                                                 context.network_provider.proxy)
         if not stake_token_nonce:
-            log_step_fail('SKIPPED unstakingEvent: No tokens to unstake!')
+            logger.warning(f'SKIPPED unstakingEvent: No {stake_token} found on {user.address.bech32()}!')
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -425,7 +434,7 @@ def generateUnstakeEvent(context: Context, user: Account, staking_contract: Stak
         context.observable.set_event(staking_contract, user, event, tx_hash)
 
     except Exception as ex:
-        print(f'Exception encountered: {ex}')
+        logger.error(f'Exception encountered: {ex}')
 
     return tx_hash
 
@@ -445,7 +454,7 @@ def get_lp_from_metastake_token_attributes(token_attributes):
 
 
 def generateExitMetastakeEvent(context: Context, user: Account, metastake_contract: MetaStakingContract):
-    print('Attempt generateExitMetastakeEvent')
+    logger.info(f'Attempt generateExitMetastakeEvent for {user.address.bech32()} on {metastake_contract.address}')
     tx_hash = ""
     try:
         metastake_token = metastake_contract.metastake_token
@@ -453,7 +462,7 @@ def generateExitMetastakeEvent(context: Context, user: Account, metastake_contra
             metastake_token, user.address, context.network_provider.proxy
         )
         if metastake_token_nonce == 0:
-            log_step_fail(f"SKIPPED: No tokens found!")
+            logger.warning(f"SKIPPED: No {metastake_token} found on {user.address.bech32()}!")
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -466,9 +475,8 @@ def generateExitMetastakeEvent(context: Context, user: Account, metastake_contra
 
         decoded_metastake_tk_attributes = get_lp_from_metastake_token_attributes(metastake_token_attributes)
 
-        farm_tk_details = context.api.get_nft_data(
-            metastake_contract.farm_token + '-' +
-            dec_to_padded_hex(decoded_metastake_tk_attributes['lp_farm_token_nonce'])
+        farm_tk_details = context.network_provider.api.get_non_fungible_token(
+            metastake_contract.farm_token, decoded_metastake_tk_attributes['lp_farm_token_nonce']
         )
 
         full_metastake_amount = metastake_token_amount
@@ -483,7 +491,7 @@ def generateExitMetastakeEvent(context: Context, user: Account, metastake_contra
         context.observable.set_event(metastake_contract, user, event, tx_hash)
 
     except Exception as ex:
-        print('Exception encountered: ', ex)
+        logger.error('Exception encountered: ', ex)
 
     return tx_hash
 
@@ -495,14 +503,15 @@ def generateRandomExitFarmEvent(context: Context):
 
 
 def generateClaimRewardsEvent(context: Context, userAccount: Account, farmContract: FarmContract):
-    print("Attempt generateClaimRewardsEvent")
+    logger.info(f"Attempt generateClaimRewardsEvent for {userAccount.address.bech32()} on {farmContract.address}")
     tx_hash = ""
     try:
         farmTkNonce, farmTkAmount, farmTkAttributes = get_token_details_for_address(farmContract.farmToken,
                                                                                     userAccount.address,
                                                                                     context.network_provider.proxy)
         if farmTkNonce == 0:
-            print(f"Skipped claim rewards farm event. No token retrieved.")
+            logger.warning(f"Skipped claim rewards farm event. No {farmContract.farmToken} "
+                           f"found on {userAccount.address.bech32()}.")
             return
 
         farmedTkNonce, farmedTkAmount, _ = get_token_details_for_address(farmContract.farmedToken,
@@ -527,14 +536,14 @@ def generateClaimRewardsEvent(context: Context, userAccount: Account, farmContra
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
-        print("Exception encountered:", ex)
+        logger.error("Exception encountered:", ex)
         traceback.print_exception(*sys.exc_info())
 
     return tx_hash
 
 
 def generateClaimStakingRewardsEvent(context: Context, user: Account, staking_contract: StakingContract):
-    print('Attemp claimStakingRewardsEvent')
+    logger.info(f'Attemp claimStakingRewardsEvent for {user.address.bech32()} on {staking_contract.address}')
     tx_hash = ''
     try:
         stake_token = staking_contract.farm_token
@@ -542,7 +551,7 @@ def generateClaimStakingRewardsEvent(context: Context, user: Account, staking_co
                                                                                           user.address,
                                                                                           context.network_provider.proxy)
         if not stake_token_nonce:
-            print('SKIPPED claimStakingRewardsEvent: No token retrieved!')
+            logger.warning(f'SKIPPED claimStakingRewardsEvent: No {stake_token} found for {user.address.bech32()}!')
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -551,17 +560,17 @@ def generateClaimStakingRewardsEvent(context: Context, user: Account, staking_co
 
         event = ClaimRewardsFarmEvent(stake_token_amount, stake_token_nonce, attributes)
 
-        tx_hash = staking_contract.claimRewards(context.network_provider, user, event)
+        tx_hash = staking_contract.claim_rewards(context.network_provider, user, event)
         context.observable.set_event(staking_contract, user, event, tx_hash)
 
     except Exception as ex:
-        print(f'Exception encountered: {ex}')
+        logger.error(f'Exception encountered: {ex}')
 
     return tx_hash
 
 
 def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastake_contract: MetaStakingContract):
-    print('Attempt generateClaimMetastakeRewardsEvent')
+    logger.info(f'Attempt generateClaimMetastakeRewardsEvent for {user.address.bech32()} on {metastake_contract.address}')
     tx_hash = ""
     try:
         metastake_token = metastake_contract.metastake_token
@@ -571,7 +580,7 @@ def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastak
                                                                                     context.network_provider.proxy
                                                                                     )
         if metastake_token_nonce == 0:
-            log_step_fail(f"SKIPPED: No tokens found!")
+            logger.warning(f"SKIPPED: No {metastake_token} found on {user.address.bech32()}!")
             return
 
         # set correct token balance in case it has been changed since the init of observers
@@ -579,8 +588,8 @@ def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastak
         context.observable.set_event(None, user, set_token_balance_event, '')
 
         farm_position = get_lp_from_metastake_token_attributes(metastake_token_attributes)
-        farm_token_details = context.api.get_nft_data(
-            metastake_contract.farm_token + '-' + dec_to_padded_hex(farm_position['lp_farm_token_nonce'])
+        farm_token_details = context.network_provider.api.get_non_fungible_token(
+            metastake_contract.farm_token, farm_position['lp_farm_token_nonce']
         )
 
         # update data for staking, farm and pair trackers inside metastaking tracker
@@ -593,7 +602,7 @@ def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastak
         context.observable.set_event(metastake_contract, user, event, tx_hash)
 
     except Exception as ex:
-        print('Exception encountered: ', ex)
+        logger.error('Exception encountered: ', ex)
 
     return tx_hash
 
@@ -605,13 +614,14 @@ def generateRandomClaimRewardsEvent(context: Context):
 
 
 def generateCompoundRewardsEvent(context: Context, userAccount: Account, farmContract: FarmContract):
-    print("Attempt generateCompoundRewardsEvent")
+    logger.info(f"Attempt generateCompoundRewardsEvent for {userAccount.address.bech32()} on {farmContract.address}")
     tx_hash = ""
     try:
         farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmContract.farmToken,
                                                                      userAccount.address, context.network_provider.proxy)
         if farmTkNonce == 0:
-            print(f"Skipped compound rewards farm event. No token retrieved.")
+            logger.warning(f"Skipped compound rewards farm event. No {farmContract.farmToken} "
+                           f"found for {userAccount.address.bech32()}.")
             return
 
         event = CompoundRewardsFarmEvent(farmTkAmount, farmTkNonce)
@@ -628,7 +638,7 @@ def generateCompoundRewardsEvent(context: Context, userAccount: Account, farmCon
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
-        print("Exception encountered:", ex)
+        logger.error("Exception encountered:", ex)
         traceback.print_exception(*sys.exc_info())
 
     return tx_hash
@@ -641,12 +651,13 @@ def generateRandomCompoundRewardsEvent(context: Context):
 
 
 def generate_migrate_farm_event(context: Context, userAccount: Account, farmContract: FarmContract):
-    print("Attempt generateMigrateFarmEvent")
+    logger.info("Attempt generateMigrateFarmEvent")
     try:
         farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farmContract.farmToken,
                                                                      userAccount.address,
                                                                      context.network_provider.proxy)
         if farmTkNonce == 0:
+            logger.warning(f"Skipped migrate farm event. No token retrieved.")
             return
 
         event = MigratePositionFarmEvent(farmTkAmount, farmTkNonce)
@@ -663,7 +674,7 @@ def generate_migrate_farm_event(context: Context, userAccount: Account, farmCont
         context.results_logger.add_event_log(event_log)
 
     except Exception as ex:
-        print("Exception encountered:", ex)
+        logger.error("Exception encountered:", ex)
         traceback.print_exception(*sys.exc_info())
 
 
@@ -755,7 +766,7 @@ def generateEnterFarmProxyEvent(context: Context, user_account: Account, farm_co
         context.dexProxyContract.enterFarmProxy(context, user_account, event, lock_rewards, initial_enter_farm)
 
     except Exception as ex:
-        print("Exception encountered:", ex)
+        logger.error("Exception encountered:", ex)
 
 
 def generateRandomEnterFarmProxyEvent(context: Context):
@@ -859,11 +870,12 @@ def generate_deposit_pd_liquidity_event(context: Context, user_account: Account,
     tx_hash = pd_contract.deposit_liquidity(context.network_provider, user_account, event)
 
     # track and check event results
-    if hasattr(context, 'price_discovery_trackers'):
-        index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-        context.price_discovery_trackers[index].deposit_event_tracking(
-            event, user_account.address, tx_hash
-        )
+    # TODO: has to be reworked
+    # if hasattr(context, 'price_discovery_trackers'):
+    #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
+    #     context.price_discovery_trackers[index].deposit_event_tracking(
+    #         event, user_account.address, tx_hash
+    #     )
 
 
 def generate_random_deposit_pd_liquidity_event(context: Context):
@@ -888,11 +900,12 @@ def generate_withdraw_pd_liquidity_event(context: Context, user_account: Account
     tx_hash = pd_contract.withdraw_liquidity(context.network_provider, user_account, event)
 
     # track and check event results
-    if hasattr(context, 'price_discovery_trackers'):
-        index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-        context.price_discovery_trackers[index].withdraw_event_tracking(
-            event, user_account.address, tx_hash
-        )
+    # TODO: has to be reworked
+    # if hasattr(context, 'price_discovery_trackers'):
+    #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
+    #     context.price_discovery_trackers[index].withdraw_event_tracking(
+    #         event, user_account.address, tx_hash
+    #     )
 
 
 def generate_random_withdraw_pd_liquidity_event(context: Context):
@@ -917,11 +930,12 @@ def generate_redeem_pd_liquidity_event(context: Context, user_account: Account, 
     tx_hash = pd_contract.redeem_liquidity_position(context.network_provider, user_account, event)
 
     # track and check event results
-    if hasattr(context, 'price_discovery_trackers'):
-        index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-        context.price_discovery_trackers[index].redeem_event_tracking(
-            event, user_account.address, tx_hash
-        )
+    # TODO: has to be reworked
+    # if hasattr(context, 'price_discovery_trackers'):
+    #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
+    #     context.price_discovery_trackers[index].redeem_event_tracking(
+    #         event, user_account.address, tx_hash
+    #     )
 
 
 def generate_random_redeem_pd_liquidity_event(context: Context):

@@ -1,4 +1,7 @@
 import json
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def load_json_as_dict(json_file: str) -> json:
@@ -11,6 +14,10 @@ def load_json_as_dict(json_file: str) -> json:
 def populate_list(json_file: str, key: str) -> list:
     json_dict = load_json_as_dict(json_file)
     values = []
+
+    if key not in json_dict:
+        logger.warning(f"Structure definition for {key} not found in {json_file}")
+        return values
 
     for i in range(len(json_dict[key])):
         values.append(json_dict[key][i])

@@ -1,0 +1,51 @@
+[
+    {
+        "firstToken": "WEGLD-01e49d",
+        "secondToken": "MEX-4638e4",
+        "lpToken": "EGLDMEX-0c01ea",
+        "address": "erd1qqqqqqqqqqqqqpgqsa0hwt0m05308mxlagc6wm3qs6duuh5f295qs5du2a",
+        "version": 2
+    },
+    {
+        "firstToken": "WEGLD-01e49d",
+        "secondToken": "USDC-f89dfe",
+        "lpToken": "EGLDUSDC-9488c5",
+        "address": "erd1qqqqqqqqqqqqqpgqqccjzsw3y8r0q52egfnnj9v26ehlkcw6295qnlq4nt",
+        "version": 2
+    },
+    {
+        "firstToken": "WEGLD-01e49d",
+        "secondToken": "RIDE-3954e7",
+        "lpToken": "EGLDRIDE-88d0b3",
+        "address": "erd1qqqqqqqqqqqqqpgq5dkvkrn56yrgavwx8fm9ld9eqj07g7ps295qchle4z",
+        "version": 2
+    },
+    {
+        "firstToken": "ITHEUM-471743",
+        "secondToken": "WEGLD-01e49d",
+        "lpToken": "ITHWEGLD-91eb49",
+        "address": "erd1qqqqqqqqqqqqqpgqkdxw8ewquxtt64t8rmdgqz3ja0zjycfm295qpdm8at",
+        "version": 2
+    },
+    {
+        "firstToken": "UTK-b97480",
+        "secondToken": "WEGLD-01e49d",
+        "lpToken": "UTKWEGLD-8274dd",
+        "address": "erd1qqqqqqqqqqqqqpgqtpmxc0e2snvns20hh8fs6udadpewhdr4295qzaln0d",
+        "version": 2
+    },
+    {
+        "firstToken": "CRT-a2c008",
+        "secondToken": "WEGLD-01e49d",
+        "lpToken": "CRTWEGLD-c98d7b",
+        "address": "erd1qqqqqqqqqqqqqpgq44x5r0zqskypepmv6csxr2q5027vj0rw295q97v2ek",
+        "version": 2
+    },
+    {
+        "firstToken": "ASH-3538e0",
+        "secondToken": "WEGLD-01e49d",
+        "lpToken": "ASHWEGLD-fde185",
+        "address": "erd1qqqqqqqqqqqqqpgq64cxskker47fd9spaetc6vylt2c3kmm7295qx2hu6j",
+        "version": 2
+    }
+]

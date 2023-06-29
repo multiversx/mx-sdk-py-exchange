@@ -12,15 +12,16 @@ from deploy.tokens_tracks import BunchOfTracks
 from utils.contract_data_fetchers import PairContractDataFetcher, PriceDiscoveryContractDataFetcher, \
     SimpleLockContractDataFetcher, LockedAssetContractDataFetcher, FarmContractDataFetcher, StakingContractDataFetcher, \
     MetaStakingContractDataFetcher, ProxyContractDataFetcher, SimpleLockEnergyContractDataFetcher
-from contracts.esdt_contract import ESDTContract
+from contracts.builtin_contracts import ESDTContract
 from contracts.farm_contract import FarmContract
 from contracts.locked_asset_contract import LockedAssetContract
+from contracts.egld_wrap_contract import EgldWrapContract
 from contracts.pair_contract import PairContract
 from contracts.price_discovery_contract import PriceDiscoveryContract
 from contracts.router_contract import RouterContract
 from contracts.simple_lock_contract import SimpleLockContract
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface, \
-    RouterContractVersion, PairContractVersion, ProxyContractVersion, StakingContractVersion
+    RouterContractVersion, PairContractVersion, ProxyContractVersion, StakingContractVersion, MetaStakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract
 from contracts.staking_contract import StakingContract
 from contracts.dex_proxy_contract import DexProxyContract
@@ -28,7 +29,7 @@ from utils.utils_tx import NetworkProviders
 from utils.utils_chain import hex_to_string
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils.utils_generic import write_json_file, read_json_file, log_step_fail, log_step_pass, \
-    log_warning
+    log_warning, get_continue_confirmation
 from deploy import populate_deploy_lists
 
 
@@ -107,6 +108,9 @@ class DeployStructure:
         self.esdt_contract = ESDTContract(config.TOKENS_CONTRACT_ADDRESS)
 
         self.contracts: Dict[str, ContractStructure] = {
+            config.EGLD_WRAPS:
+                ContractStructure(config.EGLD_WRAPS, EgldWrapContract, config.EGLD_WRAP_BYTECODE_PATH,
+                                  self.egld_wrap_deploy, False),
             config.LOCKED_ASSETS:
                 ContractStructure(config.LOCKED_ASSETS, LockedAssetContract, config.LOCKED_ASSET_FACTORY_BYTECODE_PATH,
                                   self.locked_asset_deploy, False),
@@ -164,11 +168,17 @@ class DeployStructure:
             config.STAKINGS_V2:
                 ContractStructure(config.STAKINGS_V2, StakingContract, config.STAKING_V2_BYTECODE_PATH,
                                   self.staking_deploy, False),
+            config.STAKINGS_BOOSTED:
+                ContractStructure(config.STAKINGS_BOOSTED, StakingContract, config.STAKING_V3_BYTECODE_PATH,
+                                  self.staking_deploy, False),
             config.METASTAKINGS:
                 ContractStructure(config.METASTAKINGS, MetaStakingContract, config.STAKING_PROXY_BYTECODE_PATH,
                                   self.metastaking_deploy, False),
             config.METASTAKINGS_V2:
                 ContractStructure(config.METASTAKINGS_V2, MetaStakingContract, config.STAKING_PROXY_V2_BYTECODE_PATH,
+                                  self.metastaking_deploy, False),
+            config.METASTAKINGS_BOOSTED:
+                ContractStructure(config.METASTAKINGS_BOOSTED, MetaStakingContract, config.STAKING_PROXY_V3_BYTECODE_PATH,
                                   self.metastaking_deploy, False)
         }
 
@@ -259,6 +269,15 @@ class DeployStructure:
                 contracts.load_deployed_contracts()
             else:
                 log_step_pass(f"Starting setup process for {contract_label}:")
+
+                # if aborted deploy & setup, maybe attempt load instead
+                if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
+                    log_step_pass(f"Attempting load for {contract_label}:")
+                    if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
+                        return
+                    contracts.load_deployed_contracts()
+                    return
+
                 contracts.deploy_function(contract_label, deployer_account, network_provider)
                 if len(contracts.deployed_contracts) > 0:
                     contracts.print_deployed_contracts()
@@ -288,7 +307,7 @@ class DeployStructure:
         energy_factory: Optional[SimpleLockEnergyContract] = None
         energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
         whitelist = [config.PROXIES_V2, config.FEES_COLLECTORS,
-                     config.UNSTAKERS, config.METASTAKINGS_V2]
+                     config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED]
 
         # gather contract addresses to whitelist
         addresses = []
@@ -305,14 +324,6 @@ class DeployStructure:
             tx_hash = energy_factory.set_transfer_role_locked_token(deployer_account, network_provider.proxy,
                                                                     [address])
             if not network_provider.check_complex_tx_status(tx_hash, "set transfer role for locked asset on contracts"):
-                return
-
-        # set transfer role for self
-        if self.contracts[config.SIMPLE_LOCKS_ENERGY].deploy_clean or clean_deploy_override:
-            tx_hash = energy_factory.set_transfer_role_locked_token(deployer_account, network_provider.proxy,
-                                                                    [])
-            if not network_provider.check_complex_tx_status(tx_hash,
-                                                            "set transfer role for locked asset on factory"):
                 return
 
     def set_proxy_v2_in_pairs(self, deployer_account: Account, network_providers: NetworkProviders,
@@ -358,6 +369,34 @@ class DeployStructure:
         return self.contracts[label].get_deployed_contract_by_address(address)
 
     # CONTRACT DEPLOYERS ------------------------------
+    def egld_wrap_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for contract_config in contract_structure.deploy_structure_list:
+            # deploy locked asset contract
+            wrapped_token = self.tokens[contract_config["unlocked_asset"]]
+
+            # deploy contract
+            deployed_contract = EgldWrapContract(wrapped_token)
+            tx_hash, contract_address = deployed_contract.contract_deploy(deployer_account,
+                                                                          network_providers.proxy,
+                                                                          contract_structure.bytecode)
+            # check for deployment success and save the deployed address
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "egld wrapper"): return
+            deployed_contract.address = contract_address
+            log_step_pass(f"EGLD wrap contract address: {contract_address}")
+
+            # Set special role on wrapped tokens
+            tx_hash = self.esdt_contract.set_special_role_token(deployer_account,
+                                                                network_providers.proxy,
+                                                                [wrapped_token, contract_address,
+                                                                 "ESDTRoleLocalMint", "ESDTRoleLocalBurn"])
+            if not network_providers.check_complex_tx_status(tx_hash, "set special role on wrapped token"): return
+
+            deployed_contracts.append(deployed_contract)
+
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
     def locked_asset_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]
         deployed_contracts = []
@@ -521,7 +560,11 @@ class DeployStructure:
         for config_simple_lock in contract_structure.deploy_structure_list:
             # deploy simple lock contract
             locked_token = config_simple_lock["locked_token"]
+            locked_token_name = config_simple_lock["locked_token_name"]
             locked_lp_token = config_simple_lock["locked_lp_token"]
+            locked_lp_token_name = config_simple_lock["locked_lp_token_name"]
+            locked_farm_token = config_simple_lock["locked_farm_token"]
+            locked_farm_token_name = config_simple_lock["locked_farm_token_name"]
 
             # deploy contract
             deployed_simple_lock_contract = SimpleLockContract()
@@ -534,7 +577,9 @@ class DeployStructure:
 
             # issue locked token and save it
             tx_hash = deployed_simple_lock_contract.issue_locked_token(deployer_account,
-                                                                       network_providers.proxy, locked_token)
+                                                                       network_providers.proxy,
+                                                                       [locked_token_name,
+                                                                        locked_token])
             if not network_providers.check_complex_tx_status(tx_hash, "issue locked token"): return
             locked_token_hex = SimpleLockContractDataFetcher(Address(deployed_simple_lock_contract.address),
                                                              network_providers.proxy.url).get_data("getLockedTokenId")
@@ -542,8 +587,20 @@ class DeployStructure:
 
             # issue locked LP token and save it
             tx_hash = deployed_simple_lock_contract.issue_locked_lp_token(deployer_account,
-                                                                          network_providers.proxy, locked_lp_token)
+                                                                          network_providers.proxy,
+                                                                          [locked_lp_token_name,
+                                                                           locked_lp_token])
             if not network_providers.check_complex_tx_status(tx_hash, "issue locked LP token"): return
+            locked_lp_token_hex = SimpleLockContractDataFetcher(Address(deployed_simple_lock_contract.address),
+                                                                network_providers.proxy.url).get_data("getLpProxyTokenId")
+            deployed_simple_lock_contract.lp_proxy_token = hex_to_string(locked_lp_token_hex)
+
+            # issue locked farm token and save it
+            tx_hash = deployed_simple_lock_contract.issue_locked_farm_token(deployer_account,
+                                                                            network_providers.proxy,
+                                                                            [locked_farm_token_name,
+                                                                             locked_farm_token])
+            if not network_providers.check_complex_tx_status(tx_hash, "issue locked farm token"): return
             locked_lp_token_hex = SimpleLockContractDataFetcher(Address(deployed_simple_lock_contract.address),
                                                                 network_providers.proxy.url).get_data("getLpProxyTokenId")
             deployed_simple_lock_contract.lp_proxy_token = hex_to_string(locked_lp_token_hex)
@@ -658,6 +715,13 @@ class DeployStructure:
                                                                 [base_token, contract_address,
                                                                  "ESDTRoleLocalMint"])
             if not network_providers.check_complex_tx_status(tx_hash, "set mint role on unlocked asset"): return
+
+            # set transfer role for self
+            tx_hash = deployed_contract.set_transfer_role_locked_token(deployer_account,
+                                                                       network_providers.proxy,
+                                                                       [])
+            if not network_providers.check_complex_tx_status(tx_hash, "set transfer role for locked asset on factory"):
+                return
 
             deployed_contracts.append(deployed_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -847,9 +911,21 @@ class DeployStructure:
 
             # Set simple lock if applicable
             if "simple_lock" in config_pool:
-                current_epoch = network_providers.extended_proxy.get_network_status(0).current_epoch
-                locking_deadline_epoch = current_epoch + 3
-                unlock_epoch = current_epoch + 3
+                if "locking_deadline_offset" in config_pool:
+                    locking_deadline_offset = config_pool['locking_deadline_offset']
+                else:
+                    log_warning("Locking deadline offset not set, using default value 3 epochs")
+                    locking_deadline_offset = 3
+
+                if "unlock_epoch_offset" in config_pool:
+                    unlock_epoch_offset = config_pool['unlock_epoch_offset']
+                else:
+                    log_warning("Unlock epoch offset not set, using default value 3 epochs")
+                    unlock_epoch_offset = 3
+
+                current_epoch = network_providers.proxy.get_network_status(0).current_epoch
+                locking_deadline_epoch = current_epoch + locking_deadline_offset
+                unlock_epoch = current_epoch + unlock_epoch_offset
 
                 # set locking deadline in pair
                 tx_hash = deployed_pair_contract.set_locking_deadline_epoch(deployer_account, network_providers.proxy,
@@ -994,7 +1070,33 @@ class DeployStructure:
                         get_deployed_contract_by_index(config_farm['proxy_v2'])
                 tx_hash = proxy_contract.add_farm_to_intermediate(deployer_account, network_providers.proxy,
                                                                   contract_address)
-                if not network_providers.check_simple_tx_status(tx_hash, "set farm to intermediate in proxy"): return
+                if not network_providers.check_simple_tx_status(tx_hash, "set farm to intermediate in proxy"):
+                    return
+
+                # Set simple lock if applicable
+                if "simple_lock" in config_farm:
+                    deployed_simple_lock: Optional[SimpleLockContract] = None
+                    deployed_simple_lock = self.contracts[config.SIMPLE_LOCKS].get_deployed_contract_by_index(
+                        config_farm['simple_lock'])
+                    if deployed_simple_lock is None:
+                        log_step_fail(f"Aborting setup: Simple lock contract not available! Contract will be dumped.")
+                        return
+
+                    # whitelist in simple lock contract
+                    tx_hash = deployed_simple_lock.add_farm_to_whitelist(deployer_account, network_providers.proxy,
+                                                                         [deployed_farm_contract.address,
+                                                                          deployed_farm_contract.farmingToken,
+                                                                          1])
+
+                    if not network_providers.check_simple_tx_status(tx_hash,
+                                                                    "whitelist farm in simple locking contract"):
+                        return
+
+                    # whitelist simple lock contract in farm
+                    tx_hash = deployed_farm_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy,
+                                                                               deployed_simple_lock.address)
+                    if not network_providers.check_simple_tx_status(tx_hash,
+                                                                    "whitelist simple lock in farm"): return
 
             deployed_contracts.append(deployed_farm_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -1223,6 +1325,30 @@ class DeployStructure:
                                                             penalty])
             if not network_providers.check_simple_tx_status(tx_hash, "set penalty percent in farm"): return
 
+            # Set simple lock if applicable
+            if "simple_lock" in contract_config:
+                deployed_simple_lock: Optional[SimpleLockContract] = None
+                deployed_simple_lock = self.contracts[config.SIMPLE_LOCKS].get_deployed_contract_by_index(
+                    contract_config['simple_lock'])
+                if deployed_simple_lock is None:
+                    log_step_fail(f"Aborting setup: Simple lock contract not available! Contract will be dumped.")
+                    return
+
+                # whitelist in simple lock contract
+                tx_hash = deployed_simple_lock.add_farm_to_whitelist(deployer_account, network_providers.proxy,
+                                                                     [deployed_contract.address,
+                                                                      deployed_contract.farmingToken,
+                                                                      deployed_contract.version.value - 1])
+
+                if not network_providers.check_simple_tx_status(tx_hash,
+                                                                "whitelist farm in simple locking contract"):
+                    return
+
+                # whitelist simple lock contract in farm
+                tx_hash = deployed_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy,
+                                                                      deployed_simple_lock.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist simple lock in farm"): return
+
             deployed_contracts.append(deployed_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
@@ -1300,11 +1426,16 @@ class DeployStructure:
                 log_step_fail(f"Failed to set up energy contract in farm. Energy contract not available!")
                 return
 
-            # Set locking contract
             if locking_contract is not None:
+                # Set locking contract
                 tx_hash = deployed_contract.set_locking_address(deployer_account, network_providers.proxy,
                                                                 locking_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash, "set locking address in farm"): return
+
+                # Whitelist farm in locking contract
+                tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
+                                                               deployed_contract.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in locking contract"): return
             else:
                 log_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
                 return
@@ -1323,7 +1454,7 @@ class DeployStructure:
             # Set boosted yields rewards percentage
             if 'boosted_rewards' not in contract_config:
                 boosted_rewards = 6000
-                log_step_fail(f"Boosted yields rewards percentage configured! Setting default: {boosted_rewards}")
+                log_step_fail(f"Boosted yields rewards percentage not configured! Setting default: {boosted_rewards}")
             else:
                 boosted_rewards = contract_config['boosted_rewards']
             tx_hash = deployed_contract.set_boosted_yields_rewards_percentage(deployer_account, network_providers.proxy,
@@ -1394,6 +1525,30 @@ class DeployStructure:
                 tx_hash = deployed_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy,
                                                                       proxy_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash, "whitelist proxy in farm"): return
+
+            # Set simple lock if applicable
+            if "simple_lock" in contract_config:
+                deployed_simple_lock: Optional[SimpleLockContract] = None
+                deployed_simple_lock = self.contracts[config.SIMPLE_LOCKS].get_deployed_contract_by_index(
+                    contract_config['simple_lock'])
+                if deployed_simple_lock is None:
+                    log_step_fail(f"Aborting setup: Simple lock contract not available! Contract will be dumped.")
+                    return
+
+                # whitelist in simple lock contract
+                tx_hash = deployed_simple_lock.add_farm_to_whitelist(deployer_account, network_providers.proxy,
+                                                                     [deployed_contract.address,
+                                                                      deployed_contract.farmingToken,
+                                                                      deployed_contract.version.value - 1])
+
+                if not network_providers.check_simple_tx_status(tx_hash,
+                                                                "whitelist farm in simple locking contract"):
+                    return
+
+                # whitelist simple lock contract in farm
+                tx_hash = deployed_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy,
+                                                                      deployed_simple_lock.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist simple lock in farm"): return
 
             deployed_contracts.append(deployed_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -1486,8 +1641,8 @@ class DeployStructure:
             simple_lock_sc_address = deployed_simple_lock.address
             # start_block = dex_infra.extended_proxy.get_round() + 10
             deployer_shard = network_providers.api.get_address_details(deployer_account.address.bech32())['shard']
-            start_block = network_providers.extended_proxy.get_network_status(deployer_shard).current_nonce + 10
-            unlock_epoch = network_providers.extended_proxy.get_network_status(deployer_shard).current_epoch + 1
+            start_block = network_providers.proxy.get_network_status(deployer_shard).nonce + 10
+            unlock_epoch = network_providers.proxy.get_network_status(deployer_shard).epoch_number + 1
             phase_time = 50
 
             launched_token = self.tokens[config_pd_pool['launched_token']]
@@ -1551,7 +1706,16 @@ class DeployStructure:
             rewards_per_block = config_staking['rpb']
             unbond_epochs = config_staking['unbond_epochs']
             topup_rewards = config_staking['rewards']
-            version = StakingContractVersion.V1 if contracts_index == config.STAKINGS else StakingContractVersion.V2
+
+            if contracts_index == config.STAKINGS:
+                version = StakingContractVersion.V1
+            elif contracts_index == config.STAKINGS_V2:
+                version = StakingContractVersion.V2
+            elif contracts_index == config.STAKINGS_BOOSTED:
+                version = StakingContractVersion.V3Boosted
+            else:
+                log_step_fail(f"FAIL: unknown staking contract version: {contracts_index}")
+                return
 
             # deploy contract
             deployed_staking_contract = StakingContract(
@@ -1563,7 +1727,7 @@ class DeployStructure:
             )
 
             args = []
-            if version == StakingContractVersion.V2:
+            if version != StakingContractVersion.V1:
                 args.append(deployer_account.address.bech32())
                 if 'admin' in config_staking:
                     args.append(config_staking['admin'])
@@ -1588,9 +1752,40 @@ class DeployStructure:
                                                                       rewards_per_block)
             if not network_providers.check_simple_tx_status(tx_hash, "set rewards per block in stake contract"): return
 
+            if version == StakingContractVersion.V3Boosted:
+                # Set boosted yields rewards percentage
+                if 'boosted_rewards' not in config_staking:
+                    boosted_rewards = 6000
+                    log_step_fail(f"Boosted yields rewards percentage not configured! "
+                                  f"Setting default: {boosted_rewards}")
+                else:
+                    boosted_rewards = config_staking['boosted_rewards']
+                tx_hash = deployed_staking_contract.set_boosted_yields_rewards_percentage(deployer_account,
+                                                                                          network_providers.proxy,
+                                                                                          boosted_rewards)
+                if not network_providers.check_simple_tx_status(tx_hash, "set boosted yields rewards percentage in farm"):
+                    return
+
+                # Set boosted yields factors
+                if "base_const" not in config_staking or \
+                        "energy_const" not in config_staking or \
+                        "farm_const" not in config_staking or \
+                        "min_energy" not in config_staking or \
+                        "min_farm" not in config_staking:
+                    log_step_fail(f"Aborting deploy: Boosted yields factors not configured!")
+                tx_hash = deployed_staking_contract.set_boosted_yields_factors(deployer_account,
+                                                                               network_providers.proxy,
+                                                                               [config_staking['base_const'],
+                                                                                config_staking['energy_const'],
+                                                                                config_staking['farm_const'],
+                                                                                config_staking['min_energy'],
+                                                                                config_staking['min_farm']])
+                if not network_providers.check_simple_tx_status(tx_hash, "set boosted yields factors in farm"):
+                    return
+
             # topup rewards
             tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
-            if not network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract"): return
+            _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
 
             deployed_contracts.append(deployed_staking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -1630,6 +1825,19 @@ class DeployStructure:
             elif 'staking_v2' in config_metastaking:
                 staking = self.contracts[config.STAKINGS_V2].get_deployed_contract_by_index(
                     config_metastaking['staking_v2'])
+            elif 'staking_boosted' in config_metastaking:
+                staking = self.contracts[config.STAKINGS_BOOSTED].get_deployed_contract_by_index(
+                    config_metastaking['staking_boosted'])
+
+            if contracts_index == config.METASTAKINGS:
+                version = MetaStakingContractVersion.V1
+            elif contracts_index == config.METASTAKINGS_V2:
+                version = MetaStakingContractVersion.V2
+            elif contracts_index == config.METASTAKINGS_BOOSTED:
+                version = MetaStakingContractVersion.V3Boosted
+            else:
+                log_step_fail(f"Aborting deploy: unknown metastaking contract version")
+                return
 
             # deploy contract
             deployed_metastaking_contract = MetaStakingContract(
@@ -1639,7 +1847,8 @@ class DeployStructure:
                 stake_token=staking.farm_token,
                 lp_address=lp.address,
                 farm_address=farm.address,
-                stake_address=staking.address
+                stake_address=staking.address,
+                version=version
             )
 
             tx_hash, contract_address = deployed_metastaking_contract.contract_deploy(
@@ -1676,6 +1885,13 @@ class DeployStructure:
             if not network_providers.check_simple_tx_status(tx_hash,
                                                             "whitelist metastaking contract in staking contract"):
                 return
+
+            if version == MetaStakingContractVersion.V3Boosted:
+                # set burn role from staking contract
+                tx_hash = staking.set_burn_role_for_address(deployer_account, network_providers.proxy, contract_address)
+                if not network_providers.check_simple_tx_status(tx_hash,
+                                                                "set burn role from staking contract"):
+                    return
 
             deployed_contracts.append(deployed_metastaking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts

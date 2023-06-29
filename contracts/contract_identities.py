@@ -80,11 +80,13 @@ class PairContractVersion(Enum):
 class StakingContractVersion(Enum):
     V1 = 1
     V2 = 2
+    V3Boosted = 3
 
 
 class MetaStakingContractVersion(Enum):
     V1 = 1
     V2 = 2
+    V3Boosted = 3
 
 
 class FarmContractIdentity(DEXContractIdentityInterface):

@@ -77,7 +77,8 @@ class NetworkProviders:
         try:
             results = self.api.get_transaction_status(tx_hash)
         except GenericError as e:
-            if '404' in e.data:
+            logger.debug(f"Transaction not found. Exception: {e.data}")
+            if e.data['statusCode'] == 404:
                 # api didn't index the transaction yet, try again after a delay
                 logger.debug(f"Transaction {tx_hash} not indexed yet, "
                              f"trying again in {API_TX_STATUS_REFETCH_DELAY} seconds...")
@@ -118,10 +119,16 @@ class NetworkProviders:
             return False
 
         logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
-        start_time = time.time()
+
+        if "do-multi" in self.proxy.url or "shadowfork" in self.proxy.url:
+            # TODO: remove this when the api is fixed on sf
+            time.sleep(35)
+            status = self.check_simple_tx_status(tx_hash, msg_label)
+            return status
 
         # temporary fix for the api returning the wrong status
         # start by avoiding an early false success followed by pending (usually occurring in the first 2 rounds)
+        start_time = time.time()
         time.sleep(API_LONG_TX_DELAY)
         status = self.check_simple_tx_status(tx_hash, msg_label)
         if status:
@@ -232,6 +239,29 @@ class NetworkProviders:
                     and operation['message'] == message:
                 return True
         return False
+
+    def wait_for_epoch(self, target_epoch, idle_time=30):
+        status = self.proxy.get_network_status()
+        while status.epoch_number < target_epoch:
+            status = self.proxy.get_network_status
+            time.sleep(idle_time)
+
+    def wait_for_nonce_in_shard(self, shard_id: int, target_nonce: int, idle_time=6):
+        status = self.proxy.get_network_status(shard_id)
+        while status.nonce < target_nonce:
+            status = self.proxy.get_network_status(shard_id)
+            time.sleep(idle_time)
+
+    def wait_epochs(self, num_epochs, idle_time=30):
+        status = self.proxy.get_network_status()
+        next_epoch = status.epoch_number + num_epochs
+        while status.epoch_number < next_epoch:
+            status = self.proxy.get_network_status()
+            time.sleep(idle_time)
+
+    def get_round(self):
+        status = self.proxy.get_network_status(0)
+        return status.current_round
 
 
 def _prep_args_for_addresses(args: List):

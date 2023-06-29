@@ -13,7 +13,7 @@ from trackers.pair_economics_tracking import PairEconomics
 from trackers.staking_economics_tracking import StakingEconomics
 from trackers.metastaking_economics_tracking import MetastakingEconomics
 from trackers.concrete_observer import Observable
-from utils.utils_chain import Account, BunchOfAccounts
+from utils.utils_chain import Account, BunchOfAccounts, WrapperAddress as Address
 
 
 class Context:
@@ -21,6 +21,9 @@ class Context:
 
         self.deploy_structure = DeployStructure()
         self.deployer_account = Account(pem_file=config.DEFAULT_OWNER)
+        if config.DEX_OWNER_ADDRESS:    # manual override only for shadowforks
+            self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
+        self.admin_account = Account(pem_file=config.DEFAULT_ADMIN)
         self.accounts = BunchOfAccounts.load_accounts_from_files([config.DEFAULT_ACCOUNTS])
         self.nonces_file = config.DEFAULT_WORKSPACE / "_nonces.json"
         self.debug_level = 1
@@ -46,6 +49,7 @@ class Context:
 
         # BEGIN DEPLOY
         self.deployer_account.sync_nonce(self.network_provider.proxy)
+        self.admin_account.sync_nonce(self.network_provider.proxy)
 
         # TOKENS HANDLING
         self.deploy_structure.deploy_tokens(self.deployer_account, self.network_provider, False)
@@ -149,6 +153,8 @@ class Context:
         contract = self.deploy_structure.get_deployed_contract_by_address(config.FARMS_LOCKED, address)
         if contract is None:
             contract = self.deploy_structure.get_deployed_contract_by_address(config.FARMS_UNLOCKED, address)
+        if contract is None:
+            contract = self.deploy_structure.get_deployed_contract_by_address(config.FARMS_V2, address)
 
         return contract
 
@@ -157,7 +163,11 @@ class Context:
                              random.choice(self.deploy_structure.get_deployed_contracts(config.FARMS_UNLOCKED))])
 
     def get_pair_contract_by_address(self, address: str) -> PairContract:
-        return self.deploy_structure.get_deployed_contract_by_address(config.PAIRS, address)
+        contract = self.deploy_structure.get_deployed_contract_by_address(config.PAIRS, address)
+        if contract is None:
+            contract = self.deploy_structure.get_deployed_contract_by_address(config.PAIRS_V2, address)
+
+        return contract
 
     def get_random_pair_contract(self):
         return random.choice(self.deploy_structure.get_deployed_contracts(config.PAIRS))

@@ -23,6 +23,10 @@ class WrapperAddress(Address):
         self_instance = Address.from_bech32(address)
         super().__init__(self_instance.pubkey, "erd")
 
+    @classmethod
+    def from_hex(cls, value: str, hrp: str = "erd") -> 'Address':
+        return Address.from_hex(value, hrp)
+
     def __str__(self):
         return self.bech32()
 
