@@ -248,7 +248,7 @@ class PairContract(DEXContractInterface):
         """ Expected as args:
             type[int]: total fee percentage
             type[int]: special fee percentage
-            type[str]: initial liquidity adder (only v1 router)
+            type[str]: initial liquidity adder
         """
         pair_args = [self.firstToken, self.secondToken]
         pair_args.extend(args)

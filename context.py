@@ -125,7 +125,7 @@ class Context:
     def get_pair_contract(self, index: int):
         return self.deploy_structure.get_deployed_contract_by_index(config.PAIRS, index)
 
-    def get_pair_v2_contract(self, index: int):
+    def get_pair_v2_contract(self, index: int) -> PairContract:
         return self.deploy_structure.get_deployed_contract_by_index(config.PAIRS_V2, index)
 
     def get_fee_collector_contract(self, index: int):

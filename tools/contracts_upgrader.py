@@ -145,10 +145,10 @@ def main(cli_args: List[str]):
         upgrade_router_contract(owner, network_providers)
 
     elif args.upgrade_template:
-        upgrade_template_pair_contract(owner, network_providers)
+        upgrade_template_pair_contract(owner, network_providers, args.compare_state)
 
     elif args.upgrade_pairs:
-        upgrade_pair_contracts(owner, network_providers)
+        upgrade_pair_contracts(owner, network_providers, args.compare_state)
 
     elif args.upgrade_farmsv12:
         upgrade_farmv12_contracts(owner, network_providers)
@@ -610,10 +610,17 @@ def remove_penalty_farms(dex_owner: Account, network_providers: NetworkProviders
         count += 1
 
 
-def upgrade_template_pair_contract(owner: Account, network_providers: NetworkProviders):
+def upgrade_template_pair_contract(owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
     router_data_fetcher = RouterContractDataFetcher(Address(ROUTER_CONTRACT), network_providers.proxy.url)
     template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
     template_pair = retrieve_pair_by_address(template_pair_address)
+
+    if compare_states:
+        print(f"Fetching contract states before upgrade...")
+        fetch_contracts_states("pre", network_providers, [template_pair_address], TEMPLATE_PAIR_LABEL)
+
+        if not get_user_continue():
+            return
 
     template_pair.version = PairContractVersion.V2
     args = [config.ZERO_CONTRACT_ADDRESS, config.ZERO_CONTRACT_ADDRESS,
@@ -624,10 +631,12 @@ def upgrade_template_pair_contract(owner: Account, network_providers: NetworkPro
         if not get_user_continue():
             return
 
-    fetch_new_and_compare_contract_states(TEMPLATE_PAIR_LABEL, template_pair_address, network_providers)
+    if compare_states:
+        print(f"Fetching contract states before upgrade...")
+        fetch_new_and_compare_contract_states(TEMPLATE_PAIR_LABEL, template_pair_address, network_providers)
 
 
-def upgrade_router_contract(dex_owner: Account, network_providers: NetworkProviders):
+def upgrade_router_contract(dex_owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
     router_contract = retrieve_router_by_address(ROUTER_CONTRACT)
     router_data_fetcher = RouterContractDataFetcher(Address(ROUTER_CONTRACT), network_providers.proxy.url)
     template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
@@ -643,7 +652,7 @@ def upgrade_router_contract(dex_owner: Account, network_providers: NetworkProvid
     fetch_new_and_compare_contract_states(ROUTER_LABEL, ROUTER_CONTRACT, network_providers)
 
 
-def upgrade_pair_contracts(dex_owner: Account, network_providers: NetworkProviders):
+def upgrade_pair_contracts(dex_owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
     router_contract = retrieve_router_by_address(ROUTER_CONTRACT)
     router_contract.version = RouterContractVersion.V2
     pair_addresses = get_all_pair_addresses()
@@ -655,18 +664,30 @@ def upgrade_pair_contracts(dex_owner: Account, network_providers: NetworkProvide
         pair_data_fetcher = PairContractDataFetcher(Address(pair_address), network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
         special_fee_percentage = pair_data_fetcher.get_data("getSpecialFee")
+        existent_initial_liquidity_adder = pair_data_fetcher.get_data("getInitialLiquidtyAdder")
+        initial_liquidity_adder = Address(existent_initial_liquidity_adder[2:]).bech32() if existent_initial_liquidity_adder else config.ZERO_CONTRACT_ADDRESS
+        print(f"Initial liquidity adder: {initial_liquidity_adder}")
+
+        if compare_states:
+            print(f"Fetching contract state before upgrade...")
+            fetch_contracts_states("pre", network_providers, [pair_address], PAIRS_LABEL)
+
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
 
         pair_contract.version = PairContractVersion.V2
         tx_hash = pair_contract.contract_upgrade_via_router(dex_owner, network_providers.proxy, router_contract,
-                                                            [total_fee_percentage, special_fee_percentage])
+                                                            [total_fee_percentage, special_fee_percentage,
+                                                             initial_liquidity_adder])
 
         if not network_providers.check_complex_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
-            if not get_user_continue():
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
 
-        fetch_new_and_compare_contract_states(PAIRS_LABEL, pair_address, network_providers)
+        if compare_states:
+            fetch_new_and_compare_contract_states(PAIRS_LABEL, pair_address, network_providers)
 
-        if not get_user_continue():
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
         count += 1
@@ -1120,7 +1141,10 @@ def fetch_new_and_compare_contract_states(contract_type: str, contract_address, 
     report_key_files_compare(str(OUTPUT_FOLDER), old_state_filename, new_state_filename, True)
 
 
-def get_user_continue() -> bool:
+def get_user_continue(force_yes: bool = False) -> bool:
+    if force_yes:
+        return True
+
     typed = input(f"Continue? y/n\n")
     while typed != "y" and typed != "n":
         typed = input(f"Wrong choice. Continue? y/n\n")

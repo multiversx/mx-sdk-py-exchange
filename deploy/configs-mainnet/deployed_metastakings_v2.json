@@ -8,7 +8,8 @@
         "stake_token": "SRIDE-4ab1d4",
         "lp_address": "erd1qqqqqqqqqqqqqpgqav09xenkuqsdyeyy5evqyhuusvu4gl3t2jpss57g8x",
         "farm_address": "erd1qqqqqqqqqqqqqpgqenvn0s3ldc94q2mlkaqx4arj3zfnvnmakp2sxca2h9",
-        "stake_address": "erd1qqqqqqqqqqqqqpgqmqq78c5htmdnws8hm5u4suvags36eq092jpsaxv3e7"
+        "stake_address": "erd1qqqqqqqqqqqqqpgqmqq78c5htmdnws8hm5u4suvags36eq092jpsaxv3e7",
+        "version": 2
     },
     {
         "address": "erd1qqqqqqqqqqqqqpgqduftj7u5u5d4ql2znchcmrcet9kcze7ckp2sk4474f",
@@ -19,7 +20,8 @@
         "stake_token": "SITHEUM-e05083",
         "lp_address": "erd1qqqqqqqqqqqqqpgqpmud7t8uprrxzgu8eq2mtkl08kesflj62jps9j8dyh",
         "farm_address": "erd1qqqqqqqqqqqqqpgqrdq6zvepdxg36rey8pmluwur43q4hcx3kp2su4yltq",
-        "stake_address": "erd1qqqqqqqqqqqqqpgqzps75vsk97w9nsx2cenv2r2tyxl4fl402jpsx78m9j"
+        "stake_address": "erd1qqqqqqqqqqqqqpgqzps75vsk97w9nsx2cenv2r2tyxl4fl402jpsx78m9j",
+        "version": 2
     },
     {
         "address": "erd1qqqqqqqqqqqqqpgqmgd0eu4z9kzvrputt4l4kw4fqf2wcjsekp2sftan7s",
@@ -30,7 +32,8 @@
         "stake_token": "SUTK-ba35f3",
         "lp_address": "erd1qqqqqqqqqqqqqpgq0lzzvt2faev4upyf586tg38s84d7zsaj2jpsglugga",
         "farm_address": "erd1qqqqqqqqqqqqqpgq4acurmluezvmhna8tztgcrnwh0l70a2wkp2sfh6jkp",
-        "stake_address": "erd1qqqqqqqqqqqqqpgqcedkmj8ezme6mtautj79ngv7fez978le2jps8jtawn"
+        "stake_address": "erd1qqqqqqqqqqqqqpgqcedkmj8ezme6mtautj79ngv7fez978le2jps8jtawn",
+        "version": 2
     },
     {
         "address": "erd1qqqqqqqqqqqqqpgqx6zhjfjnwxpzdcj594htl0y6w60aa3a8kp2se2pdms",
@@ -41,6 +44,7 @@
         "stake_token": "SCRT-acbd64",
         "lp_address": "erd1qqqqqqqqqqqqqpgqf57y8m9krsvrceqxujngzm77p82zqc502jpsnnezqs",
         "farm_address": "erd1qqqqqqqqqqqqqpgquhqfknr9dg5t0xma0zcc55dm8gwv5rpkkp2sq8f40p",
-        "stake_address": "erd1qqqqqqqqqqqqqpgqp2wfzvkhlpkwcdxx25qzznx33345979w2jpsl3gflj"
+        "stake_address": "erd1qqqqqqqqqqqqqpgqp2wfzvkhlpkwcdxx25qzznx33345979w2jpsl3gflj",
+        "version": 2
     }
 ]
