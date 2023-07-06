@@ -264,7 +264,7 @@ class RouterContract(DEXContractInterface):
         function_purpose = f"Resume pair contract"
         logger.info(function_purpose)
 
-        gas_limit = 30000000
+        gas_limit = 60000000
         sc_args = [
             Address(pair_contract)
         ]

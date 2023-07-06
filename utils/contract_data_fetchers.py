@@ -174,6 +174,9 @@ class PairContractDataFetcher(DataFetcher):
             "getTotalFeePercent": self._get_int_view,
             "getSpecialFee": self._get_int_view,
             "updateAndGetSafePrice": self._get_hex_view,
+            "getSafePriceByRoundOffset": self._get_hex_view,
+            "getSafePriceByTimestampOffset": self._get_hex_view,
+            "getSafePrice": self._get_hex_view,
             "getLpTokenIdentifier": self._get_hex_view,
             "getFirstTokenId": self._get_hex_view,
             "getSecondTokenId": self._get_hex_view,
@@ -181,7 +184,8 @@ class PairContractDataFetcher(DataFetcher):
             "getTokensForGivenPosition": self._get_int_list_view,
             "getState": self._get_int_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
-            "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view
+            "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
+            "getPriceObservation": self._get_hex_list_view
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
