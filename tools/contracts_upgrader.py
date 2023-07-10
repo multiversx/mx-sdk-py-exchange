@@ -99,6 +99,8 @@ def main(cli_args: List[str]):
     parser.add_argument("--remove-pairs-from-fees-collector", action="store_true", default=False)
     parser.add_argument("--set-fees-collector-in-pairs", action="store_true", default=False)
     parser.add_argument("--update-fees-in-pairs", action="store_true", default=False)
+    parser.add_argument("--enable-pair-creation", action="store_true", default=False)
+    parser.add_argument("--disable-pair-creation", action="store_true", default=False)
     parser.add_argument("--fetch-state", required=False, default="")
     parser.add_argument("--compare-state", action="store_true", default=False)
     args = parser.parse_args(cli_args)
@@ -190,6 +192,12 @@ def main(cli_args: List[str]):
 
     elif args.resume_stakings:
         resume_staking_contracts(owner, network_providers)
+
+    elif args.enable_pair_creation:
+        enable_pair_creation(owner, network_providers, True)
+
+    elif args.disable_pair_creation:
+        enable_pair_creation(owner, network_providers, False)
 
     elif args.update_fees_in_pairs:
         update_fees_percentage(owner, network_providers)
@@ -892,6 +900,18 @@ def deploy_pair_view(dex_owner: Account, network_providers: NetworkProviders):
                                                                [config.ZERO_CONTRACT_ADDRESS])
 
     if not network_providers.check_complex_tx_status(tx_hash, f"deploy view contract: {address}"):
+        if not get_user_continue():
+            return
+
+
+def enable_pair_creation(dex_owner: Account, network_providers: NetworkProviders, enable: bool):
+    action = "enable" if enable else "disable"
+    print(f"{action} pair creation...")
+    router_contract = retrieve_router_by_address(ROUTER_CONTRACT)
+
+    tx_hash = router_contract.set_pair_creation_enabled(dex_owner, network_providers.proxy, [enable])
+
+    if not network_providers.check_simple_tx_status(tx_hash, f"{action} pair creation"):
         if not get_user_continue():
             return
 

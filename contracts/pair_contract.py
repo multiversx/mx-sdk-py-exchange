@@ -266,7 +266,7 @@ class PairContract(DEXContractInterface):
 
         gas_limit = 200000000
 
-        if len(args) < 5:
+        if len(args) != 1:
             log_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
             return "", ""
 

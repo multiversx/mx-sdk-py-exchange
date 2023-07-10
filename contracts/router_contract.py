@@ -270,6 +270,23 @@ class RouterContract(DEXContractInterface):
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
 
+    def set_pair_creation_enabled(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[bool]: enabled or disabled
+        """
+        function_purpose = f"Set pair creation enabled/disabled"
+        logger.info(function_purpose)
+
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 20000000
+        sc_args = [
+            1 if args[0] else 0
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPairCreationEnabled", sc_args)
+
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
 
