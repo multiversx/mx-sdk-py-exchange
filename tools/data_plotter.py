@@ -15,18 +15,14 @@ def animate(i):
 
     data = pd.read_csv(LOG_FILENAME)
 
-    x = data['block']
-    y1 = data['safe_price']
-    y2 = data['spot_price']
-    if '10min_avg_rounds' in data.columns:
-        y3 = data['10min_avg_rounds']
-        plt.plot(x, y3, label='10Min Average')
-    if '20min_avg_timestamp' in data.columns:
-        y5 = data['20min_avg_timestamp']
-        plt.plot(x, y5, label='20Min Average')
+    x = data[data.columns[0]]   # rounds
 
-    plt.plot(x, y2, label="Spot Price")
-    plt.plot(x, y1, label='Safe Price')
+    ys = {}
+    for column in data.columns[1:]:
+        ys[column] = data[column]
+
+    for column, y in ys.items():
+        plt.plot(x, y, label=column)
 
     plt.legend(loc='upper left')
     plt.tight_layout()

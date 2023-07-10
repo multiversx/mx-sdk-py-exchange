@@ -8,6 +8,7 @@
         "stake_token": "SWEB-d9bfe2",
         "lp_address": "erd1qqqqqqqqqqqqqpgqzn90c8pp6yd97tqvnadeg8gfl7eutmyk0n4s90ylnz",
         "farm_address": "erd1qqqqqqqqqqqqqpgq835vpevjysz042t3wnp6q5a7skxaerm90n4sg85ekq",
-        "stake_address": "erd1qqqqqqqqqqqqqpgqxpshvxgesuntsq8fk0735s372w2jmmcy0n4s3q9qgr"
+        "stake_address": "erd1qqqqqqqqqqqqqpgqxpshvxgesuntsq8fk0735s372w2jmmcy0n4s3q9qgr",
+        "version": 2
     }
 ]

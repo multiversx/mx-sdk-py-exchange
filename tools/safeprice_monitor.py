@@ -14,7 +14,7 @@ from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_pa
 
 
 NUM_BLOCKS_OBSERVED = 15000
-SAMPLE_INTERVAL = 3
+SAMPLE_INTERVAL = 3.0
 LOG_FILENAME = "dump/safe_price_observations.csv"
 
 MODEL_SAMPLES = 100
@@ -67,6 +67,7 @@ def main(cli_args: List[str]):
 
     i = NUM_BLOCKS_OBSERVED
     while i:
+        query_start_time = time.time()
         reference_amount = 1 * 10 ** 18
         view_payload = f"000000{dec_to_padded_hex(len(string_to_hex(pair_contract.firstToken))//2)}" \
                        f"{string_to_hex(pair_contract.firstToken)}" \
@@ -126,13 +127,13 @@ def main(cli_args: List[str]):
             row_data = [last_block, decoded_attrs['amount'] / 10 ** 18, spot_price / 10 ** 18]
             if args.view_contract:
                 row_data.extend([ten_min_avg['amount'] / 10 ** 18,
-                                 ten_min_avg_2['amount'] / 10 ** 18,
                                  twenty_min_avg['amount'] / 10 ** 18])
             for model in offline_models:
                 row_data.append(model.last_computed_price.price / 10 ** 18)
             file_writer.writerow(row_data)
 
-        time.sleep(SAMPLE_INTERVAL)
+        query_time = time.time() - query_start_time
+        time.sleep(max(0, SAMPLE_INTERVAL - query_time))
         i -= 1
 
 
@@ -183,7 +184,9 @@ class OfflineModel:
 
         elapsed_rounds = self.observations[-1].round - self.observations[0].round
         sum_price = sum([observation.price for observation in self.observations])
-        self.last_computed_price = PriceSample(sum_price // elapsed_rounds, self.observations[-1].round)
+        self.last_computed_price = PriceSample(sum_price // self.avg_samples, self.observations[-1].round)
+        print(f"Elapsed rounds: {elapsed_rounds} Sum price: {sum_price} Avg price: {self.last_computed_price.price}"
+              f"First round {self.observations[0].round} Last round {self.observations[-1].round}")
 
 
 if __name__ == "__main__":
