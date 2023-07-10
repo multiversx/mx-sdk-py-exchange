@@ -417,6 +417,14 @@ class PairContract(DEXContractInterface):
         sc_args = []
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
 
+    def set_active_no_swaps(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Set pair active no swaps"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = []
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setStateActiveNoSwaps", sc_args)
+
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.resume(deployer, proxy)
 
