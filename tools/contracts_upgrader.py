@@ -8,6 +8,7 @@ from argparse import ArgumentParser
 from typing import List
 
 from context import Context
+from contracts.pair_contract import PairContract
 from ported_arrows.AutomaticTests.ElasticIndexer import ElasticIndexer
 from ported_arrows.AutomaticTests.ProxyExtension import ProxyExtension
 from contracts.contract_identities import RouterContractVersion, PairContractVersion, \
@@ -93,6 +94,7 @@ def main(cli_args: List[str]):
     parser.add_argument("--upgrade-stakings", action="store_true", default=False)
     parser.add_argument("--upgrade-stakings-fix", action="store_true", default=False)
     parser.add_argument("--upgrade-metastakings", action="store_true", default=False)
+    parser.add_argument("--deploy-pair-view", action="store_true", default=False)
     parser.add_argument("--set-pairs-in-fees-collector", action="store_true", default=False)
     parser.add_argument("--remove-pairs-from-fees-collector", action="store_true", default=False)
     parser.add_argument("--set-fees-collector-in-pairs", action="store_true", default=False)
@@ -167,6 +169,9 @@ def main(cli_args: List[str]):
 
     elif args.upgrade_metastakings:
         upgrade_metastaking_contracts(owner, network_providers, args.compare_state)
+
+    elif args.deploy_pair_view:
+        deploy_pair_view(owner, network_providers)
 
     elif args.set_pairs_in_fees_collector:
         set_pairs_in_fees_collector(owner, network_providers)
@@ -876,6 +881,19 @@ def upgrade_farmv13_contracts(dex_owner: Account, network_providers: NetworkProv
             return
 
         count += 1
+
+
+def deploy_pair_view(dex_owner: Account, network_providers: NetworkProviders):
+    print(f"Deploying pair view contract...")
+    pair_view_contract = PairContract("", "", PairContractVersion.V1)
+
+    tx_hash, address = pair_view_contract.view_contract_deploy(dex_owner, network_providers.proxy,
+                                                               config.PAIR_VIEW_BYTECODE_PATH,
+                                                               [config.ZERO_CONTRACT_ADDRESS])
+
+    if not network_providers.check_complex_tx_status(tx_hash, f"deploy view contract: {address}"):
+        if not get_user_continue():
+            return
 
 
 def set_transfer_role_farmv13_contracts(dex_owner: Account, network_providers: NetworkProviders):
