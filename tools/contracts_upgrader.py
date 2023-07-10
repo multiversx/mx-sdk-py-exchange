@@ -121,7 +121,7 @@ def main(cli_args: List[str]):
     if args.fetch_farms:
         fetch_and_save_farms_from_chain(network_providers.proxy)
 
-    elif args.fetch_pause_state:
+    if args.fetch_pause_state:
         fetch_and_save_pause_state(network_providers)
 
     elif args.pause_pairs:
@@ -452,7 +452,7 @@ def pause_pair_contracts(dex_owner: Account, network_providers: NetworkProviders
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
             if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {pair_address} already inactive. Current state: {contract_state}")
@@ -481,7 +481,7 @@ def resume_pair_contracts(dex_owner: Account, network_providers: NetworkProvider
         if contract_states[pair_address] == 1:
             tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, pair_address)
             if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {pair_address} wasn't touched because of initial state: {contract_states[pair_address]}")
@@ -502,7 +502,7 @@ def pause_staking_contracts(dex_owner: Account, network_providers: NetworkProvid
         if contract_state != 0:
             tx_hash = contract.pause(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"pause staking contract: {staking_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {staking_address} already inactive. Current state: {contract_state}")
@@ -531,7 +531,7 @@ def resume_staking_contracts(dex_owner: Account, network_providers: NetworkProvi
             contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
             tx_hash = contract.resume(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"resume staking contract: {staking_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {staking_address} wasn't touched because of initial state: "
