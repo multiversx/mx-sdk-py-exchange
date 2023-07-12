@@ -57,3 +57,24 @@ To run a defined scenario, just run the desired scenario script located in /scen
 ```
 python3 scenarios/stress_create_positions.py
 ```
+
+## Tools
+### Contracts upgrader
+The contracts_upgrader.py script is used to upgrade the exchange setup contracts to new versions or ease the experience of
+performing steps over large/tailored number of contracts.
+
+Usage example:
+```
+python3 tools/contracts_upgrader.py --disable-pair-creation
+python3 tools/contracts_upgrader.py --fetch-pairs     # fetches all pairs registered in the router contract
+python3 tools/contracts_upgrader.py --fetch-stakings  # fetches all stakings from the xexchange graphQL service
+python3 tools/contracts_upgrader.py --fetch-pause-state   # fetches pause state for all previously fetched contracts
+python3 tools/contracts_upgrader.py --pause-stakings
+python3 tools/contracts_upgrader.py --pause-pairs
+python3 tools/contracts_upgrader.py --upgrade-template --compare-state
+python3 tools/contracts_upgrader.py --upgrade-pairs --compare-state
+python3 tools/contracts_upgrader.py --deploy-pair-view
+python3 tools/contracts_upgrader.py --resume-pairs    # brings pairs into their original state (needs fetch-pause-state beforehand)
+python3 tools/contracts_upgrader.py --resume-stakings   # brings stakings into their original state (needs fetch-pause-state beforehand)
+python3 tools/contracts_upgrader.py --enable-pair-creation
+```

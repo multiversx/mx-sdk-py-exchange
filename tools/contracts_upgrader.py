@@ -8,6 +8,7 @@ from argparse import ArgumentParser
 from typing import List
 
 from context import Context
+from contracts.pair_contract import PairContract
 from ported_arrows.AutomaticTests.ElasticIndexer import ElasticIndexer
 from ported_arrows.AutomaticTests.ProxyExtension import ProxyExtension
 from contracts.contract_identities import RouterContractVersion, PairContractVersion, \
@@ -93,10 +94,13 @@ def main(cli_args: List[str]):
     parser.add_argument("--upgrade-stakings", action="store_true", default=False)
     parser.add_argument("--upgrade-stakings-fix", action="store_true", default=False)
     parser.add_argument("--upgrade-metastakings", action="store_true", default=False)
+    parser.add_argument("--deploy-pair-view", action="store_true", default=False)
     parser.add_argument("--set-pairs-in-fees-collector", action="store_true", default=False)
     parser.add_argument("--remove-pairs-from-fees-collector", action="store_true", default=False)
     parser.add_argument("--set-fees-collector-in-pairs", action="store_true", default=False)
     parser.add_argument("--update-fees-in-pairs", action="store_true", default=False)
+    parser.add_argument("--enable-pair-creation", action="store_true", default=False)
+    parser.add_argument("--disable-pair-creation", action="store_true", default=False)
     parser.add_argument("--fetch-state", required=False, default="")
     parser.add_argument("--compare-state", action="store_true", default=False)
     args = parser.parse_args(cli_args)
@@ -117,7 +121,7 @@ def main(cli_args: List[str]):
     if args.fetch_farms:
         fetch_and_save_farms_from_chain(network_providers.proxy)
 
-    elif args.fetch_pause_state:
+    if args.fetch_pause_state:
         fetch_and_save_pause_state(network_providers)
 
     elif args.pause_pairs:
@@ -145,10 +149,10 @@ def main(cli_args: List[str]):
         upgrade_router_contract(owner, network_providers)
 
     elif args.upgrade_template:
-        upgrade_template_pair_contract(owner, network_providers)
+        upgrade_template_pair_contract(owner, network_providers, args.compare_state)
 
     elif args.upgrade_pairs:
-        upgrade_pair_contracts(owner, network_providers)
+        upgrade_pair_contracts(owner, network_providers, args.compare_state)
 
     elif args.upgrade_farmsv12:
         upgrade_farmv12_contracts(owner, network_providers)
@@ -168,6 +172,9 @@ def main(cli_args: List[str]):
     elif args.upgrade_metastakings:
         upgrade_metastaking_contracts(owner, network_providers, args.compare_state)
 
+    elif args.deploy_pair_view:
+        deploy_pair_view(owner, network_providers)
+
     elif args.set_pairs_in_fees_collector:
         set_pairs_in_fees_collector(owner, network_providers)
 
@@ -185,6 +192,12 @@ def main(cli_args: List[str]):
 
     elif args.resume_stakings:
         resume_staking_contracts(owner, network_providers)
+
+    elif args.enable_pair_creation:
+        enable_pair_creation(owner, network_providers, True)
+
+    elif args.disable_pair_creation:
+        enable_pair_creation(owner, network_providers, False)
 
     elif args.update_fees_in_pairs:
         update_fees_percentage(owner, network_providers)
@@ -439,7 +452,7 @@ def pause_pair_contracts(dex_owner: Account, network_providers: NetworkProviders
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
             if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {pair_address} already inactive. Current state: {contract_state}")
@@ -468,7 +481,13 @@ def resume_pair_contracts(dex_owner: Account, network_providers: NetworkProvider
         if contract_states[pair_address] == 1:
             tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, pair_address)
             if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                    return
+        elif contract_states[pair_address] == 2:
+            pair_contract = PairContract("", "", PairContractVersion.V2, address=pair_address)
+            tx_hash = pair_contract.set_active_no_swaps(dex_owner, network_providers.proxy)
+            if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {pair_address} wasn't touched because of initial state: {contract_states[pair_address]}")
@@ -489,7 +508,7 @@ def pause_staking_contracts(dex_owner: Account, network_providers: NetworkProvid
         if contract_state != 0:
             tx_hash = contract.pause(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"pause staking contract: {staking_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {staking_address} already inactive. Current state: {contract_state}")
@@ -518,7 +537,7 @@ def resume_staking_contracts(dex_owner: Account, network_providers: NetworkProvi
             contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
             tx_hash = contract.resume(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"resume staking contract: {staking_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {staking_address} wasn't touched because of initial state: "
@@ -610,10 +629,17 @@ def remove_penalty_farms(dex_owner: Account, network_providers: NetworkProviders
         count += 1
 
 
-def upgrade_template_pair_contract(owner: Account, network_providers: NetworkProviders):
+def upgrade_template_pair_contract(owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
     router_data_fetcher = RouterContractDataFetcher(Address(ROUTER_CONTRACT), network_providers.proxy.url)
     template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
     template_pair = retrieve_pair_by_address(template_pair_address)
+
+    if compare_states:
+        print(f"Fetching contract states before upgrade...")
+        fetch_contracts_states("pre", network_providers, [template_pair_address], TEMPLATE_PAIR_LABEL)
+
+        if not get_user_continue():
+            return
 
     template_pair.version = PairContractVersion.V2
     args = [config.ZERO_CONTRACT_ADDRESS, config.ZERO_CONTRACT_ADDRESS,
@@ -624,10 +650,12 @@ def upgrade_template_pair_contract(owner: Account, network_providers: NetworkPro
         if not get_user_continue():
             return
 
-    fetch_new_and_compare_contract_states(TEMPLATE_PAIR_LABEL, template_pair_address, network_providers)
+    if compare_states:
+        print(f"Fetching contract states before upgrade...")
+        fetch_new_and_compare_contract_states(TEMPLATE_PAIR_LABEL, template_pair_address, network_providers)
 
 
-def upgrade_router_contract(dex_owner: Account, network_providers: NetworkProviders):
+def upgrade_router_contract(dex_owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
     router_contract = retrieve_router_by_address(ROUTER_CONTRACT)
     router_data_fetcher = RouterContractDataFetcher(Address(ROUTER_CONTRACT), network_providers.proxy.url)
     template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
@@ -643,7 +671,7 @@ def upgrade_router_contract(dex_owner: Account, network_providers: NetworkProvid
     fetch_new_and_compare_contract_states(ROUTER_LABEL, ROUTER_CONTRACT, network_providers)
 
 
-def upgrade_pair_contracts(dex_owner: Account, network_providers: NetworkProviders):
+def upgrade_pair_contracts(dex_owner: Account, network_providers: NetworkProviders, compare_states: bool = False):
     router_contract = retrieve_router_by_address(ROUTER_CONTRACT)
     router_contract.version = RouterContractVersion.V2
     pair_addresses = get_all_pair_addresses()
@@ -655,18 +683,30 @@ def upgrade_pair_contracts(dex_owner: Account, network_providers: NetworkProvide
         pair_data_fetcher = PairContractDataFetcher(Address(pair_address), network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
         special_fee_percentage = pair_data_fetcher.get_data("getSpecialFee")
+        existent_initial_liquidity_adder = pair_data_fetcher.get_data("getInitialLiquidtyAdder")
+        initial_liquidity_adder = Address(existent_initial_liquidity_adder[2:]).bech32() if existent_initial_liquidity_adder else config.ZERO_CONTRACT_ADDRESS
+        print(f"Initial liquidity adder: {initial_liquidity_adder}")
+
+        if compare_states:
+            print(f"Fetching contract state before upgrade...")
+            fetch_contracts_states("pre", network_providers, [pair_address], PAIRS_LABEL)
+
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
 
         pair_contract.version = PairContractVersion.V2
         tx_hash = pair_contract.contract_upgrade_via_router(dex_owner, network_providers.proxy, router_contract,
-                                                            [total_fee_percentage, special_fee_percentage])
+                                                            [total_fee_percentage, special_fee_percentage,
+                                                             initial_liquidity_adder])
 
-        if not network_providers.check_complex_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
-            if not get_user_continue():
+        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
 
-        fetch_new_and_compare_contract_states(PAIRS_LABEL, pair_address, network_providers)
+        if compare_states:
+            fetch_new_and_compare_contract_states(PAIRS_LABEL, pair_address, network_providers)
 
-        if not get_user_continue():
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
         count += 1
@@ -855,6 +895,31 @@ def upgrade_farmv13_contracts(dex_owner: Account, network_providers: NetworkProv
             return
 
         count += 1
+
+
+def deploy_pair_view(dex_owner: Account, network_providers: NetworkProviders):
+    print(f"Deploying pair view contract...")
+    pair_view_contract = PairContract("", "", PairContractVersion.V1)
+
+    tx_hash, address = pair_view_contract.view_contract_deploy(dex_owner, network_providers.proxy,
+                                                               config.PAIR_VIEW_BYTECODE_PATH,
+                                                               [config.ZERO_CONTRACT_ADDRESS])
+
+    if not network_providers.check_complex_tx_status(tx_hash, f"deploy view contract: {address}"):
+        if not get_user_continue():
+            return
+
+
+def enable_pair_creation(dex_owner: Account, network_providers: NetworkProviders, enable: bool):
+    action = "enable" if enable else "disable"
+    print(f"{action} pair creation...")
+    router_contract = retrieve_router_by_address(ROUTER_CONTRACT)
+
+    tx_hash = router_contract.set_pair_creation_enabled(dex_owner, network_providers.proxy, [enable])
+
+    if not network_providers.check_simple_tx_status(tx_hash, f"{action} pair creation"):
+        if not get_user_continue():
+            return
 
 
 def set_transfer_role_farmv13_contracts(dex_owner: Account, network_providers: NetworkProviders):
@@ -1120,7 +1185,10 @@ def fetch_new_and_compare_contract_states(contract_type: str, contract_address, 
     report_key_files_compare(str(OUTPUT_FOLDER), old_state_filename, new_state_filename, True)
 
 
-def get_user_continue() -> bool:
+def get_user_continue(force_yes: bool = False) -> bool:
+    if force_yes:
+        return True
+
     typed = input(f"Continue? y/n\n")
     while typed != "y" and typed != "n":
         typed = input(f"Wrong choice. Continue? y/n\n")

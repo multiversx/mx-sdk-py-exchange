@@ -47,5 +47,19 @@
         "lpToken": "ASHWEGLD-38545c",
         "address": "erd1qqqqqqqqqqqqqpgqp5d4x3d263x4alnapwafwujch5xqmvyq2jpsk2xhsy",
         "version": 2
+    },
+    {
+        "firstToken": "ZPAY-247875",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "ZPAYWEGLD-34e5c1",
+        "address": "erd1qqqqqqqqqqqqqpgqtjhhs49h0q2ncld64l3thtk7s7yuw47v2jps8emt0v",
+        "version": 2
+    },
+    {
+        "firstToken": "BHAT-c1fde3",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "BHATWEGLD-f45935",
+        "address": "erd1qqqqqqqqqqqqqpgqp32ecg03fyxgt2pf2fsxyg4knvhfvtgz2jps6rx6gf",
+        "version": 2
     }
 ]

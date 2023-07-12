@@ -152,7 +152,7 @@ class RouterContract(DEXContractInterface):
         type[str]: second token id
         type[int]: total fee percent
         type[int]: special fee percent
-        type[str]: initial liquidity adder (only v1)
+        type[str]: initial liquidity adder
         """
         function_purpose = f"Upgrade pair contract"
         logger.info(function_purpose)
@@ -167,11 +167,10 @@ class RouterContract(DEXContractInterface):
         sc_args = [
             args[0],
             args[1],
+            args[4],
             args[2],
             args[3]
         ]
-        if self.version == RouterContractVersion.V1:
-            sc_args.insert(2, args[4])
 
         tx_hash = endpoint_call(proxy, gas_limit, deployer, Address(self.address), "upgradePair", sc_args)
 
@@ -255,7 +254,7 @@ class RouterContract(DEXContractInterface):
         function_purpose = f"Pause pair contract"
         logger.info(function_purpose)
 
-        gas_limit = 30000000
+        gas_limit = 60000000
         sc_args = [
             Address(pair_contract)
         ]
@@ -265,11 +264,28 @@ class RouterContract(DEXContractInterface):
         function_purpose = f"Resume pair contract"
         logger.info(function_purpose)
 
-        gas_limit = 30000000
+        gas_limit = 60000000
         sc_args = [
             Address(pair_contract)
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
+
+    def set_pair_creation_enabled(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[bool]: enabled or disabled
+        """
+        function_purpose = f"Set pair creation enabled/disabled"
+        logger.info(function_purpose)
+
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 20000000
+        sc_args = [
+            1 if args[0] else 0
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPairCreationEnabled", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
