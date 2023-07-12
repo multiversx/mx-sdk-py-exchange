@@ -4,11 +4,12 @@ from typing import List
 from argparse import ArgumentParser
 from multiversx_sdk_cli.accounts import Address
 from context import Context
-from tools.account_state import get_account_keys_online
+from tools.runners.account_state_runner import get_account_keys_online
 from tools.common import API, OUTPUT_FOLDER, PROXY, fetch_contracts_states, get_contract_save_name
 from tools.runners import pair_runner, farm_runner, \
     staking_runner, metastaking_runner, router_runner, \
-    proxy_runner, locked_asset_runner, fees_collector_runner
+    proxy_runner, locked_asset_runner, fees_collector_runner, \
+    account_state_runner
 from utils.contract_data_fetchers import FarmContractDataFetcher, PairContractDataFetcher, RouterContractDataFetcher, StakingContractDataFetcher
 from utils.utils_generic import log_step_fail
 from utils.utils_tx import NetworkProviders
@@ -25,6 +26,7 @@ def main(cli_args: List[str]):
     proxy = subparser.add_parser('proxy', help='handle proxy')
     locked_asset = subparser.add_parser('locked-asset', help='handle locked asset')
     fees_collector = subparser.add_parser('fees-collector', help='handle fees collector')
+    account_state = subparser.add_parser('account-state', help='handle account state')
 
     pair_runner.add_parsed_arguments(pair)
     farm_runner.add_parsed_arguments(farms)
@@ -34,6 +36,7 @@ def main(cli_args: List[str]):
     proxy_runner.add_parsed_arguments(proxy)
     locked_asset_runner.add_parsed_arguments(locked_asset)
     fees_collector_runner.add_parsed_arguments(fees_collector)
+    account_state_runner.add_parsed_arguments(account_state)
 
     parser.add_argument('--fetch-pause-state', action='store_true', help='fetch pause state')
     parser.add_argument('--fetch-all-states', type=ascii, default='pre',
@@ -57,6 +60,8 @@ def main(cli_args: List[str]):
         locked_asset_runner.handle_command(args)
     elif args.command == 'fees_collector':
         fees_collector_runner.handle_command(args)
+    elif args.command == 'account_state':
+        account_state_runner.get_account_keys_online(args.address, args.proxy_url, args.block_number, args.with_save_in)
     elif args.fetch_pause_state:
         fetch_and_save_pause_state()
     elif args.fetch_all_states:

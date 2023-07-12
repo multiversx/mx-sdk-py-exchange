@@ -6,7 +6,7 @@ from typing import List
 from multiversx_sdk_cli.accounts import Address
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 import requests
-from tools.account_state import get_account_keys_online, report_key_files_compare
+from tools.runners.account_state_runner import get_account_keys_online, report_key_files_compare
 from utils.utils_chain import Account, base64_to_hex
 import config
 from utils.utils_tx import NetworkProviders
