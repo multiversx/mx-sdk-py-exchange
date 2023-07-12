@@ -33,6 +33,7 @@ class DataFetcher:
         return self.proxy.query_contract(query)
 
     def _get_int_view(self, view_name: str, attrs) -> int:
+        result = None
         try:
             result = self._query_contract(view_name, attrs)
             if result.return_data[0] == '':
@@ -40,30 +41,41 @@ class DataFetcher:
             return int(base64_to_hex(result.return_data[0]), base=16)
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
+            if result:
+                logger.debug(f"Response content: {result.to_dictionary()}")
         return -1
 
     def _get_int_list_view(self, view_name: str, attrs) -> list:
+        result = None
         try:
             result = self._query_contract(view_name, attrs)
             return [int(base64_to_hex(elem), base=16) for elem in result.return_data]
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
+            if result:
+                logger.debug(f"Response content: {result.to_dictionary()}")
         return []
 
     def _get_hex_view(self, view_name: str, attrs) -> str:
+        result = None
         try:
             result = self._query_contract(view_name, attrs)
             return base64_to_hex(result.return_data[0])
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
+            if result:
+                logger.debug(f"Response content: {result.to_dictionary()}")
         return ""
 
     def _get_hex_list_view(self, view_name: str, attrs) -> list:
+        result = None
         try:
             result = self._query_contract(view_name, attrs)
             return [base64_to_hex(elem) for elem in result.return_data]
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
+            if result:
+                logger.debug(f"Response content: {result.to_dictionary()}")
         return []
 
 
@@ -174,6 +186,9 @@ class PairContractDataFetcher(DataFetcher):
             "getTotalFeePercent": self._get_int_view,
             "getSpecialFee": self._get_int_view,
             "updateAndGetSafePrice": self._get_hex_view,
+            "getSafePriceByRoundOffset": self._get_hex_view,
+            "getSafePriceByTimestampOffset": self._get_hex_view,
+            "getSafePrice": self._get_hex_view,
             "getLpTokenIdentifier": self._get_hex_view,
             "getFirstTokenId": self._get_hex_view,
             "getSecondTokenId": self._get_hex_view,
@@ -181,7 +196,8 @@ class PairContractDataFetcher(DataFetcher):
             "getTokensForGivenPosition": self._get_int_list_view,
             "getState": self._get_int_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
-            "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view
+            "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
+            "getPriceObservation": self._get_hex_list_view
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:

@@ -255,6 +255,28 @@ class PairContract(DEXContractInterface):
         tx_hash = router_contract.pair_contract_upgrade(deployer, proxy, pair_args)
         return tx_hash
 
+    def view_contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
+        """Expecting as args:
+            type[str]: linked contract address
+        """
+        function_purpose = f"Deploy view contract for pair"
+        logger.info(function_purpose)
+
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=False, readable=True)
+
+        gas_limit = 200000000
+
+        if len(args) != 1:
+            log_step_fail(f"FAIL: Failed to deploy contract. Args list not as expected.")
+            return "", ""
+
+        arguments = [
+            Address(args[0]),
+        ]
+
+        tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
+        return tx_hash, address
+
     def issue_lp_token_via_router(self, deployer: Account, proxy: ProxyNetworkProvider, router_contract, args: list):
         """ Expected as args:
             type[str]: token display name
@@ -394,6 +416,14 @@ class PairContract(DEXContractInterface):
         gas_limit = 10000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
+
+    def set_active_no_swaps(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Set pair active no swaps"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = []
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setStateActiveNoSwaps", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.resume(deployer, proxy)

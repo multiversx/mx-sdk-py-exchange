@@ -24,6 +24,8 @@ def add_parsed_arguments(parser: ArgumentParser):
     mutex = parser.add_mutually_exclusive_group()
     mutex.add_argument('--upgrade', action='store_true', help='upgrade router')
     mutex.add_argument('--upgrade-template', action='store_true', help='upgrade template pair')
+    mutex.add_argument('--enable-pair-creation', action='store_true', help='enable pair creation')
+    mutex.add_argument('--disable-pair-creation', action='store_true', help='disable pair creation')
 
 
 def handle_command(args):
@@ -33,6 +35,10 @@ def handle_command(args):
         upgrade_router_contract(args.compare_states)
     elif args.upgrade_template:
         upgrade_template_pair_contract(args.compare_states)
+    elif args.enable_pair_creation:
+        enable_pair_creation(True)
+    elif args.disable_pair_creation:
+        enable_pair_creation(False)
     else:
         print('invalid arguments')
 
@@ -98,3 +104,21 @@ def upgrade_template_pair_contract(compare_states: bool = False):
     if compare_states:
         print("Fetching contract states before upgrade...")
         fetch_new_and_compare_contract_states(TEMPLATE_PAIR_LABEL, template_pair_address, network_providers)
+
+
+def enable_pair_creation(enable: bool):
+    """Enable pair creation"""
+
+    action = "enable" if enable else "disable"
+    print(f"{action} pair creation...")
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+    context = Context()
+
+    router_contract = retrieve_router_by_address(context.get_contracts(config.ROUTER_V2)[0].address)
+
+    tx_hash = router_contract.set_pair_creation_enabled(dex_owner, network_providers.proxy, [enable])
+
+    if not network_providers.check_simple_tx_status(tx_hash, f"{action} pair creation"):
+        if not get_user_continue():
+            return

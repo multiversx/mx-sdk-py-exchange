@@ -120,12 +120,6 @@ class NetworkProviders:
 
         logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
 
-        if "do-multi" in self.proxy.url or "shadowfork" in self.proxy.url:
-            # TODO: remove this when the api is fixed on sf
-            time.sleep(35)
-            status = self.check_simple_tx_status(tx_hash, msg_label)
-            return status
-
         # temporary fix for the api returning the wrong status
         # start by avoiding an early false success followed by pending (usually occurring in the first 2 rounds)
         start_time = time.time()

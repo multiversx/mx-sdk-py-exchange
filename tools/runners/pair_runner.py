@@ -6,6 +6,7 @@ from multiversx_sdk_cli.accounts import Address
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
+from contracts.pair_contract import PairContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue, run_graphql_query
@@ -102,7 +103,7 @@ def pause_pair_contracts():
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
             if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {pair_address} already inactive. Current state: {contract_state}")
@@ -142,7 +143,13 @@ def resume_pair_contracts():
         if contract_states[pair_address] == 1:
             tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, pair_address)
             if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                    return
+        elif contract_states[pair_address] == 2:
+            pair_contract = PairContract("", "", PairContractVersion.V2, address=pair_address)
+            tx_hash = pair_contract.set_active_no_swaps(dex_owner, network_providers.proxy)
+            if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {pair_address} wasn't touched" \
@@ -192,7 +199,7 @@ def upgrade_pair_contracts(compare_states: bool = False):
                                                             [total_fee_percentage, special_fee_percentage,
                                                              initial_liquidity_adder])
 
-        if not network_providers.check_complex_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
+        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
 
@@ -345,6 +352,24 @@ def update_fees_percentage():
             return
 
         count += 1
+
+
+def deploy_pair_view():
+    """Deploy pair view contract"""
+
+    print("Deploying pair view contract...")
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    pair_view_contract = PairContract("", "", PairContractVersion.V1)
+
+    tx_hash, address = pair_view_contract.view_contract_deploy(dex_owner, network_providers.proxy,
+                                                               config.PAIR_VIEW_BYTECODE_PATH,
+                                                               [config.ZERO_CONTRACT_ADDRESS])
+
+    if not network_providers.check_complex_tx_status(tx_hash, f"deploy view contract: {address}"):
+        if not get_user_continue():
+            return
 
 
 def get_depositing_addresses() -> list:

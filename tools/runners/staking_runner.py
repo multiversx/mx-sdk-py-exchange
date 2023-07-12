@@ -80,7 +80,7 @@ def pause_staking_contracts():
         if contract_state != 0:
             tx_hash = contract.pause(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"pause staking contract: {staking_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {staking_address} already inactive. Current state: {contract_state}")
@@ -118,7 +118,7 @@ def resume_staking_contracts():
             contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
             tx_hash = contract.resume(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"resume staking contract: {staking_address}"):
-                if not get_user_continue():
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
         else:
             print(f"Contract {staking_address} wasn't touched because of initial state: "
