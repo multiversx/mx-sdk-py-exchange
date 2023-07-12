@@ -51,7 +51,6 @@ def fetch_and_save_stakings_from_chain():
     """Fetch staking contracts from chain"""
 
     print("Fetch staking contracts from chain")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
 
@@ -63,7 +62,6 @@ def pause_staking_contracts():
     """Pause staking contracts"""
 
     print("Pause staking contracts")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -92,7 +90,6 @@ def resume_staking_contracts():
     """Resume staking contracts"""
 
     print("Resume staking contracts")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -131,7 +128,6 @@ def upgrade_staking_contracts(compare_states: bool = False):
     """Upgrade staking contracts"""
 
     print("Upgrade staking contracts")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)

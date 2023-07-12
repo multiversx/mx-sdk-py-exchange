@@ -32,7 +32,6 @@ def upgrade_locked_asset_contracts():
     """Upgrade locked asset contracts"""
 
     print("Upgrade locked asset factory contract")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)

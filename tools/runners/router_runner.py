@@ -47,7 +47,6 @@ def upgrade_router_contract(compare_states: bool = False):
     """Upgrade router contract"""
 
     print("Upgrade router contract")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -73,7 +72,6 @@ def upgrade_template_pair_contract(compare_states: bool = False):
     """Upgrade template pair contract"""
 
     print("Upgrade template pair contract")
-    return
     
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)

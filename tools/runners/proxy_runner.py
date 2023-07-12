@@ -29,7 +29,6 @@ def upgrade_proxy_dex_contracts():
     """Upgrade proxy dex contracts"""
 
     print("Upgrade proxy dex contract")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)

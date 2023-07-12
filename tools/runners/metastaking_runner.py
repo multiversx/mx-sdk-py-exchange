@@ -39,7 +39,6 @@ def fetch_and_save_metastakings_from_chain():
     """Fetch metastaking contracts from chain"""
 
     print("Fetch metastaking contracts from chain")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
 
@@ -51,7 +50,6 @@ def upgrade_metastaking_contracts(compare_states: bool = False):
     """Upgrade metastaking contracts"""
 
     print("Upgrade metastaking contracts")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)

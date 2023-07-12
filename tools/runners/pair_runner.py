@@ -11,9 +11,7 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue, run_graphql_query
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
-from utils.contract_retrievers import retrieve_router_by_address, retrieve_pair_by_address, \
-    retrieve_staking_by_address, retrieve_proxy_staking_by_address
-from utils.utils_chain import Account
+from utils.contract_retrievers import retrieve_router_by_address, retrieve_pair_by_address
 from utils.utils_tx import NetworkProviders
 import config
 
@@ -68,7 +66,7 @@ def fetch_and_save_pairs_from_chain():
     """Fetch and save pairs from chain"""
 
     print('fetch_and_save_pairs_from_chain')
-    return
+
 
     network_providers = NetworkProviders(API, PROXY)
     context = Context()
@@ -84,7 +82,6 @@ def pause_pair_contracts():
     """Pause pair contracts"""
 
     print("Pausing pair contracts")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -115,7 +112,6 @@ def resume_pair_contracts():
     """Resume pair contracts"""
 
     print("Resuming pair contracts")
-    return
     
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -162,7 +158,6 @@ def upgrade_pair_contracts(compare_states: bool = False):
     """Upgrade pair contracts"""
 
     print(f"Upgrading pair contracts with compare states: {compare_states}")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -216,7 +211,6 @@ def set_fees_collector_in_pairs():
     """Set fees collector in pairs"""
 
     print("Setting fees collector in all pairs")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -252,7 +246,6 @@ def remove_pairs_from_fees_collector():
     """Remove pairs from fees collector"""
 
     print("Removing pairs from fees collector")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -322,7 +315,6 @@ def update_fees_percentage():
     """Update fees percentage"""
 
     print("Updating fees percentage")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)

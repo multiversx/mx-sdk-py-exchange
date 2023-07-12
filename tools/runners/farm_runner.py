@@ -67,7 +67,6 @@ def fetch_and_save_farms_from_chain():
     """Fetch and save farms from chain"""
 
     print("Fetching farms from chain...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
 
@@ -83,7 +82,6 @@ def pause_farm_contracts():
     """Pause all farms"""
 
     print("Pausing farms...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -112,7 +110,6 @@ def resume_farm_contracts():
     """Resume all farms"""
 
     print("Resuming farms...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -151,7 +148,6 @@ def upgrade_farmv12_contracts():
     """Upgrade all v1.2 farms"""
 
     print("Upgrading v1.2 farms...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -183,7 +179,6 @@ def upgrade_farmv13_contracts():
     """Upgrade all v1.3 farms"""
 
     print("Upgrading v1.3 farms...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -215,7 +210,6 @@ def set_transfer_role_farmv13_contracts():
     """Set transfer role for all v1.3 farms"""
 
     print("Setting transfer role for v1.3 farms...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -241,7 +235,6 @@ def stop_produce_rewards_farms():
     """Stop produce rewards for all farms"""
 
     print("Stopping produce rewards for farms...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -265,7 +258,6 @@ def remove_penalty_farms():
     """Remove penalty from all farms"""
 
     print("Removing penalty from farms...")
-    return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
