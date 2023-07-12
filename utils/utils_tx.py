@@ -423,8 +423,7 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
     ep_args = args[1:] if len(args) != 1 else []
     tx = prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract, user, network_config,
                                                           gas, endpoint, ep_args, args[0])
-    print(tx.to_dictionary())
-    # tx_hash = send_contract_call_tx(tx, proxy)
+    tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 
     return tx_hash
