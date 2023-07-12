@@ -17,12 +17,8 @@ def animate(i):
 
     x = data[data.columns[0]]   # rounds
 
-    ys = {}
     for column in data.columns[1:]:
-        ys[column] = data[column]
-
-    for column, y in ys.items():
-        plt.plot(x, y, label=column)
+        plt.plot(x, data[column], label=column)
 
     plt.legend(loc='upper left')
     plt.tight_layout()
@@ -40,7 +36,7 @@ def main(cli_args: List[str]):
 if __name__ == "__main__":
     main(sys.argv[1:])
 
-    plt.style.use('fivethirtyeight')
+    plt.style.use('default')
     ani = FuncAnimation(plt.gcf(), animate, interval=3000, cache_frame_data=False)
 
     plt.tight_layout()

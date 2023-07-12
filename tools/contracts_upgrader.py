@@ -483,6 +483,12 @@ def resume_pair_contracts(dex_owner: Account, network_providers: NetworkProvider
             if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
                 if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                     return
+        elif contract_states[pair_address] == 2:
+            pair_contract = PairContract("", "", PairContractVersion.V2, address=pair_address)
+            tx_hash = pair_contract.set_active_no_swaps(dex_owner, network_providers.proxy)
+            if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
+                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                    return
         else:
             print(f"Contract {pair_address} wasn't touched because of initial state: {contract_states[pair_address]}")
 
@@ -693,7 +699,7 @@ def upgrade_pair_contracts(dex_owner: Account, network_providers: NetworkProvide
                                                             [total_fee_percentage, special_fee_percentage,
                                                              initial_liquidity_adder])
 
-        if not network_providers.check_complex_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
+        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
 
