@@ -120,12 +120,6 @@ class NetworkProviders:
 
         logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
 
-        if "do-multi" in self.proxy.url or "shadowfork" in self.proxy.url:
-            # TODO: remove this when the api is fixed on sf
-            time.sleep(35)
-            status = self.check_simple_tx_status(tx_hash, msg_label)
-            return status
-
         # temporary fix for the api returning the wrong status
         # start by avoiding an early false success followed by pending (usually occurring in the first 2 rounds)
         start_time = time.time()
@@ -429,7 +423,8 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
     ep_args = args[1:] if len(args) != 1 else []
     tx = prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract, user, network_config,
                                                           gas, endpoint, ep_args, args[0])
-    tx_hash = send_contract_call_tx(tx, proxy)
+    print(tx.to_dictionary())
+    # tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 
     return tx_hash

@@ -57,7 +57,7 @@ def main(cli_args: List[str]):
 
     csv_header = ["block", "safe_price", "spot_price"]
     if args.view_contract:
-        csv_header.extend(["10min_avg_rounds", "10min_avg_timestamp", "20min_avg_timestamp"])
+        csv_header.extend(["10min_avg_rounds", "20min_avg_timestamp"])
     for offline_model in offline_models:
         csv_header.append(f"{offline_model.avg_samples}_rounds_avg_offline")
 
