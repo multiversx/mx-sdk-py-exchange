@@ -2,7 +2,7 @@ import json
 import sys
 from typing import List
 from argparse import ArgumentParser
-from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_core import Address
 from context import Context
 from tools.runners.account_state_runner import get_account_keys_online
 from tools.common import API, OUTPUT_FOLDER, PROXY, fetch_contracts_states, get_contract_save_name
@@ -81,17 +81,17 @@ def fetch_and_save_pause_state():
 
     contract_states = {}
     for pair_address in pair_addresses:
-        data_fetcher = PairContractDataFetcher(Address(pair_address), network_providers.proxy.url)
+        data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[pair_address] = contract_state
 
     for staking_address in staking_addresses:
-        data_fetcher = StakingContractDataFetcher(Address(staking_address), network_providers.proxy.url)
+        data_fetcher = StakingContractDataFetcher(Address(staking_address, "erd"), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[staking_address] = contract_state
 
     for farm_address in farm_addresses:
-        data_fetcher = FarmContractDataFetcher(Address(farm_address), network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address(farm_address, "erd"), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[farm_address] = contract_state
 
@@ -130,8 +130,8 @@ def fetch_all_contracts_states(prefix: str):
         log_step_fail("Router address not available. No state saved for this!")
 
     # get template state
-    router_data_fetcher = RouterContractDataFetcher(Address(router_address), network_providers.proxy.url)
-    template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
+    router_data_fetcher = RouterContractDataFetcher(Address(router_address, "erd"), network_providers.proxy.url)
+    template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
     filename = get_contract_save_name(router_runner.TEMPLATE_PAIR_LABEL, template_pair_address, prefix)
     get_account_keys_online(template_pair_address, network_providers.proxy.url,
                             with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))

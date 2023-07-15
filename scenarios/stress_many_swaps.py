@@ -1,19 +1,17 @@
-
 import sys
 import time
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List
-
+from multiversx_sdk_core import Address, Transaction
 from ported_arrows.stress.contracts.transaction_builder import (number_as_arg,
                                                          string_as_arg,
                                                          token_id_as_arg)
+from utils.account import Account
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
-from multiversx_sdk_cli.accounts import Account, Address
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from multiversx_sdk_network_providers.network_config import NetworkConfig
-from multiversx_sdk_cli.transactions import Transaction
 
 
 def main(cli_args: List[str]):
@@ -27,7 +25,7 @@ def main(cli_args: List[str]):
 
     proxy = ProxyNetworkProvider(args.proxy)
     network = proxy.get_network_config()
-    pair = Address(args.pair)
+    pair = Address(args.pair, "erd")
     accounts = BunchOfAccounts.load_accounts_from_files([Path(args.accounts)])
 
     for _ in range(0, 100):
@@ -48,17 +46,21 @@ def create_swap_fixed_input(pair: Address, caller: Account, token_from: str, tok
     amount_to_min = 1
     tx_data = f"ESDTTransfer@{token_id_as_arg(token_from)}@{number_as_arg(amount_from)}@{string_as_arg('swapTokensFixedInput')}@{token_id_as_arg(token_to)}@{number_as_arg(amount_to_min)}"
 
-    transaction = Transaction()
+    transaction = Transaction(
+        chain_id=network.chain_id,
+        sender=caller.address.bech32(),
+        receiver=pair.bech32(),
+        gas_limit=8000000
+    )
     transaction.nonce = caller.nonce
-    transaction.sender = caller.address.bech32()
-    transaction.receiver = pair.bech32()
     transaction.value = "0"
     transaction.data = tx_data
     transaction.gasPrice = network.min_gas_price
-    transaction.gasLimit = 8000000
-    transaction.chainID = network.chain_id
     transaction.version = network.min_tx_version
-    transaction.sign(caller)
+
+    signature = caller.sign_transaction(transaction)
+    transaction.signature = signature
+
     return transaction
 
 

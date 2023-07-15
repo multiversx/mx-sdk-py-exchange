@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-from multiversx_sdk_cli.accounts import Address
 import config
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion

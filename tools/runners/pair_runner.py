@@ -1,8 +1,8 @@
 from argparse import ArgumentParser
 import json
 import os
+from multiversx_sdk_core import Address
 from common import fetch_and_save_contracts, get_saved_contract_addresses
-from multiversx_sdk_cli.accounts import Address
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
@@ -72,7 +72,7 @@ def fetch_and_save_pairs_from_chain():
     context = Context()
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
-    router_data_fetcher = RouterContractDataFetcher(Address(router_address), PROXY)
+    router_data_fetcher = RouterContractDataFetcher(Address(router_address, "erd"), PROXY)
     registered_pairs = router_data_fetcher.get_data("getAllPairsManagedAddresses")
     fetch_and_save_contracts(registered_pairs, PAIRS_LABEL,
         OUTPUT_PAIR_CONTRACTS_FILE, network_providers.proxy)
@@ -95,7 +95,7 @@ def pause_pair_contracts():
     count = 1
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
-        data_fetcher = PairContractDataFetcher(Address(pair_address), network_providers.proxy.url)
+        data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
@@ -172,13 +172,13 @@ def upgrade_pair_contracts(compare_states: bool = False):
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         pair_contract = retrieve_pair_by_address(pair_address)
-        pair_data_fetcher = PairContractDataFetcher(Address(pair_address),
+        pair_data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"),
                                                     network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
         special_fee_percentage = pair_data_fetcher.get_data("getSpecialFee")
         existent_initial_liquidity_adder = pair_data_fetcher.get_data("getInitialLiquidtyAdder")
         initial_liquidity_adder = \
-            Address(existent_initial_liquidity_adder[2:]).bech32() \
+            Address(existent_initial_liquidity_adder[2:], "erd").bech32() \
                 if existent_initial_liquidity_adder else config.ZERO_CONTRACT_ADDRESS
         print(f"Initial liquidity adder: {initial_liquidity_adder}")
 
@@ -325,7 +325,7 @@ def update_fees_percentage():
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         pair_contract = retrieve_pair_by_address(pair_address)
-        pair_data_fetcher = PairContractDataFetcher(Address(pair_address),
+        pair_data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"),
                                                     network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
         special_fee_percentage = 100

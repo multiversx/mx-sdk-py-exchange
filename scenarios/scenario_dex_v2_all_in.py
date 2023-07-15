@@ -3,9 +3,9 @@ import random
 import sys
 import time
 import traceback
-
 from typing import List
 from argparse import ArgumentParser
+from multiversx_sdk_core import Address
 
 import config
 from context import Context
@@ -26,7 +26,6 @@ from utils.utils_generic import log_step_fail, log_step_pass, log_condition_asse
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.send_egld_from_minter import main as send_egld_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from multiversx_sdk_cli.accounts import Address
 
 
 def main(cli_args: List[str]):
@@ -81,7 +80,7 @@ def add_initial_liquidity(context: Context):
     # add initial liquidity
     pair_contract: PairContract
     for pair_contract in context.get_contracts(config.PAIRS_V2):
-        pair_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
+        pair_data_fetcher = PairContractDataFetcher(Address(pair_contract.address, "erd"), context.network_provider.proxy.url)
         first_token_liquidity = pair_data_fetcher.get_token_reserve(pair_contract.firstToken)
         if first_token_liquidity == 0:
             event = AddLiquidityEvent(

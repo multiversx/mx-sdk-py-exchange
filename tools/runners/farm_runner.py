@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 import json
 import os
-from multiversx_sdk_cli.accounts import Address
 from config import GRAPHQL
 from contracts.contract_identities import FarmContractVersion
 from contracts.farm_contract import FarmContract
@@ -92,7 +91,7 @@ def pause_farm_contracts():
     count = 1
     for farm_address in farm_addresses:
         print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
-        data_fetcher = FarmContractDataFetcher(Address(farm_address), network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address(farm_address, "erd"), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract = FarmContract("", "", "", farm_address, FarmContractVersion.V14Locked)
         if contract_state != 0:

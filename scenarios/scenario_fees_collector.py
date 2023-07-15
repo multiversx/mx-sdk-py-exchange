@@ -3,9 +3,7 @@ import random
 import sys
 import time
 import traceback
-
-import pytest
-from itertools import count
+from multiversx_sdk_core import Address
 from typing import List
 from argparse import ArgumentParser
 
@@ -14,21 +12,15 @@ from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract, AddLiquidityEvent
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
-from events.event_generators import (generate_add_initial_liquidity_event,
-                                                       generate_add_liquidity_event,
-                                                       generateEnterFarmEvent,
-                                                       generateEnterMetastakeEvent,
-                                                       generateClaimMetastakeRewardsEvent,
-                                                       generateExitMetastakeEvent, generate_swap_fixed_input)
+from events.event_generators import generate_swap_fixed_input
 from utils.contract_data_fetchers import PairContractDataFetcher, SimpleLockEnergyContractDataFetcher
 from utils.utils_tx import ESDTToken
 from utils.utils_chain import nominated_amount, \
-    get_token_details_for_address, get_all_token_nonces_details_for_account
-from utils.utils_generic import log_step_fail, log_step_pass, log_condition_assert, TestStepConditions
+    get_all_token_nonces_details_for_account
+from utils.utils_generic import log_step_fail, log_step_pass
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.send_egld_from_minter import main as send_egld_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from multiversx_sdk_cli.accounts import Account, Address
 
 
 def main(cli_args: List[str]):

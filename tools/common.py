@@ -3,7 +3,7 @@ import binascii
 import os
 import json
 from typing import List
-from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_core import Address
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 import requests
 from tools.runners.account_state_runner import get_account_keys_online, report_key_files_compare
@@ -22,10 +22,14 @@ OUTPUT_FOLDER = config.UPGRADER_OUTPUT_FOLDER
 OUTPUT_PAUSE_STATES = OUTPUT_FOLDER / "contract_pause_states.json"
 
 
-def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save_path: Path, proxy: ProxyNetworkProvider):
+def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save_path: Path):
+    """Fetch and save contracts data in a json file"""
+
+    proxy = ProxyNetworkProvider(config.DEFAULT_PROXY)
     pairs_data = {}
+
     for address in contract_addresses:
-        contract_addr = Address(address)
+        contract_addr = Address(address, "erd")
         account_data = proxy.get_account(contract_addr)
         code_hash = base64_to_hex(account_data.code_hash)
 
@@ -37,12 +41,14 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
             save_wasm(account_data.code.hex(), code_hash)
         pairs_data[code_hash][contract_label].append(contract_addr.bech32())
 
-    with open(save_path, "w") as writer:
+    with open(save_path, "w", encoding="UTF-8") as writer:
         json.dump(pairs_data, writer, indent=4)
         print(f"Dumped {contract_label} data in {save_path}")
 
 
 def fetch_contracts_states(prefix: str, network_providers: NetworkProviders, contract_addresses: List[str], label: str):
+    """Fetch contracts states"""
+
     for contract_address in contract_addresses:
         filename = get_contract_save_name(label, contract_address, prefix)
         get_account_keys_online(contract_address, network_providers.proxy.url,
@@ -50,6 +56,8 @@ def fetch_contracts_states(prefix: str, network_providers: NetworkProviders, con
 
 
 def fetch_new_and_compare_contract_states(contract_type: str, contract_address, network_providers: NetworkProviders):
+    """Fetch new contract state and compare it with the old one"""
+
     old_state_filename = get_contract_save_name(contract_type, contract_address, "pre")
     new_state_filename = get_contract_save_name(contract_type, contract_address, "mid")
     fetch_contract_state(contract_address, new_state_filename, network_providers)
@@ -57,11 +65,15 @@ def fetch_new_and_compare_contract_states(contract_type: str, contract_address, 
 
 
 def fetch_contract_state(contract_address: str, save_name: str, network_providers: NetworkProviders):
+    """Fetch contract state"""
+
     get_account_keys_online(contract_address, network_providers.proxy.url,
                             with_save_in=str(OUTPUT_FOLDER / f"{save_name}.json"))
 
 
 def save_wasm(code_data_hex: str, code_hash: str):
+    """Save wasm binary"""
+
     binary_string = binascii.unhexlify(code_data_hex)
 
     if not os.path.exists(OUTPUT_FOLDER):
@@ -75,22 +87,26 @@ def save_wasm(code_data_hex: str, code_hash: str):
 
 
 def get_saved_contracts_data(saved_file: Path) -> dict:
+    """Get saved contracts data"""
+
     if not os.path.exists(saved_file):
         raise FileNotFoundError("Saved contract data from mainnet not available!")
 
     print("Reading data...")
-    with open(saved_file) as reader:
+    with open(saved_file, encoding="UTF-8") as reader:
         contracts_data = json.load(reader)
     return contracts_data
 
 
 def get_saved_contract_addresses(contract_label: str, saved_file: Path, searched_bytecode_hash: str = '') -> list:
+    """Get saved contract addresses"""
+
     contracts_data = {}
 
     try:
         contracts_data = get_saved_contracts_data(saved_file)
-    except FileNotFoundError as e:
-        print(f"Error encountered for {contract_label}: {e}")
+    except FileNotFoundError as error:
+        print(f"Error encountered for {contract_label}: {error}")
 
     contracts_addresses = []
     for bytecode_hash, contracts in contracts_data.items():
@@ -101,34 +117,43 @@ def get_saved_contract_addresses(contract_label: str, saved_file: Path, searched
 
 
 def get_owner(proxy) -> Account:
+    """Get owner account"""
+
     owner = Account(pem_file=config.DEFAULT_OWNER)
     if SHADOWFORK:
-        owner.address = Address(config.DEX_OWNER_ADDRESS)      # ONLY FOR SHADOWFORK
+        owner.address = Address(config.DEX_OWNER_ADDRESS, "erd")      # ONLY FOR SHADOWFORK
     owner.sync_nonce(proxy)
     return owner
 
 
 def get_user_continue(force_yes: bool = False) -> bool:
+    """Get user confirmation to continue"""
+
     if force_yes:
         return True
 
-    typed = input(f"Continue? y/n\n")
+    typed = input("Continue? y/n\n")
     while typed != "y" and typed != "n":
-        typed = input(f"Wrong choice. Continue? y/n\n")
+        typed = input("Wrong choice. Continue? y/n\n")
     if typed == "n":
         return False
     return True
 
 
 def run_graphql_query(uri, query):
+    """Run graphql query"""
+
     headers = {}
-    statusCode = 200
-    request = requests.post(uri, json={'query': query}, headers=headers)
-    if request.status_code == statusCode:
+    status_code = 200
+    request = requests.post(uri, json={'query': query}, headers=headers, timeout=60)
+
+    if request.status_code == status_code:
         return request.json()
-    else:
-        raise Exception(f"Unexpected status code returned: {request.status_code}")
+
+    raise Exception(f"Unexpected status code returned: {request.status_code}")
 
 
 def get_contract_save_name(contract_type: str, address: str, prefix: str):
+    """Get contract save name"""
+
     return f"{prefix}_{contract_type}_{address}"
