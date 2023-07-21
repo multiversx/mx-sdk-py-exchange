@@ -130,7 +130,8 @@ class StakingContract(DEXContractInterface):
             self.farming_token,
             1000000000000,
             self.max_apr,
-            self.unbond_epochs
+            self.unbond_epochs,
+            0, 0    # only needed for 6dc7c587b2cc4b177a192b709c092f3752b3dcf9ce1b484e69fe64dc333a9e0a
         ]
         if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
             arguments.extend(args)
@@ -334,8 +335,9 @@ class StakingContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
-        _ = self.start_produce_rewards(deployer, proxy)
-        _ = self.resume(deployer, proxy)
+        # _ = self.start_produce_rewards(deployer, proxy)
+        # _ = self.resume(deployer, proxy)
+        pass
 
     def print_contract_info(self):
         log_step_pass(f"Deployed staking contract: {self.address}")

@@ -158,7 +158,7 @@ class DeployStructure:
                                   self.proxy_deployer_deploy, False),
             config.FARMS_V2:
                 ContractStructure(config.FARMS_V2, FarmContract, config.FARM_V2_BYTECODE_PATH,
-                                  self.farm_boosted_deploy, False),  # self.farm_deploy_from_proxy_deployer, True),
+                                  self.farm_boosted_deploy, True),  # self.farm_deploy_from_proxy_deployer, True),
             config.PRICE_DISCOVERIES:
                 ContractStructure(config.PRICE_DISCOVERIES, PriceDiscoveryContract, config.PRICE_DISCOVERY_BYTECODE_PATH,
                                   self.price_discovery_deploy, False),
@@ -167,7 +167,7 @@ class DeployStructure:
                                   self.staking_deploy, False),
             config.STAKINGS_V2:
                 ContractStructure(config.STAKINGS_V2, StakingContract, config.STAKING_V2_BYTECODE_PATH,
-                                  self.staking_deploy, False),
+                                  self.staking_deploy, True),
             config.STAKINGS_BOOSTED:
                 ContractStructure(config.STAKINGS_BOOSTED, StakingContract, config.STAKING_V3_BYTECODE_PATH,
                                   self.staking_deploy, False),
@@ -176,7 +176,7 @@ class DeployStructure:
                                   self.metastaking_deploy, False),
             config.METASTAKINGS_V2:
                 ContractStructure(config.METASTAKINGS_V2, MetaStakingContract, config.STAKING_PROXY_V2_BYTECODE_PATH,
-                                  self.metastaking_deploy, False),
+                                  self.metastaking_deploy, True),
             config.METASTAKINGS_BOOSTED:
                 ContractStructure(config.METASTAKINGS_BOOSTED, MetaStakingContract, config.STAKING_PROXY_V3_BYTECODE_PATH,
                                   self.metastaking_deploy, False)
@@ -1784,8 +1784,8 @@ class DeployStructure:
                     return
 
             # topup rewards
-            tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
-            _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
+            # tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
+            # _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
 
             deployed_contracts.append(deployed_staking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts

@@ -5,8 +5,8 @@ DEFAULT_WORKSPACE = Path(__file__).parent
 
 # ------------ For normal operation, modify below ------------ #
 # Used net
-DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"                     # Proxy to be used for ALL operations
-DEFAULT_API = "https://devnet-api.multiversx.com"                           # API to be used for ALL operations
+DEFAULT_PROXY = "https://gateway.multiversx.com"                     # Proxy to be used for ALL operations
+DEFAULT_API = "https://api.multiversx.com"                           # API to be used for ALL operations
 GRAPHQL = 'https://graph.xexchange.com/graphql'                              # GraphQL service; only needed for the upgrader scripts
 HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
 # TODO: try to override the default issue token price with testnet definition to tidy code up
@@ -19,7 +19,7 @@ DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX 
 DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-mainnet-hatom"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
 FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations
@@ -37,10 +37,10 @@ FARM_LOCKED_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "dex" 
 FARM_COMMUNITY_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "dex" / "farm_with_community_rewards" / "output" / "farm_with_community_rewards.wasm"
 PRICE_DISCOVERY_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "dex" / "price-discovery" / "output" / "price-discovery.wasm"
 STAKING_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "farm-staking" / "farm-staking" / "output" / "farm-staking.wasm"
-STAKING_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "mainnet-contracts" / "farm-staking" / "farm-staking.wasm"
+STAKING_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "staking.wasm"
 STAKING_V3_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "farm-staking" / "farm-staking.wasm"
 STAKING_PROXY_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "farm-staking" / "farm-staking-proxy" / "output" / "farm-staking-proxy.wasm"
-STAKING_PROXY_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "mainnet-contracts" / "farm-staking-proxy" / "farm-staking-proxy.wasm"
+STAKING_PROXY_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "metastaking.wasm"
 STAKING_PROXY_V3_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "farm-staking-proxy" / "farm-staking-proxy.wasm"
 SIMPLE_LOCK_ENERGY_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "energy-factory.wasm"
 UNSTAKER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "token-unstake.wasm"
@@ -49,7 +49,7 @@ ROUTER_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-de
 PAIR_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "pair" / "pair.wasm"
 PAIR_VIEW_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "pair" / "safe-price-view.wasm"
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
-FARM_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "farm-with-locked-rewards.wasm"
+FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "farm.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
