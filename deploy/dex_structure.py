@@ -1784,8 +1784,9 @@ class DeployStructure:
                     return
 
             # topup rewards
-            # tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
-            # _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
+            if topup_rewards > 0:
+                tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
+                _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
 
             deployed_contracts.append(deployed_staking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts

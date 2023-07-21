@@ -221,7 +221,7 @@
             "farm_token": "HTMEGLDFL",
             "farm_token_name": "HTMEGLDLPStakedLK",
             "farmed_token": 0,
-            "rpb": 15100000000000000000000,
+            "rpb": 22000000000000000000000,
             "penalty": 300,
             "min_farming_epochs": 7,
             "lock_factory": 0,
@@ -248,10 +248,10 @@
             "staking_token": 10,
             "stake_token": "SHTM",
             "stake_token_name": "SHTM",
-            "apr": 2500,
-            "rpb": 4138000000000000000,
+            "apr": 1000,
+            "rpb": 57000000000000000,
             "unbond_epochs": 10,
-            "rewards": 10000000000000000000000000
+            "rewards": 0
         }
     ],
 
