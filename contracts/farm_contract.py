@@ -171,7 +171,7 @@ class FarmContract(DEXContractInterface):
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
                          no_init: bool = False):
-        """Expecting as args:percent
+        """Expecting as args:
         type[str]: pair contract address
         type[str]: locked asset factory address (only V14Locked)
         type[str]: admin address (only V2Boosted)
@@ -353,6 +353,17 @@ class FarmContract(DEXContractInterface):
         sc_args = [whitelisted_sc_address]
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
+    
+    def update_owner_or_admin(self, deployer: Account, proxy: ProxyNetworkProvider, old_address: str):
+        """Only V2Boosted.
+        """
+        function_purpose = "Update owner or admin"
+        logger.info(function_purpose)
+        
+        gas_limit = 70000000
+        sc_args = [old_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "updateOwnerOrAdmin", sc_args)
 
     def set_transfer_role_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
         """Only V2Boosted.
