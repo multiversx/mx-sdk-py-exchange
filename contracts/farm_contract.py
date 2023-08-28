@@ -1,8 +1,10 @@
 import sys
 import traceback
+from typing import Dict, Any
 
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
+from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
@@ -417,3 +419,12 @@ class FarmContract(DEXContractInterface):
         log_substep(f"Farming token: {self.farmingToken}")
         log_substep(f"Farmed token: {self.farmedToken}")
         log_substep(f"Farm token: {self.farmToken}")
+
+    def get_lp_address(self, proxy: ProxyNetworkProvider) -> str:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPairContractManagedAddress')
+        if not raw_results:
+            return ""
+        address = Address.from_hex(raw_results).bech32()
+
+        return address
