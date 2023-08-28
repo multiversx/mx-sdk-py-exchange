@@ -116,9 +116,7 @@ def main(cli_args: List[str]):
 
     network_providers = NetworkProviders(API, PROXY)
 
-    owner = Account(pem_file=config.DEFAULT_OWNER)
-    if SHADOWFORK:
-        owner.address = Address(DEX_OWNER)      # ONLY FOR SHADOWFORK
+    owner = CONTEXT.deployer_account
     owner.sync_nonce(network_providers.proxy)
 
     if args.fetch_pairs:
