@@ -112,6 +112,7 @@ def main(cli_args: List[str]):
     parser.add_argument("--disable-pair-creation", action="store_true", default=False)
     parser.add_argument("--fetch-state", required=False, default="")
     parser.add_argument("--compare-state", action="store_true", default=False)
+    parser.add_argument("--clear-output-dir", action="store_true", default=False)
     args = parser.parse_args(cli_args)
 
     network_providers = NetworkProviders(API, PROXY)
@@ -226,6 +227,15 @@ def main(cli_args: List[str]):
 
     if args.fetch_state:
         fetch_all_contracts_states(args.fetch_state, network_providers)
+
+    if args.clear_output_dir:
+        clear_output_dir()
+
+
+def clear_output_dir():
+    if os.path.exists(OUTPUT_FOLDER):
+        for file in os.listdir(OUTPUT_FOLDER):
+            os.remove(os.path.join(OUTPUT_FOLDER, file))
 
 
 def save_wasm(code_data_hex: str, code_hash: str):
