@@ -236,6 +236,8 @@ def clear_output_dir():
     if os.path.exists(OUTPUT_FOLDER):
         for file in os.listdir(OUTPUT_FOLDER):
             os.remove(os.path.join(OUTPUT_FOLDER, file))
+    else:
+        os.mkdir(OUTPUT_FOLDER)
 
 
 def save_wasm(code_data_hex: str, code_hash: str):
