@@ -7,17 +7,20 @@ from contracts.contract_identities import FarmContractVersion
 from contracts.farm_contract import FarmContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
-    get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query
+    get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
 from utils.contract_data_fetchers import FarmContractDataFetcher
+from utils.contract_retrievers import retrieve_farm_by_address
 from utils.utils_tx import NetworkProviders
 import config
 
 
 FARMSV13_LABEL = "farmsv13"
 FARMSV12_LABEL = "farmsv12"
+FARMSV2_LABEL = "farmsv2"
 OUTPUT_FARMV13_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv13_data.json"
 OUTPUT_FARMV13LOCKED_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv13locked_data.json"
 OUTPUT_FARMV12_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv12_data.json"
+OUTPUT_FARMV2_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv2_data.json"
 
 
 def add_parsed_arguments(parser: ArgumentParser):
@@ -33,10 +36,14 @@ def add_parsed_arguments(parser: ArgumentParser):
     mutex.add_argument('--upgrade-all-v1_2', action='store_true', help='upgrade all v1.2 farms')
     mutex.add_argument('--upgrade-all-v1_3', action='store_true',
                        help='upgrade all v1.3 farms')
+    mutex.add_argument('--upgrade-all-v2', action='store_true',
+                       help='upgrade all v2 farms')
     mutex.add_argument('--set-transfer-role', action='store_true',
                        help='set transfer role for v1.3 farms')
     mutex.add_argument('--stop-produce-rewards', action='store_true',
                        help='stop producing rewards for farms')
+    mutex.add_argument('--replace-v2-ownership',
+                       help='replace v2 soft ownership; specify old owner address to be replaced')
     mutex.add_argument('--remove-penalty', action='store_true', help='remove penalty from farms')
 
 
@@ -53,10 +60,14 @@ def handle_command(args):
         upgrade_farmv12_contracts()
     elif args.upgrade_all_v1_3:
         upgrade_farmv13_contracts()
+    elif args.upgrade_all_v2:
+        upgrade_farmv2_contracts(args.compare_states)
     elif args.set_transfer_role:
         set_transfer_role_farmv13_contracts()
     elif args.stop_produce_rewards:
         stop_produce_rewards_farms()
+    elif args.replace_v2_ownership:
+        replace_v2_ownership(args.replace_v2_ownership, args.compare_states)
     elif args.remove_penalty:
         remove_penalty_farms()
     else:
@@ -73,20 +84,24 @@ def fetch_and_save_farms_from_chain():
     farmsv13 = get_farm_addresses_from_chain("v1.3")
     farmsv13locked = get_farm_addresses_locked_from_chain()
     farmsv12 = get_farm_addresses_from_chain("v1.2")
+    farmsv2 = get_farm_addresses_from_chain("v2")
     fetch_and_save_contracts(farmsv13, FARMSV13_LABEL, OUTPUT_FARMV13_CONTRACTS_FILE, network_providers.proxy)
     fetch_and_save_contracts(farmsv13locked, FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE, network_providers.proxy)
     fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE, network_providers.proxy)
+    fetch_and_save_contracts(farmsv2, FARMSV2_LABEL, OUTPUT_FARMV2_CONTRACTS_FILE, network_providers.proxy)
 
 
 def pause_farm_contracts():
     """Pause all farms"""
 
-    print("Pausing farms...")
-
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    farm_addresses = get_all_farm_v13_addresses()
+    farm_addresses = get_all_farm_v2_addresses()
+
+    print(f"Pausing {len(farm_addresses)} farm contracts...")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     # pause all the farms
     count = 1
@@ -94,7 +109,7 @@ def pause_farm_contracts():
         print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
         data_fetcher = FarmContractDataFetcher(Address(farm_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
-        contract = FarmContract("", "", "", farm_address, FarmContractVersion.V14Locked)
+        contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
         if contract_state != 0:
             tx_hash = contract.pause(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"pause farm contract: {farm_address}"):
@@ -117,11 +132,16 @@ def resume_farm_contracts():
     if not os.path.exists(OUTPUT_PAUSE_STATES):
         print("Contract initial states not found!" \
               " Cannot proceed safely without altering initial state.")
+        return
 
     with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
         contract_states = json.load(reader)
 
-    farm_addresses = get_all_farm_v13_addresses()
+    farm_addresses = get_all_farm_v2_addresses()
+
+    print(f"Processing resume for {len(farm_addresses)} farm contracts...")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     # pause all the farm contracts
     count = 1
@@ -132,7 +152,7 @@ def resume_farm_contracts():
             continue
         # resume only if the farm contract was active
         if contract_states[farm_address] == 1:
-            contract = FarmContract("", "", "", farm_address, FarmContractVersion.V14Locked)
+            contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
             tx_hash = contract.resume(dex_owner, network_providers.proxy)
             if not network_providers.check_simple_tx_status(tx_hash, f"resume farm contract: {farm_address}"):
                 if not get_user_continue():
@@ -206,6 +226,47 @@ def upgrade_farmv13_contracts():
         count += 1
 
 
+def upgrade_farmv2_contracts(compare_states: bool):
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    all_addresses = get_all_farm_v2_addresses()
+
+    print(f"Upgrading {len(all_addresses)} boosted farm contracts...")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    count = 1
+    for address in all_addresses:
+        print(f"Processing contract {count} / {len(all_addresses)}: {address}")
+        contract: FarmContract
+        contract = retrieve_farm_by_address(address)
+        lp_address = contract.get_lp_address(network_providers.proxy)
+
+        if compare_states:
+            print(f"Fetching contract state before upgrade...")
+            fetch_contracts_states("pre", network_providers, [address], FARMSV2_LABEL)
+
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
+
+        tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
+                                            config.FARM_V2_BYTECODE_PATH,
+                                            [lp_address, dex_owner.address.bech32()])
+
+        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade farm v2 contract: {address}"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
+
+        if compare_states:
+            fetch_new_and_compare_contract_states(FARMSV2_LABEL, address, network_providers)
+
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            return
+
+        count += 1
+
+
 def set_transfer_role_farmv13_contracts():
     """Set transfer role for all v1.3 farms"""
 
@@ -226,6 +287,50 @@ def set_transfer_role_farmv13_contracts():
         _ = network_providers.check_complex_tx_status(tx_hash, f"set transfer role farm v13 locked contract: {address}")
 
         if not get_user_continue():
+            return
+
+        count += 1
+
+
+def replace_v2_ownership(old_owner: str, compare_states: bool = False):
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    all_addresses = get_all_farm_v2_addresses()
+    cleaned_address = Address(old_owner).bech32()   # pass it through the Address class to check if it's valid
+
+    print(f"Searching farm ownership for {cleaned_address}...")
+
+    count = 1
+    for address in all_addresses:
+        print(f"Processing contract {count} / {len(all_addresses)}: {address}")
+        contract = FarmContract("", "", "", address, FarmContractVersion.V2Boosted)
+        data_fetcher = FarmContractDataFetcher(Address(address), network_providers.proxy.url)
+
+        permissions = data_fetcher.get_data("getPermissions", [Address(cleaned_address).pubkey()])
+        if not permissions:
+            continue
+        print(f"Found permissions {permissions} for {cleaned_address} in contract {address}. Replace it?")
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            continue
+
+        if compare_states:
+            print(f"Fetching contract state before change...")
+            fetch_contracts_states("pre", network_providers, [address], FARMSV2_LABEL)
+
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
+
+        tx_hash = contract.update_owner_or_admin(dex_owner, network_providers.proxy, cleaned_address)
+
+        if not network_providers.check_simple_tx_status(tx_hash, f"change farm v2 ownership: {address}"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
+
+        if compare_states:
+            fetch_new_and_compare_contract_states(FARMSV2_LABEL, address, network_providers)
+
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
         count += 1
@@ -279,20 +384,30 @@ def remove_penalty_farms():
 
 def get_farm_addresses_from_chain(version: str) -> list:
     """
-    version: v1.3 | v1.2
+    version: v1.3 | v1.2 | v2
     """
+    if version == "v2":
+        model = "FarmModelV2"
+    elif version == "v1.3":
+        model = "FarmModelV1_3"
+    elif version == "v1.2":
+        model = "FarmModelV1_2"
+    else:
+        raise Exception(f"Unknown farm version: {version}")
+
     query = """
-        { farms { 
+        { farms {
+        ... on """ + model + """ {
          address
          version
-         } }
+         } } }
         """
 
     result = run_graphql_query(GRAPHQL, query)
 
     address_list = []
     for entry in result['data']['farms']:
-        if entry['version'] == version:
+        if entry.get('version') == version:
             address_list.append(entry['address'])
 
     return address_list
@@ -302,18 +417,19 @@ def get_farm_addresses_locked_from_chain() -> list:
     """Get farms with locked rewards"""
 
     query = """
-        { farms { 
-         address
-         version
-         rewardType
-         } }
-        """
+            { farms {
+             ... on FarmModelV1_3 { 
+             address
+             version
+             rewardType
+             } } }
+            """
 
     result = run_graphql_query(GRAPHQL, query)
 
     address_list = []
     for entry in result['data']['farms']:
-        if entry['version'] == 'v1.3' and entry['rewardType'] == 'lockedRewards':
+        if entry.get('version') == 'v1.3' and entry.get('rewardType') == 'lockedRewards':
             address_list.append(entry['address'])
 
     return address_list
@@ -329,6 +445,12 @@ def get_all_farm_v13locked_addresses() -> list:
     """Get all v1.3 farms addresses with locked rewards"""
 
     return get_saved_contract_addresses(FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE)
+
+
+def get_all_farm_v2_addresses() -> list:
+    """Get all v2 farms addresses with locked rewards"""
+
+    return get_saved_contract_addresses(FARMSV2_LABEL, OUTPUT_FARMV2_CONTRACTS_FILE)
 
 
 def get_all_farm_v12_addresses() -> list:
