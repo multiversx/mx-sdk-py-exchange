@@ -9,7 +9,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, fetch_contracts_states, get_
 from tools.runners import pair_runner, farm_runner, \
     staking_runner, metastaking_runner, router_runner, \
     proxy_runner, locked_asset_runner, fees_collector_runner, \
-    account_state_runner
+    account_state_runner, energy_factory_runner
 from utils.contract_data_fetchers import FarmContractDataFetcher, PairContractDataFetcher, RouterContractDataFetcher, StakingContractDataFetcher
 from utils.utils_generic import log_step_fail
 from utils.utils_tx import NetworkProviders
@@ -26,6 +26,7 @@ def main(cli_args: List[str]):
     proxy = subparser.add_parser('proxy', help='handle proxy')
     locked_asset = subparser.add_parser('locked-asset', help='handle locked asset')
     fees_collector = subparser.add_parser('fees-collector', help='handle fees collector')
+    energy_factory = subparser.add_parser('energy-factory', help='handle energy factory')
     account_state = subparser.add_parser('account-state', help='handle account state')
 
     pair_runner.add_parsed_arguments(pair)
@@ -36,6 +37,7 @@ def main(cli_args: List[str]):
     proxy_runner.add_parsed_arguments(proxy)
     locked_asset_runner.add_parsed_arguments(locked_asset)
     fees_collector_runner.add_parsed_arguments(fees_collector)
+    energy_factory_runner.add_parsed_arguments(energy_factory)
     account_state_runner.add_parsed_arguments(account_state)
 
     parser.add_argument('--fetch-pause-state', action='store_true', help='fetch pause state')
@@ -60,6 +62,8 @@ def main(cli_args: List[str]):
         locked_asset_runner.handle_command(args)
     elif args.command == 'fees_collector':
         fees_collector_runner.handle_command(args)
+    elif args.command == 'energy_factory':
+        energy_factory_runner.handle_command(args)
     elif args.command == 'account_state':
         account_state_runner.get_account_keys_online(args.address, args.proxy_url, args.block_number, args.with_save_in)
     elif args.fetch_pause_state:
@@ -75,7 +79,7 @@ def fetch_and_save_pause_state():
 
     pair_addresses = pair_runner.get_all_pair_addresses()
     staking_addresses = staking_runner.get_all_staking_addresses()
-    farm_addresses = farm_runner.get_all_farm_v13_addresses()
+    farm_addresses = farm_runner.get_all_farm_v2_addresses()
     output_pause_states = OUTPUT_FOLDER / "contract_pause_states.json"
     network_providers = NetworkProviders(API, PROXY)
 

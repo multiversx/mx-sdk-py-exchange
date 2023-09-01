@@ -17,6 +17,7 @@ DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Ac
 DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
 DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
+DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration
 DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
