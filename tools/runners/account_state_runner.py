@@ -1,26 +1,23 @@
 import json
 import os
-import sys
 from argparse import ArgumentParser
-
-from typing import Dict, Any, Tuple, List
-
-from utils.utils_generic import log_step_fail, log_step_pass, log_warning
+from typing import Dict, Any, Tuple
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 
 
-def main(cli_args: List[str]):
-    parser = ArgumentParser()
+def add_parsed_arguments(parser: ArgumentParser):
+    """Add the arguments to the parser"""
+
     parser.add_argument("--folder", required=True)
     parser.add_argument("--left-prefix", required=True)
     parser.add_argument("--right-prefix", required=True)
     parser.add_argument("--verbose", action="store_true", default=False)
-    args = parser.parse_args(cli_args)
-
-    report_key_files_compare(args.folder, args.left_prefix, args.right_prefix, args.verbose)
 
 
 def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0, with_save_in: str = "") -> Dict[str, Any]:
+    """Get account keys from chain"""
+
     if block_number == 0:
         resource_url = f"address/{address}/keys"
     else:
@@ -28,14 +25,14 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
 
     proxy = ProxyNetworkProvider(proxy_url)
     response = proxy.do_get_generic(resource_url)
-    keys = response.get("pairs", dict())
+    keys = response.get("pairs", {})
 
     if keys and with_save_in:
         dir_path = os.path.dirname(with_save_in)
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
 
-        with open(with_save_in, 'w') as state_writer:
+        with open(with_save_in, 'w', encoding="UTF-8") as state_writer:
             json.dump(keys, state_writer, indent=4)
             print(f'Dumped the retrieved contact state in: {with_save_in}')
 
@@ -80,9 +77,11 @@ def compare_keys(left_state: dict, right_state: dict) -> Tuple[bool, dict, dict,
 
 
 def report_key_files_compare(folder_path: str, left_prefix: str, right_prefix: str, verbose: bool = False):
+    """Compare all key files in the given folder"""
+
     compare_count = 0
     if not os.path.exists(folder_path):
-        log_step_fail(f"Given folder path doesn't exist.")
+        log_step_fail("Given folder path doesn't exist.")
 
     for file in os.listdir(folder_path):
         if f"{left_prefix}" not in file:
@@ -93,13 +92,13 @@ def report_key_files_compare(folder_path: str, left_prefix: str, right_prefix: s
         if not os.path.exists(os.path.join(folder_path, right_file)):
             continue
 
-        with open(os.path.join(folder_path, file)) as reader:
+        with open(os.path.join(folder_path, file), encoding="UTF-8") as reader:
             left_state = json.load(reader)
-        with open(os.path.join(folder_path, right_file)) as reader:
+        with open(os.path.join(folder_path, right_file), encoding="UTF-8") as reader:
             right_state = json.load(reader)
 
-        identical, keys_in_left, keys_in_right, common_keys_diff_values, common_keys = compare_keys(left_state,
-                                                                                                    right_state)
+        identical, keys_in_left, keys_in_right, common_keys_diff_values, _ = compare_keys(left_state,
+                                                                                          right_state)
 
         if identical:
             log_step_pass(f"\n{file} and {right_file} are identical.")
@@ -122,7 +121,3 @@ def report_key_files_compare(folder_path: str, left_prefix: str, right_prefix: s
         compare_count += 1
 
     print(f"\nFound and compared {compare_count} account state file pairs.")
-
-
-if __name__ == "__main__":
-    main(sys.argv[1:])
