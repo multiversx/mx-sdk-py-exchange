@@ -78,24 +78,24 @@ class ESDTContract:
         """ Expected as args:
                 type[str]: token_id
                 type[str]: address to assign role to
-                type[str]: role name
+                type[str..]: roles name: ESDTRoleLocalBurn, ESDTRoleLocalMint, ESDTTransferRole
             """
         function_purpose = "set special role for token"
         logger.info(function_purpose)
-        if len(args) != 3:
+        if len(args) < 3:
             log_unexpected_args(function_purpose, args)
             return ""
         token_id = args[0]
         address = args[1]
-        role = args[2]
-        logger.info(f"Setting ESDT role {role} for {token_id} on address {address}")
+        roles = args[2:]
+        logger.info(f"Setting ESDT roles {roles} for {token_id} on address {address}")
 
         gas_limit = 100000000
         sc_args = [
             token_id,
             Address(address),
-            role
         ]
+        sc_args.extend(roles)
         return endpoint_call(proxy, gas_limit, token_owner, Address(self.address), "setSpecialRole", sc_args)
 
     def unset_special_role_token(self, token_owner: Account, proxy: ProxyNetworkProvider, args: list):

@@ -50,7 +50,8 @@ ROUTER_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-de
 PAIR_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "pair" / "pair.wasm"
 PAIR_VIEW_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "pair" / "safe-price-view.wasm"
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
-FARM_V2_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "farm-with-locked-rewards.wasm"
+FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "farm-with-locked-rewards.wasm"
+GOVERNANCE_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "energy-integration" / "governance-v2" / "output" / "governance-v2.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
@@ -81,6 +82,7 @@ ROUTER = "router"
 ROUTER_V2 = "router_v2"
 PAIRS = "pairs"
 PAIRS_V2 = "pairs_v2"
+PAIRS_VIEW = "pairs_view"
 PROXY_DEPLOYERS = "proxy_deployers"
 FARMS_V2 = "farms_boosted"
 FARMS_COMMUNITY = "farms_community"
@@ -94,6 +96,7 @@ METASTAKINGS = "metastakings"
 METASTAKINGS_V2 = "metastakings_v2"
 METASTAKINGS_BOOSTED = "metastakings_boosted"
 FEES_COLLECTORS = "fees_collectors"
+GOVERNANCES = "governances"
 
 
 def get_default_tokens_file():

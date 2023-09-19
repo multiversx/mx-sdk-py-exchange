@@ -1,8 +1,62 @@
 [
     {
-        "farming_token": "WEB-5d08be",
-        "farm_token": "SWEB-d9bfe2",
-        "address": "erd1qqqqqqqqqqqqqpgqxpshvxgesuntsq8fk0735s372w2jmmcy0n4s3q9qgr",
+        "farming_token": "RIDE-05b1bb",
+        "farm_token": "SRIDE-dcd8ea",
+        "address": "erd1qqqqqqqqqqqqqpgqm88hzvc63fhgsvewd8pl6nspeuh2jcv80n4slqc45h",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "ZPAY-ce7865",
+        "farm_token": "SZPAY-b290db",
+        "address": "erd1qqqqqqqqqqqqqpgqqpxe3d5lt95gl34m4yddtk6pwp6ymfs30n4s5dnj05",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "ITHEUM-fce905",
+        "farm_token": "SITHEUM-cc4340",
+        "address": "erd1qqqqqqqqqqqqqpgqpjzcddzdaee680ydzescrsvv8s5a4h440n4s8fzpa4",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "BHAT-238f65",
+        "farm_token": "SBHAT-6dc8e5",
+        "address": "erd1qqqqqqqqqqqqqpgq5jz83n3ay53e69vgl7vhd7ffg3lheyh40n4spnjeky",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "UTK-14d57d",
+        "farm_token": "SUTK-71ed04",
+        "address": "erd1qqqqqqqqqqqqqpgqvk6gt6css4fjlsap76mshrkyupmy7uj30n4sypj9lu",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "CRT-f55762",
+        "farm_token": "SCRT-c6c552",
+        "address": "erd1qqqqqqqqqqqqqpgqxp4t3d36fxnwtrr06r0z2suescpz76dk0n4sqjhsll",
+        "max_apr": 2500,
+        "rewards_per_block": 4138000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    },
+    {
+        "farming_token": "ASH-e3d1b7",
+        "farm_token": "SASH-3b3e9a",
+        "address": "erd1qqqqqqqqqqqqqpgqhkauw36uq2gsu0u2762lrj4rch99c3mn0n4sjumdry",
         "max_apr": 2500,
         "rewards_per_block": 4138000000000000000,
         "unbond_epochs": 10,

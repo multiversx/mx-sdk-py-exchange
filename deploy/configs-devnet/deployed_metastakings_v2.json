@@ -1,14 +1,50 @@
 [
     {
-        "address": "erd1qqqqqqqqqqqqqpgqvh3wazsrlla547padvzt5l0pnasq5cs30n4stnc0et",
-        "metastake_token": "METAWEBLK-bfa02c",
-        "staking_token": "WEB-5d08be",
-        "lp_token": "WEBEGLD-270db7",
-        "farm_token": "WEBEGLDFL-6094e8",
-        "stake_token": "SWEB-d9bfe2",
-        "lp_address": "erd1qqqqqqqqqqqqqpgqzn90c8pp6yd97tqvnadeg8gfl7eutmyk0n4s90ylnz",
-        "farm_address": "erd1qqqqqqqqqqqqqpgq835vpevjysz042t3wnp6q5a7skxaerm90n4sg85ekq",
-        "stake_address": "erd1qqqqqqqqqqqqqpgqxpshvxgesuntsq8fk0735s372w2jmmcy0n4s3q9qgr",
+        "address": "erd1qqqqqqqqqqqqqpgqhgqt07dc6wja9yulyeq7sygtrqgs8sj90n4skznuhn",
+        "metastake_token": "METARIDELK-e6c1dc",
+        "staking_token": "RIDE-05b1bb",
+        "lp_token": "EGLDRIDE-9fdd72",
+        "farm_token": "EGLDRIDEFL-73a57a",
+        "stake_token": "SRIDE-dcd8ea",
+        "lp_address": "erd1qqqqqqqqqqqqqpgqpvfd0cuspuewm9z9p6lcmp66ylqg4js30n4sj2rjwh",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqyd7uaxe9sctfxsev0u3mntekxqlu6ntt0n4s8a6thz",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqm88hzvc63fhgsvewd8pl6nspeuh2jcv80n4slqc45h",
+        "version": 2
+    },
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqu4rp5sz3g7m60sxp2nc6ctjtzvk39cts0n4sdjclv7",
+        "metastake_token": "METAITHLK-2460d4",
+        "staking_token": "ITHEUM-fce905",
+        "lp_token": "ITHWEGLD-f49a21",
+        "farm_token": "ITHWEGLDFL-74d964",
+        "stake_token": "SITHEUM-cc4340",
+        "lp_address": "erd1qqqqqqqqqqqqqpgqus9r9gwtg24a9fvzv743hgydecpkxs8q0n4szz2az0",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqtmg6xzef8k6z4885qhehgvu4zlf3g5zf0n4snencta",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqpjzcddzdaee680ydzescrsvv8s5a4h440n4s8fzpa4",
+        "version": 2
+    },
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqxlzmzytv0s0qv8anltu2vauq4remckae0n4sg2nm8e",
+        "metastake_token": "METAUTKLK-4f79f0",
+        "staking_token": "UTK-14d57d",
+        "lp_token": "UTKWEGLD-4d60d6",
+        "farm_token": "UTKWEGLDFL-478337",
+        "stake_token": "SUTK-71ed04",
+        "lp_address": "erd1qqqqqqqqqqqqqpgq4zafu6rzdw7fj07hjh5tkm68jsaj7hl60n4s8py4ra",
+        "farm_address": "erd1qqqqqqqqqqqqqpgq7mq58gjqzawtzy9y5v2rawpawx03a6ny0n4sv5mzr6",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqvk6gt6css4fjlsap76mshrkyupmy7uj30n4sypj9lu",
+        "version": 2
+    },
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqt6rq6m9rthq09mqmuzm2yrpkq3cf63rq0n4sgxxzyn",
+        "metastake_token": "METACRTLK-f95a27",
+        "staking_token": "CRT-f55762",
+        "lp_token": "CRTWEGLD-fd9d4c",
+        "farm_token": "CRTWEGLDFL-08b160",
+        "stake_token": "SCRT-c6c552",
+        "lp_address": "erd1qqqqqqqqqqqqqpgqh7ds4z4cswktn2z7z7pfct4sa3qn2dsp0n4sas2vus",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqauyawadp2eex5kd30z5ehrrprgksjpyp0n4s00cy97",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqxp4t3d36fxnwtrr06r0z2suescpz76dk0n4sqjhsll",
         "version": 2
     }
 ]
