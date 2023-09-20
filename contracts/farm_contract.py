@@ -1,15 +1,13 @@
-import sys
-import traceback
-
+from typing import Dict, Any
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
+from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, ESDTToken, \
+from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
     log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
@@ -171,7 +169,7 @@ class FarmContract(DEXContractInterface):
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
                          no_init: bool = False):
-        """Expecting as args:percent
+        """Expecting as args:
         type[str]: pair contract address
         type[str]: locked asset factory address (only V14Locked)
         type[str]: admin address (only V2Boosted)
@@ -353,6 +351,17 @@ class FarmContract(DEXContractInterface):
         sc_args = [whitelisted_sc_address]
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
+    
+    def update_owner_or_admin(self, deployer: Account, proxy: ProxyNetworkProvider, old_address: str):
+        """Only V2Boosted.
+        """
+        function_purpose = "Update owner or admin"
+        logger.info(function_purpose)
+        
+        gas_limit = 70000000
+        sc_args = [old_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "updateOwnerOrAdmin", sc_args)
 
     def set_transfer_role_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
         """Only V2Boosted.
@@ -396,6 +405,15 @@ class FarmContract(DEXContractInterface):
         gas_limit = 10000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "endProduceRewards", sc_args)
+
+    def get_lp_address(self, proxy: ProxyNetworkProvider) -> str:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPairContractManagedAddress')
+        if not raw_results:
+            return ""
+        address = Address.from_hex(raw_results).bech32()
+
+        return address
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.start_produce_rewards(deployer, proxy)
