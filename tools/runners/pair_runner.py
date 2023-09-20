@@ -28,8 +28,7 @@ def add_parsed_arguments(parser: ArgumentParser):
 
     mutex = parser.add_mutually_exclusive_group()
 
-    mutex.add_argument('--fetch-all', action='store_true',
-                        help='fetch pairs from blockchain')
+    mutex.add_argument('--fetch-all', action='store_true', help='fetch pairs from blockchain')
     mutex.add_argument('--pause-all', action='store_true', help='pause all pairs')
     mutex.add_argument('--resume-all', action='store_true', help='resume all pairs')
     mutex.add_argument('--upgrade-all', action='store_true', help='upgrade all pairs')
@@ -67,15 +66,12 @@ def fetch_and_save_pairs_from_chain():
 
     print('fetch_and_save_pairs_from_chain')
 
-
-    network_providers = NetworkProviders(API, PROXY)
     context = Context()
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
-
-    router_data_fetcher = RouterContractDataFetcher(Address(router_address, "erd"), PROXY)
+    print(f"Router address: {router_address}")
+    router_data_fetcher = RouterContractDataFetcher(Address.from_bech32(router_address), PROXY)
     registered_pairs = router_data_fetcher.get_data("getAllPairsManagedAddresses")
-    fetch_and_save_contracts(registered_pairs, PAIRS_LABEL,
-        OUTPUT_PAIR_CONTRACTS_FILE, network_providers.proxy)
+    fetch_and_save_contracts(registered_pairs, PAIRS_LABEL, OUTPUT_PAIR_CONTRACTS_FILE)
 
 
 def pause_pair_contracts():
@@ -95,7 +91,7 @@ def pause_pair_contracts():
     count = 1
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
-        data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"), network_providers.proxy.url)
+        data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
@@ -112,14 +108,14 @@ def resume_pair_contracts():
     """Resume pair contracts"""
 
     print("Resuming pair contracts")
-    
+
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
     if not os.path.exists(OUTPUT_PAUSE_STATES):
-        print("Contract initial states not found!" \
+        print("Contract initial states not found!"
               "Cannot proceed safely without altering initial state.")
 
     with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
@@ -172,14 +168,14 @@ def upgrade_pair_contracts(compare_states: bool = False):
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         pair_contract = retrieve_pair_by_address(pair_address)
-        pair_data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"),
+        pair_data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_address),
                                                     network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
         special_fee_percentage = pair_data_fetcher.get_data("getSpecialFee")
         existent_initial_liquidity_adder = pair_data_fetcher.get_data("getInitialLiquidtyAdder")
         initial_liquidity_adder = \
-            Address(existent_initial_liquidity_adder[2:], "erd").bech32() \
-                if existent_initial_liquidity_adder else config.ZERO_CONTRACT_ADDRESS
+            Address.from_bech32(existent_initial_liquidity_adder[2:]).bech32() \
+            if existent_initial_liquidity_adder else config.ZERO_CONTRACT_ADDRESS
         print(f"Initial liquidity adder: {initial_liquidity_adder}")
 
         if compare_states:
@@ -273,10 +269,10 @@ def remove_pairs_from_fees_collector():
 
         removable_addresses.append(pair_address)
         if pair_contract.firstToken not in whitelisted_tokens and \
-            pair_contract.firstToken not in removable_tokens:
+           pair_contract.firstToken not in removable_tokens:
             removable_tokens.append(pair_contract.firstToken)
         if pair_contract.secondToken not in whitelisted_tokens and \
-            pair_contract.secondToken not in removable_tokens:
+           pair_contract.secondToken not in removable_tokens:
             removable_tokens.append(pair_contract.secondToken)
 
     print(f"Will remove {len(removable_addresses)} pairs from fees collector.")
@@ -325,7 +321,7 @@ def update_fees_percentage():
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         pair_contract = retrieve_pair_by_address(pair_address)
-        pair_data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"),
+        pair_data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_address),
                                                     network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
         special_fee_percentage = 100
@@ -370,7 +366,7 @@ def get_depositing_addresses() -> list:
     pair_addresses = get_pairs_for_fees_addresses()
 
     if not os.path.exists(OUTPUT_PAUSE_STATES):
-        print("Contract initial states not found!" \
+        print("Contract initial states not found!"
               "Cannot proceed due to risk of whitelisting inactive pairs.")
         return []
 
@@ -402,7 +398,7 @@ def get_pairs_for_fees_addresses() -> list:
     """Get pairs for fees addresses"""
 
     query = """
-            { pairs (limit:100) { 
+            { pairs (limit:100) {
              address
              lockedValueUSD
              type

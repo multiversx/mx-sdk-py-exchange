@@ -29,7 +29,7 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
     pairs_data = {}
 
     for address in contract_addresses:
-        contract_addr = Address(address, "erd")
+        contract_addr = Address.from_hex(address, "erd")
         account_data = proxy.get_account(contract_addr)
         code_hash = base64_to_hex(account_data.code_hash)
 

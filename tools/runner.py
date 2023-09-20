@@ -85,17 +85,17 @@ def fetch_and_save_pause_state():
 
     contract_states = {}
     for pair_address in pair_addresses:
-        data_fetcher = PairContractDataFetcher(Address(pair_address, "erd"), network_providers.proxy.url)
+        data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[pair_address] = contract_state
 
     for staking_address in staking_addresses:
-        data_fetcher = StakingContractDataFetcher(Address(staking_address, "erd"), network_providers.proxy.url)
+        data_fetcher = StakingContractDataFetcher(Address.from_bech32(staking_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[staking_address] = contract_state
 
     for farm_address in farm_addresses:
-        data_fetcher = FarmContractDataFetcher(Address(farm_address, "erd"), network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address.from_bech32(farm_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract_states[farm_address] = contract_state
 
@@ -134,8 +134,8 @@ def fetch_all_contracts_states(prefix: str):
         log_step_fail("Router address not available. No state saved for this!")
 
     # get template state
-    router_data_fetcher = RouterContractDataFetcher(Address(router_address, "erd"), network_providers.proxy.url)
-    template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
+    router_data_fetcher = RouterContractDataFetcher(Address.from_bech32(router_address), network_providers.proxy.url)
+    template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
     filename = get_contract_save_name(router_runner.TEMPLATE_PAIR_LABEL, template_pair_address, prefix)
     get_account_keys_online(template_pair_address, network_providers.proxy.url,
                             with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
