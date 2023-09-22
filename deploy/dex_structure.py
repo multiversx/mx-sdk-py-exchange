@@ -1,4 +1,5 @@
 import time
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import List, Type, Dict, Optional
 
@@ -100,6 +101,35 @@ class ContractStructure:
             contract.print_contract_info()
 
 
+class DeployStructureArguments:
+    @classmethod
+    def add_parsed_arguments(cls, parser: ArgumentParser):
+        parser.add_argument("--egld-wraps", action="store_true", help="Deploy clean EGLD wraps")
+        parser.add_argument("--locked-assets", action="store_true", help="Deploy clean locked assets")
+        parser.add_argument("--proxies", action="store_true", help="Deploy clean proxies")
+        parser.add_argument("--simple-locks", action="store_true", help="Deploy clean simple locks")
+        parser.add_argument("--simple-locks-energy", action="store_true", help="Deploy clean simple locks energy")
+        parser.add_argument("--fees-collectors", action="store_true", help="Deploy clean fees collectors")
+        parser.add_argument("--unstakers", action="store_true", help="Deploy clean unstakers")
+        parser.add_argument("--proxies-v2", action="store_true", help="Deploy clean proxies v2")
+        parser.add_argument("--router", action="store_true", help="Deploy clean router")
+        parser.add_argument("--router-v2", action="store_true", help="Deploy clean router v2")
+        parser.add_argument("--pairs", action="store_true", help="Deploy clean pairs")
+        parser.add_argument("--pairs-v2", action="store_true", help="Deploy clean pairs v2")
+        parser.add_argument("--farms-community", action="store_true", help="Deploy clean farms community")
+        parser.add_argument("--farms-unlocked", action="store_true", help="Deploy clean farms unlocked")
+        parser.add_argument("--farms-locked", action="store_true", help="Deploy clean farms locked")
+        parser.add_argument("--proxy-deployers", action="store_true", help="Deploy clean proxy deployers")
+        parser.add_argument("--farms-v2", action="store_true", help="Deploy clean farms v2")
+        parser.add_argument("--price-discoveries", action="store_true", help="Deploy clean price discoveries")
+        parser.add_argument("--stakings", action="store_true", help="Deploy clean stakings")
+        parser.add_argument("--stakings-v2", action="store_true", help="Deploy clean stakings v2")
+        parser.add_argument("--stakings-boosted", action="store_true", help="Deploy clean stakings boosted")
+        parser.add_argument("--metastakings", action="store_true", help="Deploy clean metastakings")
+        parser.add_argument("--metastakings-v2", action="store_true", help="Deploy clean metastakings v2")
+        parser.add_argument("--metastakings-boosted", action="store_true", help="Deploy clean metastakings boosted")
+
+
 class DeployStructure:
     def __init__(self):
         self.token_prefix = populate_deploy_lists.get_token_prefix(config.DEPLOY_STRUCTURE_JSON)
@@ -144,6 +174,9 @@ class DeployStructure:
             config.PAIRS_V2:
                 ContractStructure(config.PAIRS_V2, PairContract, config.PAIR_V2_BYTECODE_PATH,
                                   self.pool_deploy_from_router, False),
+            config.PAIRS_VIEW:
+                ContractStructure(config.PAIRS_VIEW, PairContract, config.PAIR_VIEW_BYTECODE_PATH,
+                                  self.pool_view_deploy, False),
             config.FARMS_COMMUNITY:
                 ContractStructure(config.FARMS_COMMUNITY, FarmContract, config.FARM_COMMUNITY_BYTECODE_PATH,
                                   self.farm_community_deploy, False),
@@ -601,9 +634,9 @@ class DeployStructure:
                                                                             [locked_farm_token_name,
                                                                              locked_farm_token])
             if not network_providers.check_complex_tx_status(tx_hash, "issue locked farm token"): return
-            locked_lp_token_hex = SimpleLockContractDataFetcher(Address(deployed_simple_lock_contract.address),
-                                                                network_providers.proxy.url).get_data("getLpProxyTokenId")
-            deployed_simple_lock_contract.lp_proxy_token = hex_to_string(locked_lp_token_hex)
+            locked_farm_token_hex = SimpleLockContractDataFetcher(Address(deployed_simple_lock_contract.address),
+                                                                network_providers.proxy.url).get_data("getFarmProxyTokenId")
+            deployed_simple_lock_contract.lp_proxy_token = hex_to_string(locked_farm_token_hex)
 
             deployed_contracts.append(deployed_simple_lock_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -978,6 +1011,22 @@ class DeployStructure:
                                                      deployed_pair_contract.secondToken])
 
             deployed_contracts.append(deployed_pair_contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def pool_view_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for _ in contract_structure.deploy_structure_list:
+            # deploy pool view contract
+            dummy_pair_contract = PairContract("", "", PairContractVersion.V2)
+            tx_hash, contract_address = dummy_pair_contract.view_contract_deploy(deployer_account,
+                                                                                 network_providers.proxy,
+                                                                                 contract_structure.bytecode,
+                                                                                 [config.ZERO_CONTRACT_ADDRESS])
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "pair view contract"): return
+            log_step_pass(f"View pair contract address: {contract_address}")
+            dummy_pair_contract.address = contract_address
+            deployed_contracts.append(dummy_pair_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
     def farm_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):

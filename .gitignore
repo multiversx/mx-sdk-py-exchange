@@ -9,3 +9,7 @@
 __pycache__
 /deploy/*/tokens.json
 /deploy/*/deployed_*.json
+/deploy/*/upgrader_outputs
+/dump
+/abis
+/wasm

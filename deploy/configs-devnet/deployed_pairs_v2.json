@@ -1,16 +1,51 @@
 [
     {
-        "firstToken": "WEGLD-d7c6bb",
-        "secondToken": "MEX-dc289c",
-        "lpToken": "EGLDMEX-c29b0e",
-        "address": "erd1qqqqqqqqqqqqqpgquu5rsa4ee6l4azz6vdu4hjp8z4p6tt8m0n4suht3dy",
+        "firstToken": "WEGLD-a28c59",
+        "secondToken": "MEX-a659d0",
+        "lpToken": "EGLDMEX-95c6d5",
+        "address": "erd1qqqqqqqqqqqqqpgqzw0d0tj25qme9e4ukverjjjqle6xamay0n4s5r0v9g",
         "version": 2
     },
     {
-        "firstToken": "WEB-5d08be",
-        "secondToken": "WEGLD-d7c6bb",
-        "lpToken": "WEBEGLD-270db7",
-        "address": "erd1qqqqqqqqqqqqqpgqzn90c8pp6yd97tqvnadeg8gfl7eutmyk0n4s90ylnz",
+        "firstToken": "WEGLD-a28c59",
+        "secondToken": "USDC-350c4e",
+        "lpToken": "EGLDUSDC-ac1a30",
+        "address": "erd1qqqqqqqqqqqqqpgqtqfhy99su9xzjjrq59kpzpp25udtc9eq0n4sr90ax6",
+        "version": 2
+    },
+    {
+        "firstToken": "WEGLD-a28c59",
+        "secondToken": "RIDE-05b1bb",
+        "lpToken": "EGLDRIDE-9fdd72",
+        "address": "erd1qqqqqqqqqqqqqpgqpvfd0cuspuewm9z9p6lcmp66ylqg4js30n4sj2rjwh",
+        "version": 2
+    },
+    {
+        "firstToken": "ITHEUM-fce905",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "ITHWEGLD-f49a21",
+        "address": "erd1qqqqqqqqqqqqqpgqus9r9gwtg24a9fvzv743hgydecpkxs8q0n4szz2az0",
+        "version": 2
+    },
+    {
+        "firstToken": "UTK-14d57d",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "UTKWEGLD-4d60d6",
+        "address": "erd1qqqqqqqqqqqqqpgq4zafu6rzdw7fj07hjh5tkm68jsaj7hl60n4s8py4ra",
+        "version": 2
+    },
+    {
+        "firstToken": "CRT-f55762",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "CRTWEGLD-fd9d4c",
+        "address": "erd1qqqqqqqqqqqqqpgqh7ds4z4cswktn2z7z7pfct4sa3qn2dsp0n4sas2vus",
+        "version": 2
+    },
+    {
+        "firstToken": "ASH-e3d1b7",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "ASHWEGLD-db53e2",
+        "address": "erd1qqqqqqqqqqqqqpgq0e9pmlzr0nk5nkulzcmessttsjkzr4xf0n4sue4r8e",
         "version": 2
     }
 ]
