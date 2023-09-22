@@ -1,0 +1,369 @@
+{   
+    "token": 
+        {
+            "token_prefix": "E2ETK7",
+            "number_of_tokens": 10
+        },
+
+    "locked_assets": [
+        {
+            "unlocked_asset": 0,
+            "locked_asset": "LKMEX",
+            "locked_asset_name": "LockedMEX"
+        }
+    ],
+
+    "simple_locks": [
+
+    ],
+
+    "simple_locks_energy": [
+        {
+            "base_token": 0,
+            "locked_token": "XMEX",
+            "locked_token_name": "xMEX",
+            "locked_asset_factory": 0,
+            "min_migrated_lock_epochs": 0,
+            "lock_options": [
+                360, 720, 1440
+            ],
+            "penalties": [
+                5000, 7000, 8000
+            ]
+        }
+    ],
+
+    "fees_collectors": [
+        {
+            "energy_factory": 0,
+            "lock_epochs": 1440,
+            "locked_tokens_per_block": 17500000000000000000000
+        }
+    ],
+
+    "unstakers": [
+        {
+            "energy_factory": 0,
+            "fees_collector": 0,
+            "unbond_epochs": 10,
+            "fees_burn_percentage": 5000
+        }
+    ],
+
+    "proxies": [
+        {
+            "locked_asset": 0,
+            "proxy_lp": "LKLP",
+            "proxy_lp_name": "LockedLP",
+            "proxy_farm": "LKFARM",
+            "proxy_farm_name": "LockedLPStaked"
+        }
+    ],
+
+    "proxies_v2": [
+        {
+            "locked_asset": 0,
+            "energy_factory": 0,
+            "proxy_lp": "XMEXLP",
+            "proxy_lp_name": "xMEXLP",
+            "proxy_farm": "XMEXFARM",
+            "proxy_farm_name": "xMEXLPStaked"
+        }
+    ],
+
+    "router": [
+
+    ],
+
+    "router_v2": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "pairs": [
+
+    ],
+
+    "pairs_v2": [
+        {
+            "launched_token": 1,
+            "accepted_token": 0,
+            "lp_token": "EGLDMEX",
+            "lp_token_name": "EGLDMEXLP",
+            "fee_token": 0,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500,
+            "proxy_v2": 0
+        },
+        {
+            "launched_token": 1,
+            "accepted_token": 2,
+            "lp_token": "EGLDUSDC",
+            "lp_token_name": "EGLDUSDCLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 1,
+            "accepted_token": 3,
+            "lp_token": "EGLDRIDE",
+            "lp_token_name": "EGLDRIDELP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 4,
+            "accepted_token": 1,
+            "lp_token": "ITHWEGLD",
+            "lp_token_name": "ITHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 5,
+            "accepted_token": 1,
+            "lp_token": "UTKWEGLD",
+            "lp_token_name": "UTKWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 6,
+            "accepted_token": 1,
+            "lp_token": "CRTWEGLD",
+            "lp_token_name": "CRTWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 7,
+            "accepted_token": 1,
+            "lp_token": "ASHWEGLD",
+            "lp_token_name": "ASHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 8,
+            "accepted_token": 1,
+            "lp_token": "ZPAYWEGLD",
+            "lp_token_name": "ZPAYWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 9,
+            "accepted_token": 1,
+            "lp_token": "BHATWEGLD",
+            "lp_token_name": "BHATWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 11,
+            "accepted_token": 1,
+            "lp_token": "USDTWEGLD",
+            "lp_token_name": "USDTWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 12,
+            "accepted_token": 1,
+            "lp_token": "WBTCWEGLD",
+            "lp_token_name": "WBTCWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 13,
+            "accepted_token": 1,
+            "lp_token": "WETHWEGLD",
+            "lp_token_name": "WETHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 14,
+            "accepted_token": 1,
+            "lp_token": "QWTWEGLD",
+            "lp_token_name": "QWTWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 15,
+            "accepted_token": 1,
+            "lp_token": "CYBERWEGLD",
+            "lp_token_name": "CYBERWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        }
+    ],
+
+    "farms_community": [
+
+    ],
+
+    "farms_unlocked": [
+
+    ],
+
+    "farms_locked": [
+
+    ],
+
+    "proxy_deployers": [
+
+    ],
+
+    "farms_boosted": [
+        {
+            "farming_pool": 9,
+            "farm_token": "USDTEGLDFL",
+            "farm_token_name": "USDTEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1000000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 10,
+            "farm_token": "WBTCEGLDFL",
+            "farm_token_name": "WBTCEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1000000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 11,
+            "farm_token": "WETHEGLDFL",
+            "farm_token_name": "WETHEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 500000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 12,
+            "farm_token": "QWTEGLDFL",
+            "farm_token_name": "QWTEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 4500000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 13,
+            "farm_token": "CYBEEGLDFL",
+            "farm_token_name": "CYBEREGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 4500000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        }
+    ],
+
+    "price_discoveries": [
+
+    ],
+
+    "stakings": [
+
+    ],
+
+    "stakings_v2": [
+
+    ],
+
+    "metastakings": [
+
+    ],
+
+    "metastakings_v2": [
+
+    ]
+}

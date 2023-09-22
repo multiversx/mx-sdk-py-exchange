@@ -20,7 +20,7 @@ DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
 DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-mainnet-farms-22-09"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
 FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations

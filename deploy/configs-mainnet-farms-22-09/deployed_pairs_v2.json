@@ -1,0 +1,100 @@
+[
+    {
+        "firstToken": "WEGLD-bd4d79",
+        "secondToken": "MEX-455c57",
+        "lpToken": "EGLDMEX-0be9e5",
+        "address": "erd1qqqqqqqqqqqqqpgqa0fsfshnff4n76jhcye6k7uvd7qacsq42jpsp6shh2",
+        "version": 2
+    },
+    {
+        "firstToken": "WEGLD-bd4d79",
+        "secondToken": "USDC-c76f1f",
+        "lpToken": "EGLDUSDC-594e5e",
+        "address": "erd1qqqqqqqqqqqqqpgqeel2kumf0r8ffyhth7pqdujjat9nx0862jpsg2pqaq",
+        "version": 2
+    },
+    {
+        "firstToken": "WEGLD-bd4d79",
+        "secondToken": "RIDE-7d18e9",
+        "lpToken": "EGLDRIDE-7bd51a",
+        "address": "erd1qqqqqqqqqqqqqpgqav09xenkuqsdyeyy5evqyhuusvu4gl3t2jpss57g8x",
+        "version": 2
+    },
+    {
+        "firstToken": "ITHEUM-df6f26",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "ITHWEGLD-1adc53",
+        "address": "erd1qqqqqqqqqqqqqpgqpmud7t8uprrxzgu8eq2mtkl08kesflj62jps9j8dyh",
+        "version": 2
+    },
+    {
+        "firstToken": "UTK-2f80e9",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "UTKWEGLD-c960d1",
+        "address": "erd1qqqqqqqqqqqqqpgq0lzzvt2faev4upyf586tg38s84d7zsaj2jpsglugga",
+        "version": 2
+    },
+    {
+        "firstToken": "CRT-52decf",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "CRTWEGLD-1fac3f",
+        "address": "erd1qqqqqqqqqqqqqpgqf57y8m9krsvrceqxujngzm77p82zqc502jpsnnezqs",
+        "version": 2
+    },
+    {
+        "firstToken": "ASH-a642d1",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "ASHWEGLD-38545c",
+        "address": "erd1qqqqqqqqqqqqqpgqp5d4x3d263x4alnapwafwujch5xqmvyq2jpsk2xhsy",
+        "version": 2
+    },
+    {
+        "firstToken": "ZPAY-247875",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "ZPAYWEGLD-34e5c1",
+        "address": "erd1qqqqqqqqqqqqqpgqtjhhs49h0q2ncld64l3thtk7s7yuw47v2jps8emt0v",
+        "version": 2
+    },
+    {
+        "firstToken": "BHAT-c1fde3",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "BHATWEGLD-f45935",
+        "address": "erd1qqqqqqqqqqqqqpgqp32ecg03fyxgt2pf2fsxyg4knvhfvtgz2jps6rx6gf",
+        "version": 2
+    },
+    {
+        "firstToken": "USDT-f8c08c",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "USDTWEGLD-1c2c31",
+        "address": "erd1qqqqqqqqqqqqqpgq5crkgmnhyj64gp2u0kzlxxh2nvz9dpav2jpswrfu6h",
+        "version": 2
+    },
+    {
+        "firstToken": "WBTC-5349b3",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "WBTCWEGLD-c5554e",
+        "address": "erd1qqqqqqqqqqqqqpgqq6y660esmedtm0neqwgkddfezuys68k42jps7pu0r9",
+        "version": 2
+    },
+    {
+        "firstToken": "WETH-b4ca29",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "WETHWEGLD-6d9c24",
+        "address": "erd1qqqqqqqqqqqqqpgqt0uek344kaerr4gf9g2r8l0f4l8ygyha2jps82u9r6",
+        "version": 2
+    },
+    {
+        "firstToken": "QWT-46ac01",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "QWTWEGLD-3eff55",
+        "address": "erd1qqqqqqqqqqqqqpgq5fj4ttp8vylx8napuuruye5rewflqr542jpsv8tauj",
+        "version": 2
+    },
+    {
+        "firstToken": "CYBER-489c1c",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "CYBERWEGLD-45a866",
+        "address": "erd1qqqqqqqqqqqqqpgq5g7xxmpuf6nmux3r3spjxv0wleyypz8q2jpsyc3nh8",
+        "version": 2
+    }
+]

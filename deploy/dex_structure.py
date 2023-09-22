@@ -191,7 +191,7 @@ class DeployStructure:
                                   self.proxy_deployer_deploy, False),
             config.FARMS_V2:
                 ContractStructure(config.FARMS_V2, FarmContract, config.FARM_V2_BYTECODE_PATH,
-                                  self.farm_boosted_deploy, False),  # self.farm_deploy_from_proxy_deployer, True),
+                                  self.farm_boosted_deploy, True),  # self.farm_deploy_from_proxy_deployer, True),
             config.PRICE_DISCOVERIES:
                 ContractStructure(config.PRICE_DISCOVERIES, PriceDiscoveryContract, config.PRICE_DISCOVERY_BYTECODE_PATH,
                                   self.price_discovery_deploy, False),
