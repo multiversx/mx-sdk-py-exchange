@@ -75,7 +75,7 @@ def add_initial_liquidity(context: Context):
     # add initial liquidity
     pair_contract: PairContract
     for pair_contract in context.get_contracts(config.PAIRS_V2):
-        pair_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
+        pair_data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_contract.address), context.network_provider.proxy.url)
         first_token_liquidity = pair_data_fetcher.get_token_reserve(pair_contract.firstToken)
         if first_token_liquidity == 0:
             event = AddLiquidityEvent(
@@ -143,7 +143,7 @@ def scenarios_per_account(context: Context, account: Account):
 
     simple_lock_energy_contract: SimpleLockEnergyContract
     simple_lock_energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
-    simple_lock_energy_data_fetcher = SimpleLockEnergyContractDataFetcher(Address(simple_lock_energy_contract.address),
+    simple_lock_energy_data_fetcher = SimpleLockEnergyContractDataFetcher(Address.from_bech32(simple_lock_energy_contract.address),
                                                                           context.network_provider.proxy.url)
     lock_options = simple_lock_energy_data_fetcher.get_data('getLockOptions')
 

@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from multiversx_sdk_core import Address
 import config
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
@@ -53,8 +54,8 @@ def upgrade_router_contract(compare_states: bool = False):
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
     router_contract = retrieve_router_by_address(router_address)
-    router_data_fetcher = RouterContractDataFetcher(Address(router_address), network_providers.proxy.url)
-    template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
+    router_data_fetcher = RouterContractDataFetcher(Address.from_bech32(router_address), network_providers.proxy.url)
+    template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
 
     # change router version & upgrade router contract
     router_contract.version = RouterContractVersion.V2
@@ -78,8 +79,8 @@ def upgrade_template_pair_contract(compare_states: bool = False):
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
 
-    router_data_fetcher = RouterContractDataFetcher(Address(router_address), network_providers.proxy.url)
-    template_pair_address = Address(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
+    router_data_fetcher = RouterContractDataFetcher(Address.from_bech32(router_address), network_providers.proxy.url)
+    template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
     template_pair = retrieve_pair_by_address(template_pair_address)
 
     if compare_states:
