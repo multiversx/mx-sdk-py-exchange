@@ -1,16 +1,51 @@
 [
     {
-        "farmingToken": "EGLDMEX-c29b0e",
-        "farmToken": "EGLDMEXFL-9fa39d",
-        "farmedToken": "MEX-dc289c",
-        "address": "erd1qqqqqqqqqqqqqpgq59hlx9lmclzngxfnxwjpzru3ukm3hfvj0n4sh8pkmp",
+        "farmingToken": "EGLDMEX-95c6d5",
+        "farmToken": "EGLDMEXFL-f0bc2e",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgq3chrzjdg3gu40zt6kes6w62cyz8tes6k0n4ssk3hj4",
         "version": 4
     },
     {
-        "farmingToken": "WEBEGLD-270db7",
-        "farmToken": "WEBEGLDFL-6094e8",
-        "farmedToken": "MEX-dc289c",
-        "address": "erd1qqqqqqqqqqqqqpgq835vpevjysz042t3wnp6q5a7skxaerm90n4sg85ekq",
+        "farmingToken": "EGLDUSDC-ac1a30",
+        "farmToken": "EGLDUSDCFL-dacba7",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgqalcjd05y3uazuw79k4vdnheq825x8e400n4s09ymcr",
+        "version": 4
+    },
+    {
+        "farmingToken": "EGLDRIDE-9fdd72",
+        "farmToken": "EGLDRIDEFL-73a57a",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgqyd7uaxe9sctfxsev0u3mntekxqlu6ntt0n4s8a6thz",
+        "version": 4
+    },
+    {
+        "farmingToken": "ITHWEGLD-f49a21",
+        "farmToken": "ITHWEGLDFL-74d964",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgqtmg6xzef8k6z4885qhehgvu4zlf3g5zf0n4snencta",
+        "version": 4
+    },
+    {
+        "farmingToken": "UTKWEGLD-4d60d6",
+        "farmToken": "UTKWEGLDFL-478337",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgq7mq58gjqzawtzy9y5v2rawpawx03a6ny0n4sv5mzr6",
+        "version": 4
+    },
+    {
+        "farmingToken": "CRTWEGLD-fd9d4c",
+        "farmToken": "CRTWEGLDFL-08b160",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgqauyawadp2eex5kd30z5ehrrprgksjpyp0n4s00cy97",
+        "version": 4
+    },
+    {
+        "farmingToken": "ASHWEGLD-db53e2",
+        "farmToken": "ASHWEGLDFL-23995b",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgqlsq7r58fn05emy66456hunfvlm03vzh00n4s5pqfqc",
         "version": 4
     }
 ]

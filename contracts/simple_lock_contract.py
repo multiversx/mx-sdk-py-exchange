@@ -12,16 +12,18 @@ logger = get_logger(__name__)
 
 
 class SimpleLockContract(DEXContractInterface):
-    def __init__(self, locked_token: str = "", lp_proxy_token: str = "", address: str = ""):
+    def __init__(self, locked_token: str = "", lp_proxy_token: str = "", farm_proxy_token: str = "", address: str = ""):
         self.address = address
         self.locked_token = locked_token
         self.lp_proxy_token = lp_proxy_token
+        self.farm_proxy_token = farm_proxy_token
 
     def get_config_dict(self) -> dict:
         output_dict = {
             "address": self.address,
             "locked_token": self.locked_token,
-            "lp_proxy_token": self.lp_proxy_token
+            "lp_proxy_token": self.lp_proxy_token,
+            "farm_proxy_token": self.farm_proxy_token
         }
         return output_dict
 
@@ -29,7 +31,8 @@ class SimpleLockContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return SimpleLockContract(address=config_dict['address'],
                                   locked_token=config_dict['locked_token'],
-                                  lp_proxy_token=config_dict['lp_proxy_token'])
+                                  lp_proxy_token=config_dict['lp_proxy_token'],
+                                  farm_proxy_token=config_dict.get('farm_proxy_token'))
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         function_purpose = f"Deploy simple lock contract"

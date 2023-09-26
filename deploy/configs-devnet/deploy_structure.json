@@ -2,8 +2,20 @@
     "token": 
         {
             "token_prefix": "E2ETK7",
-            "number_of_tokens": 3
+            "number_of_tokens": 10
         },
+
+    "egld_wraps": [
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        }
+    ],
 
     "locked_assets": [
         {
@@ -14,16 +26,23 @@
     ],
 
     "simple_locks": [
-
+        {
+            "locked_token": "LKTK",
+            "locked_token_name": "LockedTK",
+            "locked_lp_token": "LKLPTK",
+            "locked_lp_token_name": "LockedLPTK",
+            "locked_farm_token": "LKFTK",
+            "locked_farm_token_name": "LockedFarmTK"
+        }
     ],
 
     "simple_locks_energy": [
         {
             "base_token": 0,
-            "locked_token": "ELKMEX",
-            "locked_token_name": "EnergyLockedMEX",
+            "locked_token": "XMEX",
+            "locked_token_name": "xMEX",
             "locked_asset_factory": 0,
-            "min_migrated_lock_epochs": 1,
+            "min_migrated_lock_epochs": 0,
             "lock_options": [
                 360, 720, 1440
             ],
@@ -35,7 +54,9 @@
 
     "fees_collectors": [
         {
-            "energy_factory": 0
+            "energy_factory": 0,
+            "lock_epochs": 1440,
+            "locked_tokens_per_block": 17500000000000000000000
         }
     ],
 
@@ -43,7 +64,7 @@
         {
             "energy_factory": 0,
             "fees_collector": 0,
-            "unbond_epochs": 1,
+            "unbond_epochs": 10,
             "fees_burn_percentage": 5000
         }
     ],
@@ -62,10 +83,10 @@
         {
             "locked_asset": 0,
             "energy_factory": 0,
-            "proxy_lp": "ELKLP",
-            "proxy_lp_name": "EnergyLockedLP",
-            "proxy_farm": "ELKFARM",
-            "proxy_farm_name": "EnergyLockedLPStaked"
+            "proxy_lp": "XMEXLP",
+            "proxy_lp_name": "xMEXLP",
+            "proxy_farm": "XMEXFARM",
+            "proxy_farm_name": "xMEXLPStaked"
         }
     ],
 
@@ -97,15 +118,76 @@
             "proxy_v2": 0
         },
         {
-            "launched_token": 2,
-            "accepted_token": 1,
-            "lp_token": "WEBEGLD",
-            "lp_token_name": "WEBEGLDLP",
+            "launched_token": 1,
+            "accepted_token": 2,
+            "lp_token": "EGLDUSDC",
+            "lp_token_name": "EGLDUSDCLP",
             "fee_token": 1,
             "total_fee": 300,
             "special_fee": 100,
             "fees_collector": 0,
             "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 1,
+            "accepted_token": 3,
+            "lp_token": "EGLDRIDE",
+            "lp_token_name": "EGLDRIDELP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 4,
+            "accepted_token": 1,
+            "lp_token": "ITHWEGLD",
+            "lp_token_name": "ITHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 5,
+            "accepted_token": 1,
+            "lp_token": "UTKWEGLD",
+            "lp_token_name": "UTKWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 6,
+            "accepted_token": 1,
+            "lp_token": "CRTWEGLD",
+            "lp_token_name": "CRTWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 7,
+            "accepted_token": 1,
+            "lp_token": "ASHWEGLD",
+            "lp_token_name": "ASHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        }
+    ],
+
+    "pairs_view": [
+        {
+            "empty": 0
         }
     ],
 
@@ -122,44 +204,127 @@
     ],
 
     "proxy_deployers": [
-        {
-            "template": "farms_boosted"
-        }
+
     ],
 
     "farms_boosted": [
         {
-            "deployer": 0,
             "farming_pool": 0,
             "farm_token": "EGLDMEXFL",
             "farm_token_name": "EGLDMEXLPStakedLK",
             "farmed_token": 0,
-            "rpb": 1000000000000000000,
-            "penalty": 100,
+            "rpb": 340000000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
             "lock_factory": 0,
             "lock_epochs": 1440,
             "boosted_rewards": 6000,
-            "base_const": 10,
-            "energy_const": 5,
-            "farm_const": 1,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
             "min_energy": 1,
             "min_farm": 1,
             "proxy_v2": 0
         },
         {
-            "deployer": 0,
             "farming_pool": 1,
-            "farm_token": "WEBEGLDFL",
-            "farm_token_name": "WEBEGLDLPStakedLK",
+            "farm_token": "EGLDUSDCFL",
+            "farm_token_name": "EGLDUSDCLPStakedLK",
             "farmed_token": 0,
-            "rpb": 1000000000000000000,
-            "penalty": 100,
+            "rpb": 50400000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
             "lock_factory": 0,
             "lock_epochs": 1440,
             "boosted_rewards": 6000,
-            "base_const": 10,
-            "energy_const": 5,
-            "farm_const": 1,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 2,
+            "farm_token": "EGLDRIDEFL",
+            "farm_token_name": "EGLDRIDELPStakedLK",
+            "farmed_token": 0,
+            "rpb": 31600000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 3,
+            "farm_token": "ITHWEGLDFL",
+            "farm_token_name": "ITHWEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 21200000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 4,
+            "farm_token": "UTKWEGLDFL",
+            "farm_token_name": "UTKWEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 21200000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 5,
+            "farm_token": "CRTWEGLDFL",
+            "farm_token_name": "CRTWEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 15100000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 6,
+            "farm_token": "ASHWEGLDFL",
+            "farm_token_name": "ASHWEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 21100000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
             "min_energy": 1,
             "min_farm": 1
         }
@@ -175,9 +340,63 @@
 
     "stakings_v2": [
         {
-            "staking_token": 2,
-            "stake_token": "SWEB",
-            "stake_token_name": "StakedWEB",
+            "staking_token": 3,
+            "stake_token": "SRIDE",
+            "stake_token_name": "SRIDE",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        },
+        {
+            "staking_token": 8,
+            "stake_token": "SZPAY",
+            "stake_token_name": "SZPAY",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        },
+        {
+            "staking_token": 4,
+            "stake_token": "SITHEUM",
+            "stake_token_name": "SITHEUM",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        },
+        {
+            "staking_token": 9,
+            "stake_token": "SBHAT",
+            "stake_token_name": "SBHAT",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        },
+        {
+            "staking_token": 5,
+            "stake_token": "SUTK",
+            "stake_token_name": "SUTK",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        },
+        {
+            "staking_token": 6,
+            "stake_token": "SCRT",
+            "stake_token_name": "SCRT",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        },
+        {
+            "staking_token": 7,
+            "stake_token": "SASH",
+            "stake_token_name": "SASH",
             "apr": 2500,
             "rpb": 4138000000000000000,
             "unbond_epochs": 10,
@@ -191,12 +410,36 @@
 
     "metastakings_v2": [
         {
-            "token": 2,
-            "pool_v2": 1,
-            "farm_boosted": 1,
+            "token": 3,
+            "pool_v2": 2,
+            "farm_boosted": 2,
             "staking_v2": 0,
-            "metastake_token": "METAWEBLK",
-            "metastake_token_name": "MetaStakedWebLK"
+            "metastake_token": "METARIDELK",
+            "metastake_token_name": "MetaStakedRideLK"
+        },
+        {
+            "token": 4,
+            "pool_v2": 3,
+            "farm_boosted": 3,
+            "staking_v2": 2,
+            "metastake_token": "METAITHLK",
+            "metastake_token_name": "MetaStakedItheumLK"
+        },
+        {
+            "token": 5,
+            "pool_v2": 4,
+            "farm_boosted": 4,
+            "staking_v2": 4,
+            "metastake_token": "METAUTKLK",
+            "metastake_token_name": "MetaStakedUtrustLK"
+        },
+        {
+            "token": 6,
+            "pool_v2": 5,
+            "farm_boosted": 5,
+            "staking_v2": 5,
+            "metastake_token": "METACRTLK",
+            "metastake_token_name": "MetaStakedCRTLK"
         }
     ]
 }

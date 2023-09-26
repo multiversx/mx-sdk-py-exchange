@@ -58,13 +58,13 @@ def main(cli_args: List[str]):
         router_runner.handle_command(args)
     elif args.command == 'proxy':
         proxy_runner.handle_command(args)
-    elif args.command == 'locked_asset':
+    elif args.command == 'locked-asset':
         locked_asset_runner.handle_command(args)
-    elif args.command == 'fees_collector':
+    elif args.command == 'fees-collector':
         fees_collector_runner.handle_command(args)
-    elif args.command == 'energy_factory':
+    elif args.command == 'energy-factory':
         energy_factory_runner.handle_command(args)
-    elif args.command == 'account_state':
+    elif args.command == 'account-state':
         account_state_runner.get_account_keys_online(args.address, args.proxy_url, args.block_number, args.with_save_in)
     elif args.fetch_pause_state:
         fetch_and_save_pause_state()

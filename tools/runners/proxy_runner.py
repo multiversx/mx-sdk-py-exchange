@@ -33,7 +33,7 @@ def upgrade_proxy_dex_contracts():
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
-    proxy_dex_address = context.get_contracts(config.PROXIES_V2)[0].address
+    proxy_dex_address = context.get_contracts(config.PROXIES)[0].address
 
     print(f"Processing contract {proxy_dex_address}")
     proxy_dex_contract = DexProxyContract([], "", ProxyContractVersion.V1, address=proxy_dex_address)
