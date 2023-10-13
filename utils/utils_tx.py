@@ -560,7 +560,7 @@ def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkP
             logger.debug(f"sent {num_sent} instead of {len(chunk)}")
 
         chunk_index += 1
-        hashes.extend(sent_hashes)
+        hashes.extend(sent_hashes.values())
 
         if sleep is not None:
             time.sleep(sleep)

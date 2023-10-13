@@ -10,7 +10,7 @@ DEFAULT_API = "https://express-api-sovereign.elrond.ro"                         
 GRAPHQL = 'https://graph.xexchange.com/graphql'                              # GraphQL service; only needed for the upgrader scripts
 HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
 # TODO: try to override the default issue token price with testnet definition to tidy code up
-DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.05 EGLD - change only if different setup on nets
+DEFAULT_ISSUE_TOKEN_PRICE = 5000000000000000000                               # 0.05 EGLD - change only if different setup on nets
 
 # Operation wallets
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
@@ -23,7 +23,7 @@ DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
 DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-sovereign"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
-FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations
+FORCE_CONTINUE_PROMPT = True                                               # Force continue prompt for all operations
 
 # DEX contract bytecode paths
 EGLD_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "egld-wrap.wasm"

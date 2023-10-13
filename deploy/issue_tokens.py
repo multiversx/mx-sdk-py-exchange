@@ -67,7 +67,7 @@ def main(cli_args: List[str]):
                     supply,
                     num_decimals
                 ],
-                value=TokenPayment.egld_from_integer(value)
+                value=TokenPayment.egld_from_integer(int(value))
             )
 
             # calculate precise gas limit
