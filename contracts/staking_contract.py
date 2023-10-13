@@ -130,7 +130,8 @@ class StakingContract(DEXContractInterface):
             self.farming_token,
             1000000000000,
             self.max_apr,
-            self.unbond_epochs
+            self.unbond_epochs,
+            0, 0
         ]
         if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
             arguments.extend(args)
