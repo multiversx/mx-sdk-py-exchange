@@ -1,0 +1,113 @@
+{   
+    "token": 
+        {
+            "token_prefix": "SOVDEX",
+            "number_of_tokens": 2
+        },
+
+    "egld_wraps": [
+        {
+            "unlocked_asset": 1
+        }
+    ],
+
+    "locked_assets": [
+
+    ],
+
+    "simple_locks": [
+
+    ],
+
+    "simple_locks_energy": [
+
+    ],
+
+    "fees_collectors": [
+
+    ],
+
+    "unstakers": [
+
+    ],
+
+    "proxies": [
+
+    ],
+
+    "proxies_v2": [
+
+    ],
+
+    "router": [
+
+    ],
+
+    "router_v2": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "pairs": [
+
+    ],
+
+    "pairs_v2": [
+        {
+            "launched_token": 1,
+            "accepted_token": 0,
+            "lp_token": "EGLDMEX",
+            "lp_token_name": "EGLDMEXLP",
+            "fee_token": 0,
+            "total_fee": 300,
+            "special_fee": 100
+        }
+    ],
+
+    "pairs_view": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "farms_community": [
+
+    ],
+
+    "farms_unlocked": [
+
+    ],
+
+    "farms_locked": [
+
+    ],
+
+    "proxy_deployers": [
+
+    ],
+
+    "farms_boosted": [
+
+    ],
+
+    "price_discoveries": [
+
+    ],
+
+    "stakings": [
+
+    ],
+
+    "stakings_v2": [
+
+    ],
+
+    "metastakings": [
+
+    ],
+
+    "metastakings_v2": [
+
+    ]
+}
