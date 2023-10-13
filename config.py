@@ -5,8 +5,8 @@ DEFAULT_WORKSPACE = Path(__file__).parent
 
 # ------------ For normal operation, modify below ------------ #
 # Used net
-DEFAULT_PROXY = "https://testnet-gateway.multiversx.com"                     # Proxy to be used for ALL operations
-DEFAULT_API = "https://testnet-api.multiversx.com"                           # API to be used for ALL operations
+DEFAULT_PROXY = "https://proxy-sovereign.elrond.ro"                     # Proxy to be used for ALL operations
+DEFAULT_API = "https://express-api-sovereign.elrond.ro"                           # API to be used for ALL operations
 GRAPHQL = 'https://graph.xexchange.com/graphql'                              # GraphQL service; only needed for the upgrader scripts
 HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
 # TODO: try to override the default issue token price with testnet definition to tidy code up
@@ -20,7 +20,7 @@ DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
 DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-sovereign"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
 FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations
