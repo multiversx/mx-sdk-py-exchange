@@ -1,11 +1,10 @@
 from typing import List, Dict, Any
-
 import time
+from multiversx_sdk_network_providers import GenericError
 import requests
-
-from multiversx_sdk_cli import errors
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from multiversx_sdk_core.constants import METACHAIN_ID
+
 
 class NetworkStatusOnShard:
     def __init__(self, data: Dict[str, Any]) -> None:
@@ -44,9 +43,9 @@ class ProxyExtension(ProxyNetworkProvider):
 
     def get_network_status(self, shard_id) -> NetworkStatusOnShard:
         if shard_id == "metachain":
-            metrics = self._get_network_status(METACHAIN_ID)
+            metrics = self.get_network_status(METACHAIN_ID)
         else:
-            metrics = self._get_network_status(shard_id)
+            metrics = self.get_network_status(shard_id)
         result = NetworkStatusOnShard(metrics)
         return result
 
@@ -76,8 +75,8 @@ class ProxyExtension(ProxyNetworkProvider):
     def get_heartbeats_info(self) -> List[dict]:
         heartbeat_info = []
         proxy = ProxyNetworkProvider(self.url)
-        node_heartbeat_list = proxy.do_get_generic("node/heartbeatstatus")
-        heartbeats = node_heartbeat_list['heartbeats']
+        response = proxy.do_get_generic("node/heartbeatstatus")
+        heartbeats = response.to_dictionary()['heartbeats']
         for node_heartbeat in heartbeats:
             heartbeat_info.append(node_heartbeat)
         return heartbeat_info
@@ -85,9 +84,8 @@ class ProxyExtension(ProxyNetworkProvider):
     def get_validators_statistics_raw(self) -> List[dict]:
         proxy = ProxyNetworkProvider(self.url)
         response = proxy.do_get_generic("validator/statistics")
-        statistics = response['statistics']
+        statistics = response.to_dictionary()['statistics']
         return statistics
-
 
     @staticmethod
     def get_data(parsed, url):
@@ -97,7 +95,7 @@ class ProxyExtension(ProxyNetworkProvider):
         if not err and code == "successful":
             return parsed.get("data", dict())
 
-        raise errors.ProxyRequestError(url, f"code:{code}, error: {err}")
+        raise GenericError(url, f"code:{code}, error: {err}")
 
     @staticmethod
     def _extract_error_from_response(response):

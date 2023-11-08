@@ -1,10 +1,9 @@
-from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_core import Address
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import log_step_pass
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher, ChainDataFetcher
-from events.metastake_events import (EnterMetastakeEvent,
-                                                       ExitMetastakeEvent,
-                                                       ClaimRewardsMetastakeEvent)
+from events.metastake_events import EnterMetastakeEvent, ExitMetastakeEvent, \
+    ClaimRewardsMetastakeEvent
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
 from contracts.farm_contract import FarmContract
@@ -19,7 +18,7 @@ from contracts.pair_contract import PairContract, RemoveLiquidityEvent, SetCorre
 class MetastakingEconomics(Subscriber):
     def __init__(self, contract_address: str, staking_address: str, farm_contract: FarmContract,
                  pair_contract: PairContract, network_provider: NetworkProviders):
-        self.contract_address = Address(contract_address)
+        self.contract_address = Address(contract_address, "erd")
         self.farm_contract = farm_contract
         self.pair_contract = pair_contract
         self.network_provider = network_provider
