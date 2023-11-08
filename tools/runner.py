@@ -9,7 +9,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, fetch_contracts_states, get_
 from tools.runners import pair_runner, farm_runner, \
     staking_runner, metastaking_runner, router_runner, \
     proxy_runner, locked_asset_runner, fees_collector_runner, \
-    account_state_runner, energy_factory_runner
+    account_state_runner, energy_factory_runner, position_creator_runner
 from utils.contract_data_fetchers import FarmContractDataFetcher, PairContractDataFetcher, RouterContractDataFetcher, StakingContractDataFetcher
 from utils.utils_generic import log_step_fail
 from utils.utils_tx import NetworkProviders
@@ -27,6 +27,7 @@ def main(cli_args: List[str]):
     locked_asset = subparser.add_parser('locked-asset', help='handle locked asset')
     fees_collector = subparser.add_parser('fees-collector', help='handle fees collector')
     energy_factory = subparser.add_parser('energy-factory', help='handle energy factory')
+    position_creator = subparser.add_parser('position-creator', help='handle position creator')
     account_state = subparser.add_parser('account-state', help='handle account state')
 
     pair_runner.add_parsed_arguments(pair)
@@ -38,6 +39,7 @@ def main(cli_args: List[str]):
     locked_asset_runner.add_parsed_arguments(locked_asset)
     fees_collector_runner.add_parsed_arguments(fees_collector)
     energy_factory_runner.add_parsed_arguments(energy_factory)
+    position_creator_runner.add_parsed_arguments(position_creator)
     account_state_runner.add_parsed_arguments(account_state)
 
     parser.add_argument('--fetch-pause-state', action='store_true', help='fetch pause state')
@@ -64,6 +66,8 @@ def main(cli_args: List[str]):
         fees_collector_runner.handle_command(args)
     elif args.command == 'energy-factory':
         energy_factory_runner.handle_command(args)
+    elif args.command == 'position-creator':
+        position_creator_runner.handle_command(args)
     elif args.command == 'account-state':
         account_state_runner.get_account_keys_online(args.address, args.proxy_url, args.block_number, args.with_save_in)
     elif args.fetch_pause_state:
