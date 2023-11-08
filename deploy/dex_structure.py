@@ -5,6 +5,7 @@ from typing import List, Type, Dict, Optional
 
 import config
 from contracts.fees_collector_contract import FeesCollectorContract
+from contracts.position_creator_contract import PositionCreatorContract
 from contracts.proxy_deployer_contract import ProxyDeployerContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.unstaker_contract import UnstakerContract
@@ -212,7 +213,10 @@ class DeployStructure:
                                   self.metastaking_deploy, False),
             config.METASTAKINGS_BOOSTED:
                 ContractStructure(config.METASTAKINGS_BOOSTED, MetaStakingContract, config.STAKING_PROXY_V3_BYTECODE_PATH,
-                                  self.metastaking_deploy, False)
+                                  self.metastaking_deploy, False),
+            config.POSITION_CREATOR:
+                ContractStructure(config.POSITION_CREATOR, PositionCreatorContract, config.POSITION_CREATOR_BYTECODE_PATH,
+                                  self.position_creator_deploy, False),
         }
 
     # main entry method to deploy tokens (either deploy fresh ones or reuse existing ones)
@@ -1943,4 +1947,28 @@ class DeployStructure:
                     return
 
             deployed_contracts.append(deployed_metastaking_contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def position_creator_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for contract_config in contract_structure.deploy_structure_list:
+            position_creator_contract = PositionCreatorContract(
+                "", contract_config['egld_wrapped_address'], contract_config['wrapped_token_id']
+            )
+            tx_hash, contract_address = position_creator_contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    position_creator_contract.egld_wrapper_address,
+                    position_creator_contract.wrapped_token_id
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "position creator contract"):
+                return
+            log_step_pass(f"Position creator contract address: {contract_address}")
+            position_creator_contract.address = contract_address
+            deployed_contracts.append(position_creator_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
