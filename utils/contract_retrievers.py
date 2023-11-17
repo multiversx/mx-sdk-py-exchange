@@ -9,6 +9,7 @@ from contracts.metastaking_contract import MetaStakingContract
 from contracts.pair_contract import PairContract
 from contracts.locked_asset_contract import LockedAssetContract
 import config
+from contracts.position_creator_contract import PositionCreatorContract
 from contracts.router_contract import RouterContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.staking_contract import StakingContract
@@ -122,6 +123,11 @@ def retrieve_proxy_by_address(address: str) -> Optional[DexProxyContract]:
     version = ProxyContractVersion.V2
 
     contract = DexProxyContract(locked_tokens, token, version, address, proxy_lp_token, proxy_farm_token)
+    return contract
+
+
+def retrieve_position_creator_by_address(address: str) -> Optional[PositionCreatorContract]:
+    contract = PositionCreatorContract(address)
     return contract
 
 
