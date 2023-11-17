@@ -174,6 +174,8 @@ class FarmContractDataFetcher(DataFetcher):
             "getFarmingTokenId": self._get_hex_view,
             "getRewardTokenId": self._get_hex_view,
             "getState": self._get_int_view,
+            "getPairContractManagedAddress": self._get_hex_view,
+            "getUserTotalFarmPosition": self._get_hex_view,
         }
 
 

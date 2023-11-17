@@ -47,5 +47,33 @@
         "lpToken": "ASHWEGLD-db53e2",
         "address": "erd1qqqqqqqqqqqqqpgq0e9pmlzr0nk5nkulzcmessttsjkzr4xf0n4sue4r8e",
         "version": 2
+    },
+    {
+        "firstToken": "WBTC-05fd5b",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "WBTCWEGLD-e709ab",
+        "address": "erd1qqqqqqqqqqqqqpgqll98p9940f6u5erf4dje5r0f94g4jctc0n4s48vmz2",
+        "version": 2
+    },
+    {
+        "firstToken": "WETH-bbe4ab",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "WETHWEGLD-811f8d",
+        "address": "erd1qqqqqqqqqqqqqpgqph6g8569lnvpgd3x569hd6n6qse2aw0w0n4sms6nzv",
+        "version": 2
+    },
+    {
+        "firstToken": "BUSD-866948",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "BUSDWEGLD-731835",
+        "address": "erd1qqqqqqqqqqqqqpgqmtzsfzu2jjkxlfhwpyr4zg72ryamkzmp0n4s0tl6ce",
+        "version": 2
+    },
+    {
+        "firstToken": "USDT-58d5d0",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "USDTWEGLD-0adb82",
+        "address": "erd1qqqqqqqqqqqqqpgq205dg9t5wnczfh7uxyxe5kudk6ez4e3y0n4su5t6gc",
+        "version": 2
     }
 ]

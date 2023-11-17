@@ -1,11 +1,12 @@
 from typing import Dict, Any
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
+from utils import decoding_structures
 from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
@@ -414,6 +415,15 @@ class FarmContract(DEXContractInterface):
         address = Address.from_hex(raw_results).bech32()
 
         return address
+    
+    def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider,) -> str:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).serialize()])
+        if not raw_results:
+            return {}
+        user_farm_position = decode_merged_attributes(raw_results, decoding_structures.USER_FARM_POSITION)
+
+        return user_farm_position
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.start_produce_rewards(deployer, proxy)
