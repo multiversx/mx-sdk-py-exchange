@@ -19,10 +19,10 @@ class PositionCreatorContract(DEXContractInterface):
         PositionCreatorContract class
     """
 
-    def __init__(self, address: str = "", egld_wrapper_address: str = "", wegld_token_id: str = ""):
+    def __init__(self, address: str = "", egld_wrapper_address: str = "", router_address: str = ""):
         self.address = address
         self.egld_wrapper_address = egld_wrapper_address
-        self.wegld_token_id = wegld_token_id
+        self.router_address = router_address
 
     def get_config_dict(self) -> dict:
         output_dict = {
@@ -44,7 +44,7 @@ class PositionCreatorContract(DEXContractInterface):
         """
             Expecting as args:
                 type[str]: egld wrapper address
-                type[str]: wegld token id
+                type[str]: router address
         """
         function_purpose = f"deploy {type(self).__name__} contract"
         logger.info(function_purpose)
@@ -94,4 +94,4 @@ class PositionCreatorContract(DEXContractInterface):
     def print_contract_info(self):
         log_step_pass(f"Deployed position creator contract: {self.address}")
         log_substep(f"EGLD Wrapper address: {self.egld_wrapper_address}")
-        log_substep(f"Wrapped EGLD TokenID: {self.wegld_token_id}")
+        log_substep(f"Router address: {self.router_address}")

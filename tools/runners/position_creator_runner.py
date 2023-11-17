@@ -5,9 +5,10 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
 from context import Context
 from utils.contract_retrievers import retrieve_position_creator_by_address
 from utils.utils_tx import NetworkProviders
+from deploy import populate_deploy_lists
 import config
 
-POSITION_CREATOR_LABEL = "pairs"
+POSITION_CREATOR_LABEL = "position_creator"
 OUTPUT_POSITION_CREATOR_FILE = OUTPUT_FOLDER / "position_creator_data.json"
 
 
@@ -61,6 +62,10 @@ def upgrade_position_creator_contract(compare_states: bool = False):
     position_creator_address = context.get_contracts(config.POSITION_CREATOR)[0].address
     position_creator_contract = retrieve_position_creator_by_address(position_creator_address)
 
+    deploy_structure_list = populate_deploy_lists.populate_list(config.DEPLOY_STRUCTURE_JSON, POSITION_CREATOR_LABEL)
+    position_creator_contract.egld_wrapper_address = deploy_structure_list[0]["egld_wrapped_address"]
+    position_creator_contract.router_address = deploy_structure_list[0]["router_address"]
+
     if compare_states:
         print("Fetching contract state before upgrade...")
         fetch_contracts_states("pre", network_providers, [position_creator_address], POSITION_CREATOR_LABEL)
@@ -68,7 +73,7 @@ def upgrade_position_creator_contract(compare_states: bool = False):
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
-    tx_hash = position_creator_contract.contract_upgrade(dex_owner, network_providers.proxy)
+    tx_hash = position_creator_contract.contract_upgrade(dex_owner, network_providers.proxy, config.POSITION_CREATOR_BYTECODE_PATH)
 
     if not network_providers.check_simple_tx_status(tx_hash, f"upgrade position creator contract: {position_creator_address}"):
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
