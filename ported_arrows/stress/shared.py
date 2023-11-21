@@ -1,4 +1,4 @@
-from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_core import Address
 from multiversx_sdk_core.constants import METACHAIN_ID
 
 

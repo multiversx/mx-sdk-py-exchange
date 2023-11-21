@@ -1,8 +1,7 @@
-from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
+from multiversx_sdk_core import Address
 from utils.contract_data_fetchers import SimpleLockEnergyContractDataFetcher
 from utils.utils_tx import ESDTToken, NetworkProviders
-from utils.utils_chain import get_token_details_for_address, decode_merged_attributes, base64_to_hex
-from multiversx_sdk_cli.accounts import Address
+from utils.utils_chain import decode_merged_attributes, base64_to_hex
 
 
 class SimpleLockEnergyTokenAttributes:
@@ -25,7 +24,7 @@ class SimpleLockEnergyTracker:
     def __init__(self, address: str, network_provider: NetworkProviders):
         self.address = address
         self.network_provider = network_provider
-        self.contract_data_fetcher = SimpleLockEnergyContractDataFetcher(Address(address), network_provider.proxy.url)
+        self.contract_data_fetcher = SimpleLockEnergyContractDataFetcher(Address(address, "erd"), network_provider.proxy.url)
         self.base_token = self.contract_data_fetcher.get_data("getBaseAssetTokenId")
         self.locked_token = self.contract_data_fetcher.get_data("getLockedTokenId")
 

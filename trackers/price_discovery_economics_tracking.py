@@ -1,12 +1,11 @@
 from typing import Dict
-
+from multiversx_sdk_core import Address
 from utils.contract_data_fetchers import PriceDiscoveryContractDataFetcher
-from events.price_discovery_events import (DepositPDLiquidityEvent,
-                                                             WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
+from events.price_discovery_events import DepositPDLiquidityEvent, WithdrawPDLiquidityEvent, \
+    RedeemPDLPTokensEvent
 from contracts.contract_identities import PriceDiscoveryContractIdentity
 from utils.utils_chain import get_all_token_nonces_details_for_account, get_token_details_for_address
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep
-from multiversx_sdk_cli.accounts import Address
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 
 
@@ -29,7 +28,7 @@ class PriceDiscoveryEconomics:
     def __init__(self, contract_identity: PriceDiscoveryContractIdentity, proxy_url: str):
         self.proxy = ProxyNetworkProvider(proxy_url)
         self.pd_contract_identity = contract_identity
-        self.contract_data_fetcher = PriceDiscoveryContractDataFetcher(Address(contract_identity.address), proxy_url)
+        self.contract_data_fetcher = PriceDiscoveryContractDataFetcher(Address(contract_identity.address, "erd"), proxy_url)
 
         self.first_token_reserve = 0
         self.second_token_reserve = 0

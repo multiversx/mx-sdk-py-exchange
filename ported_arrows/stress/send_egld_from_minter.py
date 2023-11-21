@@ -3,12 +3,11 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List
-
+from multiversx_sdk_core import Transaction
+from utils.account import Account
 from utils.utils_chain import BunchOfAccounts
 from utils.utils_tx import broadcast_transactions
-from multiversx_sdk_cli.accounts import Account
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
-from multiversx_sdk_cli.transactions import Transaction
 
 
 def main(cli_args: List[str]):
@@ -35,16 +34,20 @@ def main(cli_args: List[str]):
         if account.address.bech32() == minter.address.bech32():
             continue
 
-        transaction = Transaction()
+        transaction = Transaction(
+            chain_id=network.chain_id,
+            sender=minter.address.bech32(),
+            receiver=account.address.bech32(),
+            gas_limit=50000,
+        )
         transaction.nonce = minter.nonce
-        transaction.sender = minter.address.bech32()
-        transaction.receiver = account.address.bech32()
         transaction.value = str(args.value_atoms)
         transaction.gasPrice = network.min_gas_price
-        transaction.gasLimit = 50000
         transaction.chainID = network.chain_id
         transaction.version = network.min_transaction_version
-        transaction.sign(minter)
+
+        signature = minter.sign_transaction(transaction)
+        transaction.signature = signature
         minter.nonce += 1
 
         transactions.append(transaction)

@@ -3,14 +3,13 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List
-
+from multiversx_sdk_core import Transaction
 from ported_arrows.stress.contracts.transaction_builder import (number_as_arg,
                                                          token_id_as_arg)
+from utils.account import Account
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
-from multiversx_sdk_cli.accounts import Account
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-from multiversx_sdk_cli.transactions import Transaction
 
 
 def main(cli_args: List[str]):
@@ -34,17 +33,19 @@ def main(cli_args: List[str]):
 
     for account in accounts.get_all():
 
-        transaction = Transaction()
+        transaction = Transaction(
+            chain_id=network.chain_id,
+            sender=minter.address.bech32(),
+            receiver=account.address.bech32(),
+            gas_limit=250000 + 50000 + 1500 * len(transaction.data),
+        )
         transaction.nonce = minter.nonce
-        transaction.sender = minter.address.bech32()
-        transaction.receiver = account.address.bech32()
         transaction.data = f"ESDTTransfer@{token_id_as_arg(args.token)}@{number_as_arg(args.amount_atoms)}"
         transaction.value = "0"
         transaction.gasPrice = network.min_gas_price
-        transaction.gasLimit = 250000 + 50000 + 1500 * len(transaction.data)
-        transaction.chainID = network.chain_id
         transaction.version = network.min_transaction_version
-        transaction.sign(minter)
+        signature = minter.sign_transaction(transaction)
+        transaction.signature = signature
         minter.nonce += 1
 
         transactions.append(transaction)
