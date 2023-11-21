@@ -1,5 +1,4 @@
 ipykernel
-multiversx-sdk-cli~=8.1.5
 multiversx-sdk-core~=0.6.0
 multiversx-sdk-network-providers~=0.11.1
 multiversx-sdk-wallet~=0.7.0
