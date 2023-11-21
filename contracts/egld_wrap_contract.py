@@ -64,6 +64,14 @@ class EgldWrapContract(DEXContractInterface):
         ]
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
                                         Address(self.address), "unwrapEgld", args)
+    
+    def resume(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Resume wrapper contract"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = []
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "unpause", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass

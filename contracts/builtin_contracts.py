@@ -128,12 +128,28 @@ class SFControlContract:
         logger.info(f"Fast forwarding {epochs} epochs")
         gas_limit = 13000000
 
-        if blocks_per_epoch < 20:
-            logger.warning("Blocks per epoch is less than 20; defaulting to 20.")
-            blocks_per_epoch = 20
+        if blocks_per_epoch < 9:
+            logger.warning("Blocks per epoch is less than 9; defaulting to 9.")
+            blocks_per_epoch = 9
 
         sc_args = [
             epochs,
             blocks_per_epoch
         ]
         return endpoint_call(proxy, gas_limit, caller, Address(self.address), "epochfastforward", sc_args)
+    
+    def epochs_fast_forward(self, caller: Account, proxy: ProxyNetworkProvider, epochs: int, blocks_per_epoch: int):
+        function_purpose = "fast forward epoch"
+        logger.info(function_purpose)
+        logger.info(f"Fast forwarding {epochs} epochs")
+        gas_limit = 13000000
+
+        if blocks_per_epoch < 9:
+            logger.warning("Blocks per epoch is less than 9; defaulting to 9.")
+            blocks_per_epoch = 9
+
+        sc_args = [
+            epochs,
+            blocks_per_epoch
+        ]
+        return endpoint_call(proxy, gas_limit, caller, Address(self.address), "epochsFastForward", sc_args)

@@ -92,18 +92,15 @@ class GovernanceContract(DEXContractInterface):
 
     def propose(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
-            type[ESDTToken]: fee payment
+            type[List[ESDTToken]]: fee payment
             opt: type[list]: actions ???
         """
-        function_purpose = f"lock tokens"
+        function_purpose = f"propose"
         logger.info(function_purpose)
 
         gas_limit = 30000000
-        arguments = [
-            [args]
-        ]
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
-                                        Address(self.address), "lock", arguments)
+                                        Address(self.address), "propose", args)
 
     def vote(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -117,7 +114,7 @@ class GovernanceContract(DEXContractInterface):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 10000000
+        gas_limit = 20000000
         sc_args = args
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "vote", sc_args)
     

@@ -31,3 +31,16 @@ LIQUID_LOCKING_LOCKED_TOKEN_AMOUNTS = {
 LIQUID_LOCKING_UNLOCKED_TOKEN_AMOUNTS = {
     'unlocked_tokens': LIQUID_LOCKING_UNLOCKED_TOKEN
 }
+
+USER_FARM_POSITION = {
+    'total_farm_position': 'biguint',
+    'allow_external_claim': 'u8'
+}
+
+FARM_TOKEN_ATTRIBUTES = {
+    'reward_per_share': 'biguint',
+    'entering_epoch': 'u64',
+    'compounded_reward': 'biguint',
+    'current_farm_amount': 'biguint',
+    'original_owner': 'address',
+}

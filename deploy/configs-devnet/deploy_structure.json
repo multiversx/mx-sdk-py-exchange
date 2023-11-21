@@ -2,7 +2,7 @@
     "token": 
         {
             "token_prefix": "E2ETK7",
-            "number_of_tokens": 10
+            "number_of_tokens": 14
         },
 
     "egld_wraps": [
@@ -177,6 +177,50 @@
             "accepted_token": 1,
             "lp_token": "ASHWEGLD",
             "lp_token_name": "ASHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 10,
+            "accepted_token": 1,
+            "lp_token": "WBTCWEGLD",
+            "lp_token_name": "WBTCWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 11,
+            "accepted_token": 1,
+            "lp_token": "WETHWEGLD",
+            "lp_token_name": "WETHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 12,
+            "accepted_token": 1,
+            "lp_token": "BUSDWEGLD",
+            "lp_token_name": "BUSDWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 13,
+            "accepted_token": 1,
+            "lp_token": "USDTWEGLD",
+            "lp_token_name": "USDTWEGLDLP",
             "fee_token": 1,
             "total_fee": 300,
             "special_fee": 100,
