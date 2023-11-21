@@ -337,6 +337,11 @@ def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
             _, result, index = fixed_length_primitive(attributes, index, payload_size)
             result_string = bytearray.fromhex(result).decode()
         return result_string, index
+    
+    def address(attributes: str, start_index: int):
+        _, result, index = fixed_length_primitive(attributes, start_index, 32)
+        bech32 = Address.from_hex(result, "erd").bech32()
+        return bech32, index
 
     results_dict = {}
     sliding_index = 0
@@ -345,7 +350,8 @@ def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
                               'u32': u32,
                               'u64': u64,
                               'biguint': biguint,
-                              'string': string}
+                              'string': string,
+                              'address': address}
 
     for key, primitive in decode_struct.items():
         if type(primitive) is dict:
