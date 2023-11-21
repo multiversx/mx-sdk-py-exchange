@@ -1,26 +1,18 @@
 import logging
 import random
-import sys
 import time
-import traceback
-
 from context import Context
 from contracts.farm_contract import FarmContract
-from events.event_generators import (generate_add_liquidity_event, generate_swap_fixed_input,
-                                                       generate_migrate_farm_event, generate_remove_liquidity_event,
-                                                       generate_random_swap_fixed_input,
-                                                       generate_random_swap_fixed_output, generateRandomEnterFarmEvent,
-                                                       generateRandomExitFarmEvent, generateRandomClaimRewardsEvent,
-                                                       generateRandomCompoundRewardsEvent,
-                                                       generateAddLiquidityProxyEvent,
-                                                       generateRemoveLiquidityProxyEvent,
-                                                       generateRandomEnterFarmProxyEvent,
-                                                       generateRandomExitFarmProxyEvent,
-                                                       generateRandomClaimRewardsProxyEvent,
-                                                       generateRandomCompoundRewardsProxyEvent, generateEnterFarmEvent,
-                                                       generateExitFarmEvent, generateClaimRewardsEvent,
-                                                       generateEnterFarmv12Event, generate_add_initial_liquidity_event)
-from multiversx_sdk_cli.accounts import Account
+from events.event_generators import generate_add_liquidity_event, \
+    generate_add_initial_liquidity_event, generate_random_swap_fixed_input, \
+    generate_random_swap_fixed_output, generate_remove_liquidity_event, \
+    generate_swap_fixed_input, generate_migrate_farm_event, generateAddLiquidityProxyEvent, \
+    generateClaimRewardsEvent, generateEnterFarmEvent, generateEnterFarmv12Event, \
+    generateExitFarmEvent, generateRandomClaimRewardsEvent, generateRandomClaimRewardsProxyEvent, \
+    generateRandomCompoundRewardsEvent, generateRandomCompoundRewardsProxyEvent, \
+    generateRandomEnterFarmEvent, generateRandomEnterFarmProxyEvent, generateRandomExitFarmEvent, \
+    generateRandomExitFarmProxyEvent, generateRemoveLiquidityProxyEvent
+from utils.account import Account
 
 
 def main():

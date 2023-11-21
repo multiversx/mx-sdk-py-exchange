@@ -1,4 +1,4 @@
-from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_core import Address
 from utils.utils_tx import NetworkProviders
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
@@ -9,7 +9,7 @@ from utils.utils_generic import log_step_fail, log_step_pass, log_substep
 
 class StakingEconomics(Subscriber):
     def __init__(self, address: str, network_provider: NetworkProviders):
-        self.contract_address = Address(address)
+        self.contract_address = Address(address, "erd")
         self.network_provider = network_provider
         self.data_fetcher = StakingContractDataFetcher(self.contract_address, self.network_provider.proxy.url)
         self.chain_data_fetcher = ChainDataFetcher(self.network_provider.proxy.url)

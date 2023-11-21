@@ -2,13 +2,12 @@ import logging
 import sys
 from argparse import ArgumentParser
 from typing import List
-
+from multiversx_sdk_core import Transaction
+from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
+from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 import config
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
-from multiversx_sdk_cli.contracts import SmartContract
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
-from multiversx_sdk_cli.transactions import Transaction
 
 
 def main(cli_args: List[str]):
@@ -48,23 +47,21 @@ def main(cli_args: List[str]):
         for account in accounts:
             sc_args = [f'str:{token_id}', supply]
 
-            receiver_address = SmartContract(address=account.address)
-            tx_data = receiver_address.prepare_execute_transaction_data("ESDTLocalMint", sc_args)
+            tx_config = DefaultTransactionBuildersConfiguration(
+                network.chain_id
+            )
+            contract_call = ContractCallBuilder(
+                tx_config,
+                caller=account.address.bech32(),
+                contract=account.address.bech32(),
+                function_name="ESDTLocalMint",
+                call_arguments=sc_args,
+                gas_limit=args.gas_limit,
+            )
+            tx = contract_call.build()
 
-            gas_limit = args.gas_limit or args.base_gas_limit + 50000 + 1500 * len(tx_data)
-            value = "0"
-
-            tx = Transaction()
-            tx.nonce = account.nonce
-            tx.value = value
-            tx.sender = account.address.bech32()
-            tx.receiver = receiver_address.address.bech32()
-            tx.gasPrice = network.min_gas_price
-            tx.gasLimit = gas_limit
-            tx.data = tx_data
-            tx.chainID = str(network.chain_id)
-            tx.version = network.min_tx_version
-            tx.sign(account)
+            signature = account.sign_transaction(tx)
+            tx.signature = signature
 
             print("Holder account: ", account.address)
             print("Token id: ", token_id)

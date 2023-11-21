@@ -4,15 +4,15 @@ import time
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List
+from multiversx_sdk_core import Address, Transaction
 
 from ported_arrows.stress.contracts.transaction_builder import \
     transfer_multi_esdt_and_execute
+from utils.account import Account
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
-from multiversx_sdk_cli.accounts import Account, Address
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from multiversx_sdk_network_providers.network_config import NetworkConfig
-from multiversx_sdk_cli.transactions import Transaction
 
 
 def main(cli_args: List[str]):
@@ -27,7 +27,7 @@ def main(cli_args: List[str]):
 
     proxy = ProxyNetworkProvider(args.proxy)
     network = proxy.get_network_config()
-    pair = Address(args.pair)
+    pair = Address(args.pair, "erd")
     accounts = BunchOfAccounts.load_accounts_from_files([Path(args.accounts)])
 
     for _ in range(0, 1000):

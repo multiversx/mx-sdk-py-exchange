@@ -2,17 +2,18 @@ import random
 import sys
 import time
 from typing import List
+from multiversx_sdk_core import Address
 
 import config
 from context import Context
 from events.event_generators import (
     generate_add_initial_liquidity_event, generate_add_liquidity_event,
     generate_swap_fixed_input)
+from utils.account import Account
 from utils.contract_data_fetchers import (
     FeeCollectorContractDataFetcher, PairContractDataFetcher)
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from multiversx_sdk_cli.accounts import Account, Address
 
 
 def main(cli_args: List[str]):
@@ -23,7 +24,7 @@ def main(cli_args: List[str]):
     user_account = context.accounts.get_all()[0]
     pair_contract = context.get_pair_v2_contract(0)
     fee_collector_contract = context.get_fee_collector_contract(0)
-    contract_data_fetcher = FeeCollectorContractDataFetcher(Address(fee_collector_contract.address), context.proxy.url)
+    contract_data_fetcher = FeeCollectorContractDataFetcher(Address(fee_collector_contract.address, "erd"), context.proxy.url)
     tokens = [pair_contract.firstToken, pair_contract.secondToken]
 
     # add_initial_liquidity(context=context, account=user_account)

@@ -52,6 +52,7 @@ PAIR_VIEW_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-de
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
 FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "farm-with-locked-rewards.wasm"
 GOVERNANCE_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "energy-integration" / "governance-v2" / "output" / "governance-v2.wasm"
+POSITION_CREATOR_BYTECODE_PATH = Path().home() / "MultiversX/mx-exchange-tools-sc/auto-pos-creator/output" / "auto-pos-creator.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
@@ -97,6 +98,7 @@ METASTAKINGS_V2 = "metastakings_v2"
 METASTAKINGS_BOOSTED = "metastakings_boosted"
 FEES_COLLECTORS = "fees_collectors"
 GOVERNANCES = "governances"
+POSITION_CREATOR = "position_creator"
 
 
 def get_default_tokens_file():

@@ -2,26 +2,17 @@ import concurrent.futures
 import random
 import sys
 import time
-from itertools import count
 from typing import List
 from argparse import ArgumentParser
-
 import config
 from context import Context
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
-from events.event_generators import (generate_add_initial_liquidity_event,
-                                                       generate_add_liquidity_event,
-                                                       generateEnterFarmEvent,
-                                                       generateEnterMetastakeEvent,
-                                                       generateClaimMetastakeRewardsEvent,
-                                                       generateExitMetastakeEvent)
+from utils.account import Account
 from utils.utils_tx import ESDTToken
-from utils.utils_chain import nominated_amount, \
-    get_token_details_for_address
-from utils.utils_generic import log_step_fail, log_step_pass, log_condition_assert, TestStepConditions
+from utils.utils_chain import nominated_amount
+from utils.utils_generic import log_step_fail, log_step_pass, TestStepConditions
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from multiversx_sdk_cli.accounts import Account
 
 
 def main(cli_args: List[str]):

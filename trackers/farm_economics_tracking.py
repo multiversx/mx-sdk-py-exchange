@@ -1,10 +1,11 @@
 from typing import Dict
+from multiversx_sdk_core import Address
+from utils.account import Account
 from utils.contract_data_fetchers import FarmContractDataFetcher, ChainDataFetcher
 from utils.utils_tx import NetworkProviders
-from multiversx_sdk_cli.accounts import Account, Address
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
-                                                  ClaimRewardsFarmEvent, SetTokenBalanceEvent)
+                                ClaimRewardsFarmEvent, SetTokenBalanceEvent)
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
 from utils.utils_chain import get_current_tokens_for_address
@@ -158,7 +159,7 @@ class FarmAccountEconomics(Subscriber):
 class FarmEconomics(Subscriber):
 
     def __init__(self, contract_address: str, version: FarmContractVersion, network_provider: NetworkProviders):
-        self.contract_address = Address(contract_address)
+        self.contract_address = Address(contract_address, "erd")
         self.version = version
         self.network_provider = network_provider
         self.farm_data_fetcher = FarmContractDataFetcher(self.contract_address, network_provider.proxy.url)

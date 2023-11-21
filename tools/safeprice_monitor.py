@@ -2,14 +2,10 @@ import csv
 import sys
 import time
 from argparse import ArgumentParser
-
-import config
+from multiversx_sdk_core import Address
 from typing import List
-
 from context import Context
 from utils.contract_data_fetchers import PairContractDataFetcher
-from multiversx_sdk_cli.accounts import Address
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_padded_hex
 
 
@@ -34,9 +30,9 @@ def main(cli_args: List[str]):
     context = Context()
     pair_contract = context.get_pair_v2_contract(0)
     proxy = context.network_provider.proxy
-    contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), proxy.url)
+    contract_data_fetcher = PairContractDataFetcher(Address(pair_contract.address, "erd"), proxy.url)
     if args.view_contract:
-        view_data_fetcher = PairContractDataFetcher(Address(args.view_contract), proxy.url)
+        view_data_fetcher = PairContractDataFetcher(Address(args.view_contract, "erd"), proxy.url)
 
     esdt_token_payment_schema = {
         'token_identifier': 'string',
@@ -91,21 +87,21 @@ def main(cli_args: List[str]):
 
         if args.view_contract:
             hex_val = view_data_fetcher.get_data("getSafePriceByRoundOffset",
-                                                 [Address(pair_contract.address).pubkey(), 100,
+                                                 [Address(pair_contract.address, "erd").pubkey, 100,
                                                   bytes.fromhex(view_payload)])
             ten_min_avg: dict = zero_esdt_token_result
             if hex_val:
                 ten_min_avg = decode_merged_attributes(hex_val, esdt_token_payment_schema)
 
             hex_val = view_data_fetcher.get_data("getSafePriceByTimestampOffset",
-                                                 [Address(pair_contract.address).pubkey(), 600,
+                                                 [Address(pair_contract.address, "erd").pubkey, 600,
                                                   bytes.fromhex(view_payload)])
             ten_min_avg_2: dict = zero_esdt_token_result
             if hex_val:
                 ten_min_avg_2 = decode_merged_attributes(hex_val, esdt_token_payment_schema)
 
             hex_val = view_data_fetcher.get_data("getSafePriceByTimestampOffset",
-                                                 [Address(pair_contract.address).pubkey(), 1200,
+                                                 [Address(pair_contract.address, "erd").pubkey, 1200,
                                                   bytes.fromhex(view_payload)])
             twenty_min_avg: dict = zero_esdt_token_result
             if hex_val:

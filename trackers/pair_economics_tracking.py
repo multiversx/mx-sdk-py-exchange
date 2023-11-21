@@ -1,20 +1,17 @@
-from multiversx_sdk_cli.accounts import Address
+from multiversx_sdk_core import Address
 from utils.utils_tx import NetworkProviders
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep
-from contracts.pair_contract import (AddLiquidityEvent,
-                                                       RemoveLiquidityEvent,
-                                                       SwapFixedInputEvent,
-                                                       SwapFixedOutputEvent,
-                                                       SetCorrectReservesEvent)
+from contracts.pair_contract import AddLiquidityEvent, RemoveLiquidityEvent, \
+    SwapFixedInputEvent, SwapFixedOutputEvent, SetCorrectReservesEvent
 
 
 class PairEconomics(Subscriber):
 
     def __init__(self, contract_address: str, first_token: str, second_token: str, network_provider: NetworkProviders):
-        self.contract_address = Address(contract_address)
+        self.contract_address = Address(contract_address, "erd")
         self.network_provider = network_provider
         self.pair_data_fetcher = PairContractDataFetcher(self.contract_address, self.network_provider.proxy.url)
         self._get_tokens_reserve_and_total_supply()

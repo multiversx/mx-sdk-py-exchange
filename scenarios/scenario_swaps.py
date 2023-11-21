@@ -3,32 +3,20 @@ import random
 import sys
 import time
 import traceback
-
-import pytest
-from itertools import count
+from multiversx_sdk_core import Address
 from typing import List
 from argparse import ArgumentParser
-
 import config
 from context import Context
-from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract, AddLiquidityEvent
-from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
-from events.event_generators import (generate_add_initial_liquidity_event,
-                                                       generate_add_liquidity_event,
-                                                       generateEnterFarmEvent,
-                                                       generateEnterMetastakeEvent,
-                                                       generateClaimMetastakeRewardsEvent,
-                                                       generateExitMetastakeEvent, generate_swap_fixed_input)
-from utils.contract_data_fetchers import PairContractDataFetcher, SimpleLockEnergyContractDataFetcher
-from utils.utils_tx import ESDTToken
-from utils.utils_chain import nominated_amount, \
-    get_token_details_for_address, get_all_token_nonces_details_for_account
-from utils.utils_generic import log_step_fail, log_step_pass, log_condition_assert, TestStepConditions
+from events.event_generators import generate_swap_fixed_input
+from utils.account import Account
+from utils.contract_data_fetchers import PairContractDataFetcher
+from utils.utils_chain import nominated_amount
+from utils.utils_generic import log_step_fail, log_step_pass
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.send_egld_from_minter import main as send_egld_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from multiversx_sdk_cli.accounts import Account, Address
 
 
 def main(cli_args: List[str]):
@@ -83,7 +71,7 @@ def add_initial_liquidity(context: Context):
     # add initial liquidity
     pair_contract: PairContract
     for pair_contract in context.get_contracts(config.PAIRS):
-        pair_data_fetcher = PairContractDataFetcher(Address(pair_contract.address), context.network_provider.proxy.url)
+        pair_data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_contract.address), context.network_provider.proxy.url)
         first_token_liquidity = pair_data_fetcher.get_token_reserve(pair_contract.firstToken)
         if first_token_liquidity == 0:
             event = AddLiquidityEvent(
