@@ -3,13 +3,12 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List
-from multiversx_sdk_core import Transaction
-from ported_arrows.stress.contracts.transaction_builder import (number_as_arg,
-                                                         token_id_as_arg)
-from utils.account import Account
+from utils.utils_chain import Account
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
 from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk_core.transaction_builders import MultiESDTNFTTransferBuilder, DefaultTransactionBuildersConfiguration
+from multiversx_sdk_core import TokenPayment, Transaction
 
 
 def main(cli_args: List[str]):
@@ -33,19 +32,16 @@ def main(cli_args: List[str]):
 
     for account in accounts.get_all():
 
-        transaction = Transaction(
-            chain_id=network.chain_id,
-            sender=minter.address.bech32(),
-            receiver=account.address.bech32(),
-            gas_limit=250000 + 50000 + 1500 * len(transaction.data),
-        )
+        send_config = DefaultTransactionBuildersConfiguration(network.chain_id)
+        payments = [TokenPayment.fungible_from_integer(args.token, args.amount_atoms, 18)]
+        transaction = MultiESDTNFTTransferBuilder(
+            config=send_config,
+            sender=minter.address,
+            destination=account.address,
+            payments=payments,
+        ).build()
         transaction.nonce = minter.nonce
-        transaction.data = f"ESDTTransfer@{token_id_as_arg(args.token)}@{number_as_arg(args.amount_atoms)}"
-        transaction.value = "0"
-        transaction.gasPrice = network.min_gas_price
-        transaction.version = network.min_transaction_version
-        signature = minter.sign_transaction(transaction)
-        transaction.signature = signature
+        transaction.signature = minter.sign_transaction(transaction)
         minter.nonce += 1
 
         transactions.append(transaction)

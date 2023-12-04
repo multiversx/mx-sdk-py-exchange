@@ -9,7 +9,7 @@ from events.event_generators import (
     generate_swap_fixed_input)
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
 from ported_arrows.stress.shared import get_shard_of_address
-from utils.account import Account
+from utils.utils_chain import Account
 
 
 def main(cli_args: List[str]):

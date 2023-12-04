@@ -127,6 +127,7 @@ def send_egld(context: Context):
             f'--minter={minter}', f'--value-atoms={amount}']
     send_egld_from_minter(args)
     time.sleep(7)
+    context.admin_account.sync_nonce(context.network_provider.proxy)
 
 
 def send_tokens(context: Context):
@@ -137,6 +138,9 @@ def send_tokens(context: Context):
     for token in context.deploy_structure.tokens:
         amount_on_deployer = context.network_provider.proxy.get_fungible_token_of_account(
             context.admin_account.address, token).balance
+        
+        if amount_on_deployer == 0:
+            continue
 
         # divide the amount between all user accounts + deployer
         no_accounts = len(context.accounts.accounts) + 1
@@ -147,6 +151,8 @@ def send_tokens(context: Context):
                 f'--minter={minter}', f'--token={token}', f'--amount-atoms={amount}']
         send_token_from_minter(args)
         time.sleep(7)
+    
+    context.admin_account.sync_nonce(context.network_provider.proxy)
 
 
 def add_initial_liquidity(context: Context):
@@ -157,15 +163,16 @@ def add_initial_liquidity(context: Context):
         first_token_liquidity = pair_data_fetcher.get_token_reserve(pair_contract.firstToken)
         if first_token_liquidity == 0:
             event = AddLiquidityEvent(
-                pair_contract.firstToken, nominated_amount(1000000), 1,
-                pair_contract.secondToken, nominated_amount(1000000), 1
+                pair_contract.firstToken, nominated_amount(10), 1,
+                pair_contract.secondToken, nominated_amount(10), 1
             )
-            pair_contract.add_liquidity(context.network_provider, context.deployer_account, event)
+            pair_contract.add_initial_liquidity(context.network_provider, context.deployer_account, event)
             time.sleep(6)
 
 
 def stress(context: Context, threads: int, repeats: int):
-    accounts = context.accounts.get_in_shard(1)
+    deployer_shard = context.deployer_account.address.get_shard()
+    accounts = context.accounts.get_in_shard(deployer_shard)
 
     context.swap_min_tokens_to_spend = 0.0001
     context.swap_max_tokens_to_spend = 0.001
@@ -210,7 +217,7 @@ def stress_per_account(context: Context, account: Account):
 
     account.sync_nonce(context.network_provider.proxy)
 
-    for metastaking_contract in context.get_contracts(config.METASTAKINGS_BOOSTED):
+    for metastaking_contract in context.get_contracts(config.METASTAKINGS_V2):
         farm_contract = context.get_farm_contract_by_address(metastaking_contract.farm_address)
         pair_contract = context.get_pair_contract_by_address(metastaking_contract.lp_address)
 

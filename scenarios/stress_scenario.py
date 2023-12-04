@@ -12,7 +12,7 @@ from events.event_generators import generate_add_liquidity_event, \
     generateRandomCompoundRewardsEvent, generateRandomCompoundRewardsProxyEvent, \
     generateRandomEnterFarmEvent, generateRandomEnterFarmProxyEvent, generateRandomExitFarmEvent, \
     generateRandomExitFarmProxyEvent, generateRemoveLiquidityProxyEvent
-from utils.account import Account
+from utils.utils_chain import Account
 
 
 def main():

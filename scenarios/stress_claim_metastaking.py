@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from typing import List
 from multiversx_sdk_core import Address, Transaction
 from ported_arrows.stress.contracts.transaction_builder import number_as_arg, string_as_arg
-from utils.account import Account
+from utils.utils_chain import Account
 from utils.utils_tx import broadcast_transactions
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from multiversx_sdk_network_providers.network_config import NetworkConfig

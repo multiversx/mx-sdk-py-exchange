@@ -74,7 +74,7 @@ class EgldWrapContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "unpause", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
-        pass
+        self.resume(deployer, proxy)
 
     def print_contract_info(self):
         log_step_pass(f"Deployed egld wrapper contract: {self.address}")
