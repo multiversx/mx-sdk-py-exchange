@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 import config
 from context import Context
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
-from utils.account import Account
+from utils.utils_chain import Account
 from utils.utils_tx import ESDTToken
 from utils.utils_chain import nominated_amount
 from utils.utils_generic import log_step_fail, log_step_pass, TestStepConditions

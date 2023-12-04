@@ -1,6 +1,6 @@
 from typing import Dict
 from multiversx_sdk_core import Address
-from utils.account import Account
+from utils.utils_chain import Account
 from utils.contract_data_fetchers import FarmContractDataFetcher, ChainDataFetcher
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep

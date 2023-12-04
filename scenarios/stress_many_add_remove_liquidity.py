@@ -8,7 +8,7 @@ from multiversx_sdk_core import Address, Transaction
 
 from ported_arrows.stress.contracts.transaction_builder import \
     transfer_multi_esdt_and_execute
-from utils.account import Account
+from utils.utils_chain import Account
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider

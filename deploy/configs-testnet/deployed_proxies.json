@@ -1,12 +1,12 @@
 [
     {
-        "token": "MEX-4638e4",
+        "token": "MEX-708726",
         "locked_tokens": [
-            "LKMEX-e5a4a8"
+            "LKMEX-828c89"
         ],
-        "proxy_farm_token": "LKFARM-8bd1b0",
-        "proxy_lp_token": "LKLP-8507c4",
-        "address": "erd1qqqqqqqqqqqqqpgq7kl4lj75v4g33jc0e2snhzk6rzwfank3295qsuz7mk",
+        "proxy_farm_token": "LKFARM-72faa3",
+        "proxy_lp_token": "LKLP-035d67",
+        "address": "erd1qqqqqqqqqqqqqpgqyxu6kgfxmw22zx5atyal4vtpwkc62v86exkshygpfx",
         "version": 1
     }
 ]

@@ -5,7 +5,7 @@ from os import path
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, cast
 from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
-from multiversx_sdk_core import Address, Transaction
+from multiversx_sdk_core import Address, Transaction, MessageV1
 from multiversx_sdk_core.interfaces import ISignature
 from multiversx_sdk_wallet.user_signer import UserSigner
 from multiversx_sdk_wallet.pem_entry import PemEntry
@@ -60,7 +60,16 @@ class Account:
         logger.debug(f"Account.sync_nonce() done: {self.nonce}")
 
     def sign_transaction(self, transaction: Transaction) -> ISignature:
+        assert self.signer is not None
         return self.signer.sign(transaction)
+    
+    def sign_message(self, data: bytes) -> ISignature:
+        assert self.signer is not None
+        message = MessageV1(data)
+        signature = self.signer.sign(message)
+
+        logger.debug(f"Account.sign_message(): raw_data_to_sign = {data.hex()}, message_data_to_sign = {message.serialize_for_signing().hex()}, signature = {signature.hex()}")
+        return signature
 
 
 class BunchOfAccounts:

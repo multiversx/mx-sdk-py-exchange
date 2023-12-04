@@ -151,14 +151,17 @@ class StakingContract(DEXContractInterface):
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=False, readable=True)
         gas_limit = 200000000
 
-        arguments = [
-            self.farming_token,
-            1000000000000,
-            self.max_apr,
-            self.unbond_epochs,
-        ]
-        if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
-            arguments.extend(args)
+        if no_init:
+            arguments = []
+        else:
+            arguments = [
+                self.farming_token,
+                1000000000000,
+                self.max_apr,
+                self.unbond_epochs,
+            ]
+            if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
+                arguments.extend(args)
 
         return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                             bytecode_path, metadata, arguments)

@@ -10,7 +10,7 @@ import config
 from context import Context
 from contracts.pair_contract import PairContract, AddLiquidityEvent
 from events.event_generators import generate_swap_fixed_input
-from utils.account import Account
+from utils.utils_chain import Account
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import nominated_amount
 from utils.utils_generic import log_step_fail, log_step_pass

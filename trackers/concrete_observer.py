@@ -1,6 +1,6 @@
 from typing import List, Any
 from trackers.abstract_observer import Publisher, Subscriber
-from utils.account import Account
+from utils.utils_chain import Account
 from contracts.contract_identities import DEXContractInterface
 
 
