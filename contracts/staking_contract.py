@@ -139,7 +139,7 @@ class StakingContract(DEXContractInterface):
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
-                         yes: bool = True):
+                         no_init: bool = True):
         """Expecting as args:percent
         type[str]: owner address - only from v2
         type[str]: admin address - only from v2
