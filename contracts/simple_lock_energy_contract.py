@@ -306,6 +306,28 @@ class SimpleLockEnergyContract(DEXContractInterface):
         
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
                              "removeFromTokenTransferWhitelist", sc_args)
+    
+    def set_energy_for_old_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: address
+            type[int]: token_amount
+            type[int]: energy_amount
+        """
+        function_purpose = "Set energy for old tokens in simple lock energy contract"
+        logger.info(function_purpose)
+
+        if len(args) != 3:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 50000000
+        sc_args = [
+            Address(args[0]),
+            args[1],
+            args[2]
+        ]
+        
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyForOldTokens", sc_args)
 
     def lock_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:

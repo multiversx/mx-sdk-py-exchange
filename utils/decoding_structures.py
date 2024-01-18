@@ -11,6 +11,11 @@ ENERGY_ENTRY = {
     'total_locked_tokens': 'biguint',
 }
 
+USER_CLAIM_PROGRESS = {
+    'energy': 'biguint',
+    'week': 'u32'
+}
+
 ESDT_TOKEN_PAYMENT = {
     'token_identifier': 'string',
     'token_nonce': 'u64',

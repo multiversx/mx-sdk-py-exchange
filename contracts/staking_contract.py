@@ -102,6 +102,16 @@ class StakingContract(DEXContractInterface):
         sc_args = [tokens]
         return multi_esdt_endpoint_call(claim_fn, network_provider.proxy, gas_limit, user,
                                         Address(self.address), claim_fn, sc_args)
+    
+    def claim_boosted_rewards(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsFarmEvent) -> str:
+        claim_fn = 'claimBoostedRewards'
+        logger.info(f"{claim_fn}")
+        logger.debug(f"Account: {user.address} claiming for {event.user}")
+
+        gas_limit = 50000000
+
+        sc_args = [Address(event.user)] if event.user else []
+        return endpoint_call(network_provider.proxy, gas_limit, user, Address(self.address), claim_fn, sc_args)
 
     def compound_rewards(self, network_provider: NetworkProviders, user: Account, event: CompoundRewardsFarmEvent) -> str:
         compound_fn = 'compoundRewards'
@@ -113,9 +123,18 @@ class StakingContract(DEXContractInterface):
         sc_args = [tokens]
         return multi_esdt_endpoint_call(compound_fn, network_provider.proxy, gas_limit, user,
                                         Address(self.address), compound_fn, sc_args)
+    
+    def allow_external_claim(self, network_provider: NetworkProviders, user: Account) -> str:
+        fn = 'allowExternalClaimBoostedRewards'
+        logger.info(f"{fn}")
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 20000000
+
+        return endpoint_call(network_provider.proxy, gas_limit, user, Address(self.address), fn, [])
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
-        """Expecting as args:percent
+        """Expecting as args:
         type[str]: owner address - only from v2
         type[str]: admin address - only from v2
         self.version has to be initialized to correctly attempt the deploy for that specific type of farm.
@@ -139,8 +158,8 @@ class StakingContract(DEXContractInterface):
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
-                         no_init: bool = True):
-        """Expecting as args:percent
+                         no_init: bool = False):
+        """Expecting as args:
         type[str]: owner address - only from v2
         type[str]: admin address - only from v2
         self.version has to be initialized to correctly attempt the deploy for that specific type of farm.
@@ -214,6 +233,18 @@ class StakingContract(DEXContractInterface):
         sc_args = [tokens]
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, deployer,
                                         Address(self.address), "topUpRewards", sc_args)
+    
+    def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
+        function_purpose = "Set energy factory address in stake contract"
+        logger.info(function_purpose)
+
+        if energy_address == "":
+            log_unexpected_args(function_purpose, energy_address)
+            return ""
+
+        gas_limit = 50000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
+                             [energy_address])
 
     def set_boosted_yields_factors(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """Only V3Boosted.

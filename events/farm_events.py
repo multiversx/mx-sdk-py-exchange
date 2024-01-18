@@ -22,11 +22,11 @@ class ExitFarmEvent:
 
 
 class ClaimRewardsFarmEvent:
-    def __init__(self, amount: int, nonce: int, attributes):
+    def __init__(self, amount: int, nonce: int, attributes: str, user: str = None):
         self.amount = amount
         self.nonce = nonce
         self.attributes = attributes
-
+        self.user = user
 
 class CompoundRewardsFarmEvent:
     def __init__(self, amount: int, nonce: int):

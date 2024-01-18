@@ -3,7 +3,7 @@ import traceback
 
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, endpoint_call
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, endpoint_call, upgrade_call
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
 from multiversx_sdk_core import CodeMetadata
@@ -49,6 +49,35 @@ class FeesCollectorContract(DEXContractInterface):
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
 
         return tx_hash, address
+    
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None,
+                         no_init: bool = False):
+        """ Expected as args:
+            type[str]: locked token
+            type[str]: energy factory address
+        """
+        function_purpose = f"upgrade {type(self).__name__} contract"
+        logger.info(function_purpose)
+
+        if len(args) != 2 and not no_init:
+            log_unexpected_args(function_purpose, args)
+            return "", ""
+
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
+        gas_limit = 200000000
+
+        if no_init:
+            arguments = []
+        else:
+            arguments = [
+                args[0],
+                Address(args[1])
+            ]
+
+        tx_hash = upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
+                                        bytecode_path, metadata, arguments)
+
+        return tx_hash
 
     def add_known_contracts(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:

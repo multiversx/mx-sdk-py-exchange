@@ -176,6 +176,12 @@ class FarmContractDataFetcher(DataFetcher):
             "getState": self._get_int_view,
             "getPairContractManagedAddress": self._get_hex_view,
             "getUserTotalFarmPosition": self._get_hex_view,
+            "getUserEnergyForWeek": self._get_hex_view,
+            "getCurrentWeek": self._get_int_view,
+            "getLastActiveWeekForUser": self._get_int_view,
+            "getTotalLockedTokensForWeek": self._get_int_view,
+            "getTotalEnergyForWeek": self._get_int_view,
+            "getCurrentClaimProgress": self._get_hex_view,
         }
 
 
