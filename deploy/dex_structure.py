@@ -167,7 +167,7 @@ class DeployStructure:
                                   self.staking_deploy, False),
             config.STAKINGS_V2:
                 ContractStructure(config.STAKINGS_V2, StakingContract, config.STAKING_V2_BYTECODE_PATH,
-                                  self.staking_deploy, True),
+                                  self.staking_deploy, False),
             config.STAKINGS_BOOSTED:
                 ContractStructure(config.STAKINGS_BOOSTED, StakingContract, config.STAKING_V3_BYTECODE_PATH,
                                   self.staking_deploy, False),

@@ -1,0 +1,11 @@
+[
+    {
+        "farming_token": "TADA-5c032c",
+        "farm_token": "STADA-833615",
+        "address": "erd1qqqqqqqqqqqqqpgqnyq8k8nfurx5rz7zxudfeeqm983uw2tvkp2shvf2ls",
+        "max_apr": 500,
+        "rewards_per_block": 690000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    }
+]
