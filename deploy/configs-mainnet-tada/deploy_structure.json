@@ -221,7 +221,7 @@
             "farm_token": "TADAEGLDFL",
             "farm_token_name": "TADAEGLDLPStakedLK",
             "farmed_token": 0,
-            "rpb": 22000000000000000000000,
+            "rpb": 10660000000000000000000,
             "penalty": 300,
             "min_farming_epochs": 7,
             "lock_factory": 0,
