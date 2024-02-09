@@ -1,0 +1,87 @@
+{   
+    "token": 
+        {
+            "token_prefix": "E2ETK7",
+            "number_of_tokens": 1
+        },
+
+    "locked_assets": [
+    ],
+
+    "simple_locks": [
+
+    ],
+
+    "simple_locks_energy": [
+    ],
+
+    "fees_collectors": [
+    ],
+
+    "unstakers": [
+    ],
+
+    "proxies": [
+    ],
+
+    "proxies_v2": [
+    ],
+
+    "router": [
+
+    ],
+
+    "router_v2": [
+    ],
+
+    "pairs": [
+    ],
+
+    "pairs_v2": [
+    ],
+
+    "farms_community": [
+
+    ],
+
+    "farms_unlocked": [
+
+    ],
+
+    "farms_locked": [
+
+    ],
+
+    "proxy_deployers": [
+
+    ],
+
+    "farms_boosted": [
+    ],
+
+    "price_discoveries": [
+
+    ],
+
+    "stakings": [
+
+    ],
+
+    "stakings_v2": [
+        {
+            "staking_token": 0,
+            "stake_token": "STADA",
+            "stake_token_name": "STADA",
+            "apr": 500,
+            "rpb": 690000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 0
+        }
+    ],
+
+    "metastakings": [
+    ],
+
+    "metastakings_v2": [
+    ]
+}
