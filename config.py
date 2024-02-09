@@ -16,13 +16,13 @@ DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
 DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
-DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
+DEX_OWNER_ADDRESS = "erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97"  # Only needed for shadowforks
 
 # Used DEX deploy configuration
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-mainnet-hatom"   # Deploy configuration folder
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-mainnet-tada"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
-FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations
+FORCE_CONTINUE_PROMPT = True                                               # Force continue prompt for all operations
 
 # DEX contract bytecode paths
 EGLD_WRAP_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-bridge-elrond" / "egld-esdt-swap" / "output" / "egld-wrap.wasm"
