@@ -115,7 +115,7 @@ class PairContract(DEXContractInterface):
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
                                         user, Address(self.address), "swapTokensFixedOutput", sc_args)
 
-    def add_liquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
+    def add_liquidity(self, proxy: ProxyNetworkProvider, user: Account, event: AddLiquidityEvent):
         function_purpose = f"addLiquidity"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
@@ -128,7 +128,7 @@ class PairContract(DEXContractInterface):
             event.amountBmin,
         ]
 
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, 20000000,
+        return multi_esdt_endpoint_call(function_purpose, proxy, 20000000,
                                         user, Address(self.address), "addLiquidity", sc_args)
 
     def add_initial_liquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
@@ -426,7 +426,9 @@ class PairContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setStateActiveNoSwaps", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+        add_liquidity_event = AddLiquidityEvent(self.firstToken, 1000000000000000000000000000, 1, self.secondToken, 1000000000000000000000000000, 1)
         _ = self.resume(deployer, proxy)
+        _ = self.add_liquidity(proxy, deployer, add_liquidity_event)
 
     def print_contract_info(self):
         log_step_pass(f"Deployed pair contract: {self.address}")

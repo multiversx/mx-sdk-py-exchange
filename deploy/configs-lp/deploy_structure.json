@@ -1,0 +1,25 @@
+{   
+    "token": 
+        {
+            "token_prefix": "TKN1",
+            "number_of_tokens": 2
+        },
+
+    "router_v2": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "pairs_v2": [
+        {
+            "launched_token": 1,
+            "accepted_token": 0,
+            "lp_token": "LPTKN",
+            "lp_token_name": "LPTKN",
+            "fee_token": 0,
+            "total_fee": 300,
+            "special_fee": 100
+        }
+    ]
+}

@@ -29,7 +29,7 @@ def main(cli_args: List[str]):
     parser.add_argument("--num-decimals", type=int, default=18)
     parser.add_argument("--supply-exp", type=int, default=27)
     parser.add_argument("--tokens-prefix", default=config.DEFAULT_TOKEN_PREFIX)
-    parser.add_argument("--value", default=str(config.DEFAULT_ISSUE_TOKEN_PRICE))
+    parser.add_argument("--value", default=int(config.DEFAULT_ISSUE_TOKEN_PRICE))
     parser.add_argument("--yes", action="store_true", default=False)
     parser.add_argument("--mode", choices=["direct", "via"], default="direct")
 

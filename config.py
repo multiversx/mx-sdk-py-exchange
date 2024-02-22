@@ -20,10 +20,10 @@ DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
 DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-devnet"   # Deploy configuration folder
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-lp"   # Deploy configuration folder
 DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
 
-FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations
+FORCE_CONTINUE_PROMPT = True                                               # Force continue prompt for all operations
 
 # DEX contract bytecode paths
 EGLD_WRAP_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-bridge-elrond" / "egld-esdt-swap" / "output" / "egld-wrap.wasm"
