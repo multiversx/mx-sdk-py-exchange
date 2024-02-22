@@ -426,7 +426,7 @@ class PairContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setStateActiveNoSwaps", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
-        add_liquidity_event = AddLiquidityEvent(self.firstToken, 1000000000000000000000000000, 1, self.secondToken, 1000000000000000000000000000, 1)
+        add_liquidity_event = AddLiquidityEvent(self.firstToken, 10000000000000000000000000, 1, self.secondToken, 10000000000000000000000000, 1)
         _ = self.resume(deployer, proxy)
         _ = self.add_liquidity(proxy, deployer, add_liquidity_event)
 

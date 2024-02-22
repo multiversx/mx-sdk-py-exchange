@@ -75,7 +75,7 @@ class NetworkProviders:
         # due to API data propagation delays, some transactions may not be indexed yet at the time of the request
         results = None
         try:
-            results = self.api.get_transaction_status(tx_hash)
+            results = self.proxy.get_transaction_status(tx_hash)
         except GenericError as e:
             logger.debug(f"Transaction not found. Exception: {e.data}")
             if e.data['statusCode'] == 404:
@@ -83,7 +83,7 @@ class NetworkProviders:
                 logger.debug(f"Transaction {tx_hash} not indexed yet, "
                              f"trying again in {API_TX_STATUS_REFETCH_DELAY} seconds...")
                 time.sleep(API_TX_STATUS_REFETCH_DELAY)
-                results = self.api.get_transaction_status(tx_hash)
+                results = self.proxy.get_transaction_status(tx_hash)
         return results
 
     def wait_for_tx_executed(self, tx_hash: str) -> Union[None, TransactionStatus]:
@@ -93,7 +93,7 @@ class NetworkProviders:
             return None
         while not status.is_executed():
             time.sleep(API_TX_STATUS_REFETCH_DELAY)
-            status = self.api.get_transaction_status(tx_hash)
+            status = self.proxy.get_transaction_status(tx_hash)
             logger.debug(f"Transaction {tx_hash} status: {status.status}")
         return status
 
