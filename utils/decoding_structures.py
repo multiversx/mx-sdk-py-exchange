@@ -49,3 +49,9 @@ FARM_TOKEN_ATTRIBUTES = {
     'current_farm_amount': 'biguint',
     'original_owner': 'address',
 }
+
+XMEX_ATTRIBUTES = {
+    'original_token_id': 'string',
+    'original_token_nonce': 'u64',
+    'unlock_epoch': 'u64',
+}

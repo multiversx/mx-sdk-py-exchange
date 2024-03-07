@@ -472,5 +472,21 @@
             "metastake_token": "METACRTLK",
             "metastake_token_name": "MetaStakedCRTLK"
         }
+    ],
+
+    "escrows": [
+        {
+            "lock_factory": 0,
+            "lock_epochs": 30,
+            "cooldown_epochs": 30
+        }
+    ],
+
+    "lk_wraps": [
+        {
+            "lock_factory:": 0,
+            "wrapped_token": "WXMEX",
+            "wrapped_token_name": "WrappedXMEX"
+        }
     ]
 }

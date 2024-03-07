@@ -437,7 +437,7 @@ def log_explorer(proxy: str, name: str, path: str, details: str):
         explorer_name, explorer_url = networks[proxy]
         logger.info(f"View this {name} in the {explorer_name}: {explorer_url}/{path}/{details}")
     except KeyError:
-        logger.info(f"No explorer known for {proxy}. {name} raw path: {path}/{details}")
+        logger.info(f"No explorer known for {proxy}. {name} raw path: {proxy}/transaction/{details}")
 
 
 def log_explorer_contract_address(address: str, proxy_url: str):

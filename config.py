@@ -5,8 +5,8 @@ DEFAULT_WORKSPACE = Path(__file__).parent
 
 # ------------ For normal operation, modify below ------------ #
 # Used net
-DEFAULT_PROXY = "https://proxy-shadowfork-four.elrond.ro"                     # Proxy to be used for ALL operations
-DEFAULT_API = "https://express-api-shadowfork-four.elrond.ro"                           # API to be used for ALL operations
+DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"                     # Proxy to be used for ALL operations
+DEFAULT_API = "https://devnet-api.multiversx.com"                           # API to be used for ALL operations
 GRAPHQL = 'https://graph.xexchange.com/graphql'                              # GraphQL service; only needed for the upgrader scripts
 HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
 # TODO: try to override the default issue token price with testnet definition to tidy code up
@@ -16,8 +16,8 @@ DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
 DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
-DEX_OWNER_ADDRESS = "erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97"  # Only needed for shadowforks
-DEX_ADMIN_ADDRESS = "erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97"  # Only needed for shadowforks
+DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
+DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration
 DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-mainnet"   # Deploy configuration folder
@@ -54,6 +54,8 @@ FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2"
 FARM_V3_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "farm-with-locked-rewards.wasm"
 GOVERNANCE_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "energy-integration" / "governance-v2" / "output" / "governance-v2.wasm"
 POSITION_CREATOR_BYTECODE_PATH = Path().home() / "MultiversX/mx-exchange-tools-sc/auto-pos-creator/output" / "auto-pos-creator.wasm"
+ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "lkmex-transfer.wasm"
+LK_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-wrapper.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
@@ -100,6 +102,8 @@ METASTAKINGS_BOOSTED = "metastakings_boosted"
 FEES_COLLECTORS = "fees_collectors"
 GOVERNANCES = "governances"
 POSITION_CREATOR = "position_creator"
+ESCROWS = "escrows"
+LK_WRAPS = "lk_wraps"
 
 
 def get_default_tokens_file():

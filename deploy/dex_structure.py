@@ -4,14 +4,16 @@ from pathlib import Path
 from typing import List, Type, Dict, Optional
 
 import config
+from contracts.escrow_contract import EscrowContract
 from contracts.fees_collector_contract import FeesCollectorContract
+from contracts.lk_wrap_contract import LkWrapContract
 from contracts.position_creator_contract import PositionCreatorContract
 from contracts.proxy_deployer_contract import ProxyDeployerContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.unstaker_contract import UnstakerContract
 from deploy import sync_tokens, issue_tokens
 from deploy.tokens_tracks import BunchOfTracks
-from utils.contract_data_fetchers import PairContractDataFetcher, PriceDiscoveryContractDataFetcher, \
+from utils.contract_data_fetchers import LkWrapContractDataFetcher, PairContractDataFetcher, PriceDiscoveryContractDataFetcher, \
     SimpleLockContractDataFetcher, LockedAssetContractDataFetcher, FarmContractDataFetcher, StakingContractDataFetcher, \
     MetaStakingContractDataFetcher, ProxyContractDataFetcher, SimpleLockEnergyContractDataFetcher
 from contracts.builtin_contracts import ESDTContract
@@ -217,6 +219,12 @@ class DeployStructure:
             config.POSITION_CREATOR:
                 ContractStructure(config.POSITION_CREATOR, PositionCreatorContract, config.POSITION_CREATOR_BYTECODE_PATH,
                                   self.position_creator_deploy, False),
+            config.ESCROWS:
+                ContractStructure(config.ESCROWS, EscrowContract, config.ESCROW_BYTECODE_PATH,
+                                  self.escrow_deploy, False),
+            config.LK_WRAPS:
+                ContractStructure(config.LK_WRAPS, LkWrapContract, config.LK_WRAP_BYTECODE_PATH,
+                                  self.lk_wrap_deploy, False),
         }
 
     # main entry method to deploy tokens (either deploy fresh ones or reuse existing ones)
@@ -1837,8 +1845,9 @@ class DeployStructure:
                     return
 
             # topup rewards
-            tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
-            _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
+            if topup_rewards > 0:
+                tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
+                _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
 
             deployed_contracts.append(deployed_staking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -1971,4 +1980,73 @@ class DeployStructure:
             log_step_pass(f"Position creator contract address: {contract_address}")
             position_creator_contract.address = contract_address
             deployed_contracts.append(position_creator_contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def escrow_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        
+        for contract_config in contract_structure.deploy_structure_list:
+            locking_contract: Optional[SimpleLockEnergyContract] = None
+            locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                contract_config.get('lock_factory', 0)
+            )
+            lock_epochs = contract_config.get('lock_epochs', 30)
+            cooldown_epochs = contract_config.get('cooldown_epochs', 30)
+            
+            contract = EscrowContract()
+            tx_hash, contract_address = contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    locking_contract.address,
+                    locking_contract.locked_token,
+                    lock_epochs,
+                    cooldown_epochs
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "escrow contract"):
+                return
+            log_step_pass(f"escrow contract address: {contract_address}")
+            contract.address = contract_address
+            deployed_contracts.append(contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def lk_wrap_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for contract_config in contract_structure.deploy_structure_list:
+            locking_contract: Optional[SimpleLockEnergyContract] = None
+            locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                contract_config.get('lock_factory', 0)
+            )
+            wrapped_token = contract_config['wrapped_token']
+            wrapped_token_name = contract_config['wrapped_token_name']
+
+            contract = LkWrapContract()
+            tx_hash, contract_address = contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    locking_contract.address
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "position creator contract"):
+                return
+            log_step_pass(f"Lk Token Wrapping contract address: {contract_address}")
+            contract.address = contract_address
+
+            # register wrapped token and save it
+            tx_hash = contract.issue_wrapped_token(deployer_account, network_providers.proxy,
+                                                       [wrapped_token_name, wrapped_token])
+            if not network_providers.check_complex_tx_status(tx_hash, "register wrapped token"): return
+            wrapped_token_hex = LkWrapContractDataFetcher(Address(contract.address),
+                                                          network_providers.proxy.url).get_data("getWrappedTokenId")
+            contract.wrapped_token = hex_to_string(wrapped_token_hex)
+
+            deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts

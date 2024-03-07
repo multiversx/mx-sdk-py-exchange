@@ -276,6 +276,14 @@ class LiquidLockingContractDataFetcher(DataFetcher):
         }
 
 
+class LkWrapContractDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "getWrappedTokenId": self._get_hex_view,
+        }
+
+
 class ChainDataFetcher:
     def __init__(self, proxy_url: str):
         self.proxy = ProxyNetworkProvider(proxy_url)
