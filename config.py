@@ -5,8 +5,8 @@ DEFAULT_WORKSPACE = Path(__file__).parent
 
 # ------------ For normal operation, modify below ------------ #
 # Used net
-DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"                     # Proxy to be used for ALL operations
-DEFAULT_API = "https://devnet-api.multiversx.com"                           # API to be used for ALL operations
+DEFAULT_PROXY = "https://gateway.multiversx.com"                     # Proxy to be used for ALL operations
+DEFAULT_API = "https://api.multiversx.com"                           # API to be used for ALL operations
 GRAPHQL = 'https://graph.xexchange.com/graphql'                              # GraphQL service; only needed for the upgrader scripts
 HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
 # TODO: try to override the default issue token price with testnet definition to tidy code up
@@ -54,8 +54,8 @@ FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2"
 FARM_V3_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "farm-with-locked-rewards.wasm"
 GOVERNANCE_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "energy-integration" / "governance-v2" / "output" / "governance-v2.wasm"
 POSITION_CREATOR_BYTECODE_PATH = Path().home() / "MultiversX/mx-exchange-tools-sc/auto-pos-creator/output" / "auto-pos-creator.wasm"
-ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "lkmex-transfer.wasm"
-LK_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-wrapper.wasm"
+ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "lkmex-transfer.wasm"
+LK_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "locked-token-wrapper.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
