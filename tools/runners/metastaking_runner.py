@@ -16,12 +16,14 @@ OUTPUT_METASTAKING_CONTRACTS_FILE = OUTPUT_FOLDER / "metastaking_data.json"
 def add_parsed_arguments(parser: ArgumentParser):
     """Add arguments to the parser"""
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
+    parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after upgrade')
+    parser.add_argument('--address', type=str, help='metastaking contract address')
     mutex = parser.add_mutually_exclusive_group()
     mutex.add_argument('--fetch-all', action='store_true',
-        help='fetch metastakings from blockchain')
+                       help='fetch metastakings from blockchain')
     mutex.add_argument('--upgrade-all', action='store_true', help='upgrade all metastakings')
+    mutex.add_argument('--upgrade', action='store_true', help='upgrade metastaking contract by address')
 
 
 def handle_command(args):
@@ -31,6 +33,8 @@ def handle_command(args):
         fetch_and_save_metastakings_from_chain()
     elif args.upgrade_all:
         upgrade_metastaking_contracts(args.compare_states)
+    elif args.upgrade:
+        upgrade_metastaking_contract(args.address, args.compare_states)
     else:
         print('invalid arguments')
 
@@ -90,6 +94,39 @@ def upgrade_metastaking_contracts(compare_states: bool = False):
             return
 
         count += 1
+
+
+def upgrade_metastaking_contract(metastaking_address: str, compare_states: bool = False):
+    """Upgrade metastaking contract by address"""
+
+    print(f"Upgrade metastaking contract {metastaking_address}")
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    if compare_states:
+        print("Fetching contracts states before upgrade...")
+        fetch_contracts_states("pre", network_providers, [metastaking_address], METASTAKINGS_LABEL)
+
+    if not get_user_continue():
+        return
+
+    metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, MetaStakingContractVersion.V2)
+
+    metastaking_contract.version = MetaStakingContractVersion.V3Boosted
+    tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
+                                                    config.STAKING_PROXY_V3_BYTECODE_PATH, [], True)
+
+    if not network_providers.check_complex_tx_status(tx_hash,
+                                                     f"upgrade metastaking contract: {metastaking_address}"):
+        if not get_user_continue():
+            return
+
+    if compare_states:
+        fetch_new_and_compare_contract_states(METASTAKINGS_LABEL, metastaking_address, network_providers)
+
+    if not get_user_continue():
+        return
 
 
 def get_metastaking_addresses_from_chain() -> list:
