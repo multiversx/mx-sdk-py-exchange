@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
 import json
 import os
+
+from multiversx_sdk_core import Address
 from config import GRAPHQL
 from contracts.contract_identities import FarmContractVersion
 from contracts.farm_contract import FarmContract
@@ -25,18 +27,23 @@ OUTPUT_FARMV2_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv2_data.json"
 def add_parsed_arguments(parser: ArgumentParser):
     """Add arguments to the parser"""
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
+    parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after upgrade')
+    parser.add_argument('--address', type=str, help='farm contract address')
     mutex = parser.add_mutually_exclusive_group()
     mutex.add_argument('--fetch-all', action='store_true',
-        help='fetch farms from blockchain')
+                       help='fetch farms from blockchain')
     mutex.add_argument('--pause-all', action='store_true', help='pause all farms')
+    mutex.add_argument('--pause', action='store_true', help='pause farm by address')
     mutex.add_argument('--resume-all', action='store_true', help='resume all farms')
+    mutex.add_argument('--resume', action='store_true', help='resume farm by address')
     mutex.add_argument('--upgrade-all-v1_2', action='store_true', help='upgrade all v1.2 farms')
     mutex.add_argument('--upgrade-all-v1_3', action='store_true',
                        help='upgrade all v1.3 farms')
     mutex.add_argument('--upgrade-all-v2', action='store_true',
                        help='upgrade all v2 farms')
+    mutex.add_argument('--upgrade', action='store_true',
+                       help='upgrade farm contract by address')
     mutex.add_argument('--set-transfer-role', action='store_true',
                        help='set transfer role for v1.3 farms')
     mutex.add_argument('--stop-produce-rewards', action='store_true',
@@ -53,14 +60,20 @@ def handle_command(args):
         fetch_and_save_farms_from_chain()
     elif args.pause_all:
         pause_farm_contracts()
+    elif args.pause:
+        pause_farm_contract(args.address)
     elif args.resume_all:
         resume_farm_contracts()
+    elif args.resume:
+        resume_farm_contract(args.address)
     elif args.upgrade_all_v1_2:
         upgrade_farmv12_contracts()
     elif args.upgrade_all_v1_3:
         upgrade_farmv13_contracts()
     elif args.upgrade_all_v2:
         upgrade_farmv2_contracts(args.compare_states)
+    elif args.upgrade:
+        upgrade_farmv2_contract(args.compare_states, args.address)
     elif args.set_transfer_role:
         set_transfer_role_farmv13_contracts()
     elif args.stop_produce_rewards:
@@ -120,6 +133,28 @@ def pause_farm_contracts():
         count += 1
 
 
+def pause_farm_contract(farm_address: str):
+    """Pause farm contract"""
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    print(f"Pausing farm contract {farm_address} ...")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    data_fetcher = FarmContractDataFetcher(Address.from_bech32(farm_address), network_providers.proxy.url)
+    contract_state = data_fetcher.get_data("getState")
+    contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
+    if contract_state != 0:
+        tx_hash = contract.pause(dex_owner, network_providers.proxy)
+        if not network_providers.check_simple_tx_status(tx_hash, f"pause farm contract: {farm_address}"):
+            if not get_user_continue():
+                return
+    else:
+        print(f"Contract {farm_address} already inactive. Current state: {contract_state}")
+
+
 def resume_farm_contracts():
     """Resume all farms"""
 
@@ -129,7 +164,7 @@ def resume_farm_contracts():
     dex_owner = get_owner(network_providers.proxy)
 
     if not os.path.exists(OUTPUT_PAUSE_STATES):
-        print("Contract initial states not found!" \
+        print("Contract initial states not found!"
               " Cannot proceed safely without altering initial state.")
         return
 
@@ -161,6 +196,40 @@ def resume_farm_contracts():
                   f"{contract_states[farm_address]}")
 
         count += 1
+
+
+def resume_farm_contract(farm_address: str):
+    """Resume farm contract"""
+
+    print(f"Resuming farm {farm_address} ...")
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    if not os.path.exists(OUTPUT_PAUSE_STATES):
+        print("Contract initial states not found!"
+              " Cannot proceed safely without altering initial state.")
+        return
+
+    with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
+        contract_states = json.load(reader)
+
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    if farm_address not in contract_states:
+        print(f"Contract {farm_address} wasn't touched for no available initial state!")
+        return
+    # resume only if the farm contract was active
+    if contract_states[farm_address] == 1:
+        contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
+        tx_hash = contract.resume(dex_owner, network_providers.proxy)
+        if not network_providers.check_simple_tx_status(tx_hash, f"resume farm contract: {farm_address}"):
+            if not get_user_continue():
+                return
+    else:
+        print(f"Contract {farm_address} wasn't touched because of initial state: "
+              f"{contract_states[farm_address]}")
 
 
 def upgrade_farmv12_contracts():
@@ -264,6 +333,39 @@ def upgrade_farmv2_contracts(compare_states: bool):
             return
 
         count += 1
+
+
+def upgrade_farmv2_contract(compare_states: bool, farm_address: str):
+    print(f"Upgrading farm contract: {farm_address}")
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    contract = retrieve_farm_by_address(farm_address)
+
+    if compare_states:
+        print(f"Fetching contract state before upgrade...")
+        fetch_contracts_states("pre", network_providers, [farm_address], FARMSV2_LABEL)
+
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            return
+
+    tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
+                                        config.FARM_V2_BYTECODE_PATH,
+                                        [], True)
+
+    if not network_providers.check_complex_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            return
+
+    if compare_states:
+        fetch_new_and_compare_contract_states(FARMSV2_LABEL, farm_address, network_providers)
+
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
 
 def set_transfer_role_farmv13_contracts():
