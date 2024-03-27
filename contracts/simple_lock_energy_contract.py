@@ -101,7 +101,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         arguments.extend(lock_options)  # lock_options
 
         return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
-                            bytecode_path, metadata, arguments)
+                            bytecode_path, metadata, [])
 
     def issue_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, locked_lp_token: str):
         function_purpose = "Issue locked LP token"
@@ -277,7 +277,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         sc_args = [
             Address(contract_address)
         ]
-        
+
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeSCAddressFromWhitelist", sc_args)
 
     def add_sc_to_token_transfer_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, contract_address: str):
@@ -288,7 +288,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         sc_args = [
             Address(contract_address)
         ]
-        
+
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
                              "addToTokenTransferWhitelist", sc_args)
 
@@ -303,7 +303,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         sc_args = [
             Address(contract_address)
         ]
-        
+
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
                              "removeFromTokenTransferWhitelist", sc_args)
 
@@ -360,6 +360,19 @@ class SimpleLockEnergyContract(DEXContractInterface):
             return ""
         return multi_esdt_endpoint_call(function_purpose, proxy, 20000000,
                                         user, Address(self.address), "reduceLockPeriod", args)
+
+    def extend_lock(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[List[ESDTToken]]: tokens list
+            type[int]: new lock option
+        """
+        function_purpose = "extend lock period"
+        logger.info(function_purpose)
+        if len(args) != 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        return multi_esdt_endpoint_call(function_purpose, proxy, 10000000,
+                                        user, Address(self.address), "extendLockingPeriod", args)
 
     def extend_lock(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -448,6 +461,17 @@ class SimpleLockEnergyContract(DEXContractInterface):
         function_purpose = "Resume simple lock energy contract"
         logger.info(function_purpose)
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "unpause", [])
+
+    def set_energy_entry(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: user address
+            type[str]: energy
+            type[str]: amount
+        """
+        function_purpose = "Set energy entry"
+        logger.info(function_purpose)
+
+        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setEnergyForOldTokens", args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         self.set_transfer_role_locked_token(deployer, proxy, [])
