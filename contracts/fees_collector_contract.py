@@ -53,15 +53,9 @@ class FeesCollectorContract(DEXContractInterface):
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None,
                          no_init: bool = False):
         """ Expected as args:
-            type[str]: locked token
-            type[str]: energy factory address
         """
         function_purpose = f"upgrade {type(self).__name__} contract"
         logger.info(function_purpose)
-
-        if len(args) != 2 and not no_init:
-            log_unexpected_args(function_purpose, args)
-            return "", ""
 
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
@@ -69,10 +63,8 @@ class FeesCollectorContract(DEXContractInterface):
         if no_init:
             arguments = []
         else:
-            arguments = [
-                args[0],
-                Address(args[1])
-            ]
+            # implement below in case of upgrade args needed
+            arguments = []
 
         tx_hash = upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                                         bytecode_path, metadata, arguments)

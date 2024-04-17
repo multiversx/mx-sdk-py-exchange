@@ -81,7 +81,7 @@ class LockedAssetContract(DEXContractInterface):
         """ Expected as args:
             type[List[ESDTToken]]: tokens list
         """
-        function_purpose = "unlock tokens early"
+        function_purpose = "unlock tokens"
         logger.info(function_purpose)
         if len(args) != 1:
             log_unexpected_args(function_purpose, args)

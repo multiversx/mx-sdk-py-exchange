@@ -211,7 +211,7 @@ class DexProxyContract(DEXContractInterface):
             type[List[ESDTTokens]]: tokens to increase energy for
             type[int]: lock epochs
         """
-        function_purpose = "increase proxy pair token energy"
+        function_purpose = "increase proxy farm token energy"
         logger.info(function_purpose)
 
         if len(args) != 2:
@@ -467,29 +467,12 @@ class DexProxyContract(DEXContractInterface):
         decoded_xmex_farm_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), XMEXFARM_ATTRIBUTES)
         logger.debug(decoded_xmex_farm_attributes)
 
-        # Decode the LP token attributes
+        # Decode the LP token attributes & underlying locked token
         xmex_lp_token_id = decoded_xmex_farm_attributes.get('proxy_token_id')
         if xmex_lp_token_id != self.proxy_lp_token:
             logger.error(f"Wrong token contained by XMEXFARM token: {xmex_lp_token_id} expected {self.proxy_lp_token}")
 
-        lp_token_on_network = api.get_non_fungible_token(xmex_lp_token_id, decoded_xmex_farm_attributes.get('proxy_token_nonce'))
-
-        decoded_xmex_lp_attributes = decode_merged_attributes(base64_to_hex(lp_token_on_network.attributes), XMEXLP_ATTRIBUTES)
-        logger.debug(decoded_xmex_lp_attributes)
-
-        # Decode the XMEX token attributes
-        xmex_token_id = decoded_xmex_lp_attributes.get('locked_tokens_id')
-
-        if xmex_token_id not in self.locked_tokens:
-            logger.error(f"Locked token not found in locked tokens: {xmex_token_id}")
-
-        xmex_token_on_network = api.get_non_fungible_token(xmex_token_id, decoded_xmex_lp_attributes.get('locked_tokens_nonce'))
-
-        if "XMEX" in xmex_token_id:
-            decoded_lk_token_attributes = decode_merged_attributes(base64_to_hex(xmex_token_on_network.attributes), XMEX_ATTRIBUTES)
-        if "LKMEX" in xmex_token_id:
-            decoded_lk_token_attributes = decode_merged_attributes(base64_to_hex(xmex_token_on_network.attributes), LKMEX_ATTRIBUTES)
-        logger.debug(decoded_lk_token_attributes)
+        decoded_xmex_lp_attributes, decoded_lk_token_attributes = self.get_all_decoded_lp_token_attributes_from_network(api, decoded_xmex_farm_attributes.get('proxy_token_nonce'))
 
         return decoded_xmex_farm_attributes, decoded_xmex_lp_attributes, decoded_lk_token_attributes
     

@@ -77,15 +77,14 @@ class MetaStakingContract(DEXContractInterface):
             self.stake_token,
             self.lp_token,
         ]
+        if self.version == MetaStakingContractVersion.V3Boosted:
+            arguments.insert(0, Address(args[0]))
 
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
                          args: list = [], no_init: bool = False):
-        """ Expected as args:
-            type[str]: energy factory address; only for V3Boosted
-        """
         function_purpose = f"Upgrade metastaking contract"
         logger.info(function_purpose)
 
@@ -95,19 +94,8 @@ class MetaStakingContract(DEXContractInterface):
         if no_init:
             arguments = []
         else:
-            arguments = [
-                Address(self.farm_address),
-                Address(self.stake_address),
-                Address(self.lp_address),
-                self.staking_token,
-                self.farm_token,
-                self.stake_token,
-                self.lp_token,
-            ]
-            if self.version == MetaStakingContractVersion.V3Boosted:
-                if len(args) != 1:
-                    log_unexpected_args(function_purpose, args)
-                arguments.insert(0, Address(args[0]))
+            # implement below if arguments for upgrade are needed
+            arguments = []
 
         return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                             bytecode_path, metadata, arguments)
