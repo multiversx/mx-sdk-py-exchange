@@ -72,7 +72,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
 
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list, no_init=False):
         """Expecting as args:
                     type[str]: legacy token id
                     type[str]: locked asset factory address
@@ -86,19 +86,22 @@ class SimpleLockEnergyContract(DEXContractInterface):
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
 
-        if len(args) != 5:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        arguments = [
-            self.base_token,   # base token id
-            args[0],           # legacy token id
-            Address(args[1]),   # locked asset factory address
-            args[2]   # min migrated token locking epochs
-        ]
+        if no_init:
+            arguments = []
+        else:
+            if len(args) != 5:
+                log_unexpected_args(function_purpose, args)
+                return ""
+            arguments = [
+                self.base_token,   # base token id
+                args[0],           # legacy token id
+                Address(args[1]),   # locked asset factory address
+                args[2]   # min migrated token locking epochs
+            ]
 
-        lock_fee_pairs = list(zip(args[3], args[4]))
-        lock_options = [item for sublist in lock_fee_pairs for item in sublist]
-        arguments.extend(lock_options)  # lock_options
+            lock_fee_pairs = list(zip(args[3], args[4]))
+            lock_options = [item for sublist in lock_fee_pairs for item in sublist]
+            arguments.extend(lock_options)  # lock_options
 
         return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                             bytecode_path, metadata, arguments)

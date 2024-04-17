@@ -6,13 +6,13 @@ LOCK_OPTIONS = {
 }
 
 ENERGY_ENTRY = {
-    'amount': 'biguint',
+    'amount': 'bigint',
     'last_update_epoch': 'u64',
     'total_locked_tokens': 'biguint',
 }
 
 USER_CLAIM_PROGRESS = {
-    'energy': 'biguint',
+    'energy': 'bigint',
     'week': 'u32'
 }
 
@@ -50,8 +50,33 @@ FARM_TOKEN_ATTRIBUTES = {
     'original_owner': 'address',
 }
 
+LKMEX_ATTRIBUTES = {
+    'unlock_schedule_list': {
+            'unlock_epoch': 'u64',
+            'unlock_percent': 'u64'
+        },
+    'merged': 'u8'
+}
+
 XMEX_ATTRIBUTES = {
     'original_token_id': 'string',
     'original_token_nonce': 'u64',
     'unlock_epoch': 'u64',
+}
+
+XMEXLP_ATTRIBUTES = {
+    'lp_token_id': 'string',
+    'lp_token_amount': 'biguint',
+    'locked_tokens_id': 'string',
+    'locked_tokens_nonce': 'u64',
+    'locked_tokens_amount': 'biguint'
+}
+
+XMEXFARM_ATTRIBUTES = {
+    'farm_token_id': 'string',
+    'farm_token_nonce': 'u64',
+    'farm_token_amount': 'biguint',
+    'proxy_token_id': 'string',
+    'proxy_token_nonce': 'u64',
+    'proxy_token_amount': 'biguint'
 }
