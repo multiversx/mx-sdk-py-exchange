@@ -299,18 +299,14 @@ class DexProxyContract(DEXContractInterface):
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
                          args: list = [], no_init: bool = False):
         """Expecting as args:
-        type[list]: locked asset factories contract addresses; care for the correct order based on locked tokens list
+        type[str]: old_locked_token_id
+        type[str]: old_factory_address
         """
         function_purpose = f"upgrade {type(self).__name__} contract"
         logger.info(function_purpose)
 
-        if len(args) != 1 and not no_init:
+        if len(args) != 2 and not no_init:
             log_unexpected_args(function_purpose, args)
-            return "", ""
-
-        if not no_init and len(self.locked_tokens) != len(args[0]):
-            log_step_fail(f"FAIL: Failed to upgrade contract. "
-                                 f"Mismatch between locked tokens and factory addresses.")
             return "", ""
 
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
@@ -319,9 +315,10 @@ class DexProxyContract(DEXContractInterface):
         if no_init:
             arguments = []
         else:
-            arguments = [self.token]
-            locked_tokens_args = list(sum(zip(self.locked_tokens, args[0]), ()))
-            arguments.extend(locked_tokens_args)
+            arguments = [
+                args[0],
+                Address(args[1])
+            ]
 
         tx_hash = upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                                bytecode_path, metadata, arguments)
