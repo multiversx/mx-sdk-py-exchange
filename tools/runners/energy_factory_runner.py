@@ -12,7 +12,7 @@ from utils.utils_tx import NetworkProviders
 def add_parsed_arguments(parser: ArgumentParser):
     """Add arguments to the parser"""
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
+    parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after upgrade')
     mutex = parser.add_mutually_exclusive_group()
     mutex.add_argument('--pause', action='store_true', help='pause energy factory')
