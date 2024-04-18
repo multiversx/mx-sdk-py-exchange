@@ -226,6 +226,17 @@
             "special_fee": 100,
             "fees_collector": 0,
             "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 14,
+            "accepted_token": 1,
+            "lp_token": "HTMWEGLD",
+            "lp_token_name": "HTMWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
         }
     ],
 
@@ -359,6 +370,23 @@
             "farming_pool": 6,
             "farm_token": "ASHWEGLDFL",
             "farm_token_name": "ASHWEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 21100000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 11,
+            "farm_token": "HTMWEGLDFL",
+            "farm_token_name": "HTMWEGLDLPStakedLK",
             "farmed_token": 0,
             "rpb": 21100000000000000000000,
             "penalty": 300,

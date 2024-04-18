@@ -77,6 +77,8 @@ class MetaStakingContract(DEXContractInterface):
             self.stake_token,
             self.lp_token,
         ]
+        if self.version == MetaStakingContractVersion.V3Boosted:
+            arguments.insert(0, Address(args[0]))
 
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
@@ -92,15 +94,9 @@ class MetaStakingContract(DEXContractInterface):
         if no_init:
             arguments = []
         else:
-            arguments = [
-                Address(self.farm_address),
-                Address(self.stake_address),
-                Address(self.lp_address),
-                self.staking_token,
-                self.farm_token,
-                self.stake_token,
-                self.lp_token,
-            ]
+            # implement below if arguments for upgrade are needed
+            arguments = []
+
         return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                             bytecode_path, metadata, arguments)
 
@@ -225,3 +221,15 @@ class MetaStakingContract(DEXContractInterface):
 
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
                                         user, Address(self.address), function, tokens)
+    
+    def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
+        function_purpose = "Set energy factory address in proxy staking contract"
+        logger.info(function_purpose)
+
+        if energy_address == "":
+            log_unexpected_args(function_purpose, energy_address)
+            return ""
+
+        gas_limit = 50000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
+                             [energy_address])

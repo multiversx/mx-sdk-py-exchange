@@ -75,5 +75,12 @@
         "lpToken": "USDTWEGLD-0adb82",
         "address": "erd1qqqqqqqqqqqqqpgq205dg9t5wnczfh7uxyxe5kudk6ez4e3y0n4su5t6gc",
         "version": 2
+    },
+    {
+        "firstToken": "HTM-23a1da",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "HTMWEGLD-acd22a",
+        "address": "erd1qqqqqqqqqqqqqpgqnp4wf8nsd0pfz957fe2n8gzpksycxc790n4sqvv74v",
+        "version": 2
     }
 ]

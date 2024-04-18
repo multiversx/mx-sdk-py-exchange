@@ -2,7 +2,7 @@ import sys
 import traceback
 
 from contracts.contract_identities import DEXContractInterface
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
+from utils.utils_tx import multi_esdt_endpoint_call, prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
 from multiversx_sdk_core import CodeMetadata
@@ -76,6 +76,18 @@ class LockedAssetContract(DEXContractInterface):
 
         return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                             bytecode_path, metadata, arguments)
+    
+    def unlock_assets(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[List[ESDTToken]]: tokens list
+        """
+        function_purpose = "unlock tokens"
+        logger.info(function_purpose)
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
+                                        user, Address(self.address), "unlockAssets", args)
 
     def set_new_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, contract_address: str):
         function_purpose = "Set new factory address"

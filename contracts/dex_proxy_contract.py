@@ -2,14 +2,17 @@ import config
 from contracts.contract_identities import DEXContractInterface, ProxyContractVersion
 from contracts.farm_contract import FarmContract
 from contracts.pair_contract import PairContract
+from multiversx_sdk_network_providers.api_network_provider import ApiNetworkProvider
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
     endpoint_call, multi_esdt_endpoint_call, ESDTToken
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, \
     log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, dec_to_padded_hex, decode_merged_attributes
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from multiversx_sdk_core import CodeMetadata
+
+from utils.decoding_structures import LKMEX_ATTRIBUTES, XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES, XMEXLP_ATTRIBUTES
 
 logger = get_logger(__name__)
 
@@ -187,6 +190,84 @@ class DexProxyContract(DEXContractInterface):
         ]
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
                                         "claimRewardsProxy", sc_args)
+    
+    def increase_proxy_lp_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+        """Expecting as args:
+            type[List[ESDTTokens]]: tokens to increase energy for
+            type[int]: lock epochs
+        """
+        function_purpose = "increase proxy pair token energy"
+        logger.info(function_purpose)
+
+        if len(args) != 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 50000000
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "increaseProxyPairTokenEnergy", args)
+    
+    def increase_proxy_farm_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+        """Expecting as args:
+            type[List[ESDTTokens]]: tokens to increase energy for
+            type[int]: lock epochs
+        """
+        function_purpose = "increase proxy farm token energy"
+        logger.info(function_purpose)
+
+        if len(args) != 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 50000000
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "increaseProxyFarmTokenEnergy", args)
+    
+    def destroy_proxy_farm_token(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+        """Expecting as args:
+            type[List[ESDTTokens]]: tokens to destroy
+            type[str]: farm address
+            type[str]: pair address
+            type[int]: first token slippage
+            type[int]: second token slippage
+            optional type[str]: original caller
+        """
+        function_purpose = "destroy proxy farm token"
+        logger.info(function_purpose)
+
+        if len(args) < 5:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 50000000
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "destroyFarmProxy", args)
+    
+    def merge_proxy_farm_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+        """Expecting as args:
+            type[List[ESDTTokens]]: tokens to merge
+            type[str]: farm address
+        """
+        function_purpose = "merge proxy farm tokens"
+        logger.info(function_purpose)
+
+        if len(args) < 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 50000000
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "mergeWrappedFarmTokens", args)
+    
+    def merge_proxy_lp_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+        """Expecting as args:
+            type[List[ESDTTokens]]: tokens to merge
+        """
+        function_purpose = "merge proxy lp tokens"
+        logger.info(function_purpose)
+
+        if len(args) < 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 50000000
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "mergeWrappedLpTokens", args)
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         """Expecting as args:
@@ -218,18 +299,14 @@ class DexProxyContract(DEXContractInterface):
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
                          args: list = [], no_init: bool = False):
         """Expecting as args:
-        type[list]: locked asset factories contract addresses; care for the correct order based on locked tokens list
+        type[str]: old_locked_token_id
+        type[str]: old_factory_address
         """
         function_purpose = f"upgrade {type(self).__name__} contract"
         logger.info(function_purpose)
 
-        if len(args) != 1 and not no_init:
+        if len(args) != 2 and not no_init:
             log_unexpected_args(function_purpose, args)
-            return "", ""
-
-        if not no_init and len(self.locked_tokens) != len(args[0]):
-            log_step_fail(f"FAIL: Failed to upgrade contract. "
-                                 f"Mismatch between locked tokens and factory addresses.")
             return "", ""
 
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
@@ -238,9 +315,10 @@ class DexProxyContract(DEXContractInterface):
         if no_init:
             arguments = []
         else:
-            arguments = [self.token]
-            locked_tokens_args = list(sum(zip(self.locked_tokens, args[0]), ()))
-            arguments.extend(locked_tokens_args)
+            arguments = [
+                args[0],
+                Address(args[1])
+            ]
 
         tx_hash = upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
                                bytecode_path, metadata, arguments)
@@ -377,3 +455,43 @@ class DexProxyContract(DEXContractInterface):
         log_substep(f"Locked tokens: {self.locked_tokens}")
         log_substep(f"Proxy LP token: {self.proxy_lp_token}")
         log_substep(f"Proxy Farm token: {self.proxy_farm_token}")
+
+    def get_all_decoded_farm_token_attributes_from_network(self, api: ApiNetworkProvider, farm_token_nonce: int):
+        # Get token details for a given farm token
+        farm_token_on_network = api.get_non_fungible_token(self.proxy_farm_token, farm_token_nonce)
+
+        # Decode the farm token attributes
+        decoded_xmex_farm_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), XMEXFARM_ATTRIBUTES)
+        logger.debug(decoded_xmex_farm_attributes)
+
+        # Decode the LP token attributes & underlying locked token
+        xmex_lp_token_id = decoded_xmex_farm_attributes.get('proxy_token_id')
+        if xmex_lp_token_id != self.proxy_lp_token:
+            logger.error(f"Wrong token contained by XMEXFARM token: {xmex_lp_token_id} expected {self.proxy_lp_token}")
+
+        decoded_xmex_lp_attributes, decoded_lk_token_attributes = self.get_all_decoded_lp_token_attributes_from_network(api, decoded_xmex_farm_attributes.get('proxy_token_nonce'))
+
+        return decoded_xmex_farm_attributes, decoded_xmex_lp_attributes, decoded_lk_token_attributes
+    
+    def get_all_decoded_lp_token_attributes_from_network(self, api: ApiNetworkProvider, lp_token_nonce: int):
+        # Decode the LP token attributes
+        lp_token_on_network = api.get_non_fungible_token(self.proxy_lp_token, lp_token_nonce)
+
+        decoded_xmex_lp_attributes = decode_merged_attributes(base64_to_hex(lp_token_on_network.attributes), XMEXLP_ATTRIBUTES)
+        logger.debug(decoded_xmex_lp_attributes)
+
+        # Decode the XMEX token attributes
+        xmex_token_id = decoded_xmex_lp_attributes.get('locked_tokens_id')
+
+        if xmex_token_id not in self.locked_tokens:
+            logger.error(f"Locked token not found in locked tokens: {xmex_token_id}")
+
+        xmex_token_on_network = api.get_non_fungible_token(xmex_token_id, decoded_xmex_lp_attributes.get('locked_tokens_nonce'))
+
+        if "XMEX" in xmex_token_id:
+            decoded_lk_token_attributes = decode_merged_attributes(base64_to_hex(xmex_token_on_network.attributes), XMEX_ATTRIBUTES)
+        if "LKMEX" in xmex_token_id:
+            decoded_lk_token_attributes = decode_merged_attributes(base64_to_hex(xmex_token_on_network.attributes), LKMEX_ATTRIBUTES)
+        logger.debug(decoded_lk_token_attributes)
+
+        return decoded_xmex_lp_attributes, decoded_lk_token_attributes

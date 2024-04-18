@@ -74,16 +74,17 @@ class NetworkProviders:
     def _get_initial_tx_status(self, tx_hash: str) -> Union[None, TransactionStatus]:
         # due to API data propagation delays, some transactions may not be indexed yet at the time of the request
         results = None
-        try:
-            results = self.api.get_transaction_status(tx_hash)
-        except GenericError as e:
-            logger.debug(f"Transaction not found. Exception: {e.data}")
-            if e.data['statusCode'] == 404:
-                # api didn't index the transaction yet, try again after a delay
-                logger.debug(f"Transaction {tx_hash} not indexed yet, "
-                             f"trying again in {API_TX_STATUS_REFETCH_DELAY} seconds...")
-                time.sleep(API_TX_STATUS_REFETCH_DELAY)
+        while True:
+            try:
                 results = self.api.get_transaction_status(tx_hash)
+                break   # if no exception, we got the results
+            except GenericError as e:
+                logger.debug(f"Transaction not found. Exception: {e.data}")
+                if e.data['statusCode'] == 404:
+                    # api didn't index the transaction yet, try again after a delay
+                    logger.debug(f"Transaction {tx_hash} not indexed yet, "
+                                f"trying again in {API_TX_STATUS_REFETCH_DELAY} seconds...")
+                    time.sleep(API_TX_STATUS_REFETCH_DELAY)
         return results
 
     def wait_for_tx_executed(self, tx_hash: str) -> Union[None, TransactionStatus]:

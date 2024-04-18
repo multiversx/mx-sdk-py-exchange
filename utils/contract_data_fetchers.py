@@ -176,6 +176,12 @@ class FarmContractDataFetcher(DataFetcher):
             "getState": self._get_int_view,
             "getPairContractManagedAddress": self._get_hex_view,
             "getUserTotalFarmPosition": self._get_hex_view,
+            "getUserEnergyForWeek": self._get_hex_view,
+            "getCurrentWeek": self._get_int_view,
+            "getLastActiveWeekForUser": self._get_int_view,
+            "getTotalLockedTokensForWeek": self._get_int_view,
+            "getTotalEnergyForWeek": self._get_int_view,
+            "getCurrentClaimProgress": self._get_hex_view,
         }
 
 
@@ -267,6 +273,14 @@ class LiquidLockingContractDataFetcher(DataFetcher):
             "unlockedTokens": self._get_hex_list_view,
             "whitelistedTokens": self._get_hex_list_view,
             "unbondPeriod": self._get_int_view
+        }
+
+
+class LkWrapContractDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "getWrappedTokenId": self._get_hex_view,
         }
 
 

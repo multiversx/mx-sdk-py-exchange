@@ -263,7 +263,8 @@ def get_current_tokens_for_address(address: Address, proxy: ProxyNetworkProvider
     return tokens_dict
 
 
-def get_token_details_for_address(in_token: str, address: str, proxy: ProxyNetworkProvider, underlying_tk: str = ""):
+def get_token_details_for_address(in_token: str, address: str, proxy: ProxyNetworkProvider, underlying_tk: str = "") -> tuple[int, int, str]:
+    """Returns nonce, amount, attributes_hex"""
     # TODO: This is a temporary adaptor between new specs of mxpy sdk and old specs of the rest of the code.
     prevent_spam_crash_elrond_proxy_go()
     tokens = cast(List, _get_all_esdts_for_account(address, proxy))
@@ -338,6 +339,14 @@ def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
         if payload_size:
             result, _, index = fixed_length_primitive(attributes, index, payload_size)
         return result, index
+    
+    def bigint(attributes: str, start_index: int):
+        payload_size, _, index = fixed_length_primitive(attributes, start_index, 4)
+        result = 0
+        if payload_size:
+            _, hex, index = fixed_length_primitive(attributes, index, payload_size)
+            result = int.from_bytes(hex, byteorder="big", signed=True)
+        return result, index
 
     def string(attributes: str, start_index: int):
         payload_size, _, index = fixed_length_primitive(attributes, start_index, 4)
@@ -359,6 +368,7 @@ def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
                               'u32': u32,
                               'u64': u64,
                               'biguint': biguint,
+                              'bigint': bigint,
                               'string': string,
                               'address': address}
 
@@ -437,7 +447,7 @@ def log_explorer(proxy: str, name: str, path: str, details: str):
         explorer_name, explorer_url = networks[proxy]
         logger.info(f"View this {name} in the {explorer_name}: {explorer_url}/{path}/{details}")
     except KeyError:
-        logger.info(f"No explorer known for {proxy}. {name} raw path: {path}/{details}")
+        logger.info(f"No explorer known for {proxy}. {name} raw path: {proxy}/transaction/{details}")
 
 
 def log_explorer_contract_address(address: str, proxy_url: str):

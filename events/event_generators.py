@@ -475,8 +475,8 @@ def generateExitMetastakeEvent(context: Context, user: Account, metastake_contra
 
         decoded_metastake_tk_attributes = get_lp_from_metastake_token_attributes(metastake_token_attributes)
 
-        farm_tk_details = context.network_provider.api.get_non_fungible_token(
-            metastake_contract.farm_token, decoded_metastake_tk_attributes['lp_farm_token_nonce']
+        farm_tk_details = context.network_provider.proxy.get_nonfungible_token_of_account(
+            Address(metastake_contract.address), metastake_contract.farm_token, decoded_metastake_tk_attributes['lp_farm_token_nonce']
         )
 
         full_metastake_amount = metastake_token_amount
@@ -588,8 +588,9 @@ def generateClaimMetastakeRewardsEvent(context: Context, user: Account, metastak
         context.observable.set_event(None, user, set_token_balance_event, '')
 
         farm_position = get_lp_from_metastake_token_attributes(metastake_token_attributes)
-        farm_token_details = context.network_provider.api.get_non_fungible_token(
-            metastake_contract.farm_token, farm_position['lp_farm_token_nonce']
+
+        farm_token_details = context.network_provider.proxy.get_nonfungible_token_of_account(
+            Address(metastake_contract.address), metastake_contract.farm_token, farm_position['lp_farm_token_nonce']
         )
 
         # update data for staking, farm and pair trackers inside metastaking tracker
