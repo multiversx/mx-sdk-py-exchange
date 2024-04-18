@@ -13,14 +13,13 @@ from utils.utils_tx import NetworkProviders
 
 
 TEMPLATE_PAIR_LABEL = "template_pair"
-ROUTER_LABEL = "router"
 
 
 def add_parsed_arguments(parser: ArgumentParser):
     """Add arguments to the parser"""
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
-                        help='compare states before and after upgrade')
+    parser.add_argument('--compare-states', action='store_true', help='compare states before and after upgrade')
+    parser.add_argument('--address', type=str, help='router / pair template contract address')
     mutex = parser.add_mutually_exclusive_group()
     mutex.add_argument('--upgrade', action='store_true', help='upgrade router')
     mutex.add_argument('--upgrade-template', action='store_true', help='upgrade template pair')
@@ -32,7 +31,7 @@ def handle_command(args):
     """Handle router commands"""
 
     if args.upgrade:
-        upgrade_router_contract(args.compare_states)
+        upgrade_router_contract(args.address, args.compare_states)
     elif args.upgrade_template:
         upgrade_template_pair_contract(args.compare_states)
     elif args.enable_pair_creation:
@@ -43,29 +42,34 @@ def handle_command(args):
         print('invalid arguments')
 
 
-def upgrade_router_contract(compare_states: bool = False):
+def upgrade_router_contract(router_address: str, compare_states: bool = False):
     """Upgrade router contract"""
 
     print("Upgrade router contract")
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
-    context = Context()
-    router_address = context.get_contracts(config.ROUTER_V2)[0].address
+
+    print(f"Router address: {router_address}")
 
     router_contract = retrieve_router_by_address(router_address)
-    router_data_fetcher = RouterContractDataFetcher(Address.from_bech32(router_address), network_providers.proxy.url)
-    template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
+
+    if compare_states:
+        print(f"Fetching contract state before upgrade...")
+        fetch_contracts_states("pre", network_providers, [router_address], config.ROUTER_V2)
+
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            return
 
     # change router version & upgrade router contract
     router_contract.version = RouterContractVersion.V2
-    tx_hash = router_contract.contract_upgrade(dex_owner, network_providers.proxy, config.ROUTER_V2_BYTECODE_PATH,
-                                               [template_pair_address])
+    tx_hash = router_contract.contract_upgrade(dex_owner, network_providers.proxy, config.ROUTER_V2_BYTECODE_PATH)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade router contract {router_address}"):
         return
 
-    fetch_new_and_compare_contract_states(ROUTER_LABEL, router_address, network_providers)
+    if compare_states:
+        fetch_new_and_compare_contract_states(config.ROUTER_V2, router_address, network_providers)
 
 
 def upgrade_template_pair_contract(compare_states: bool = False):

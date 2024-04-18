@@ -263,7 +263,7 @@ def get_current_tokens_for_address(address: Address, proxy: ProxyNetworkProvider
     return tokens_dict
 
 
-def get_token_details_for_address(in_token: str, address: str, proxy: ProxyNetworkProvider, underlying_tk: str = "") -> tuple[int, int, str]:
+def get_token_details_for_address(in_token: str, address: str, proxy: ProxyNetworkProvider, underlying_tk: str = ""):
     """Returns nonce, amount, attributes_hex"""
     # TODO: This is a temporary adaptor between new specs of mxpy sdk and old specs of the rest of the code.
     prevent_spam_crash_elrond_proxy_go()
