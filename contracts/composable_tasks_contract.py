@@ -72,7 +72,7 @@ class ComposableTasksContract(DEXContractInterface):
         function_purpose = "Set router address"
         logger.info(function_purpose)
 
-        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setrouterAddr", args)
+        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setRouterAddr", args)
 
     def set_pair_address_for_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:

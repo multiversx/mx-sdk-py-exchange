@@ -49,26 +49,15 @@ class RouterContract(DEXContractInterface):
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
-        """Expecting as args:
-        type[str]: pair template address
-        """
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path):
         function_purpose = f"Upgrade router contract"
         logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True)
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
 
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        arguments = [
-            Address(args[0])
-        ]
-
         tx_hash = upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
-                               bytecode_path, metadata, arguments)
+                               bytecode_path, metadata, [])
 
         return tx_hash
 

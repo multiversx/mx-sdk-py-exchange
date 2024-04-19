@@ -248,7 +248,7 @@ def upgrade_staking_contract(staking_address: str, compare_states: bool = False)
 
     staking_contract.version = StakingContractVersion.V3Boosted
     tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, config.STAKING_V3_BYTECODE_PATH,
-                                                [dex_owner.address.bech32()])
+                                                [], True)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
         if not get_user_continue():
