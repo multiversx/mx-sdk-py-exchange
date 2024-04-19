@@ -18,7 +18,6 @@ SHADOWFORK = "shadowfork" in PROXY
 
 API = config.DEFAULT_API
 
-OUTPUT_FOLDER = config.UPGRADER_OUTPUT_FOLDER
 OUTPUT_PAUSE_STATES = OUTPUT_FOLDER / "contract_pause_states.json"
 
 
@@ -121,7 +120,7 @@ def get_owner(proxy) -> Account:
 
     owner = Account(pem_file=config.DEFAULT_OWNER)
     if SHADOWFORK:
-        owner.address = Address(config.DEX_OWNER_ADDRESS, "erd")      # ONLY FOR SHADOWFORK
+        owner.address = Address.from_bech32(config.DEX_OWNER_ADDRESS)      # ONLY FOR SHADOWFORK
     owner.sync_nonce(proxy)
     return owner
 
