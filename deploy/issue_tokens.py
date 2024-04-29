@@ -5,9 +5,8 @@ from typing import List
 import config
 from utils.logger import get_logger
 from utils.utils_chain import (Account, build_token_name, build_token_ticker)
-from multiversx_sdk_network_providers import ProxyNetworkProvider
-from multiversx_sdk_core import Address, TokenPayment, Transaction
-from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
+from multiversx_sdk import ProxyNetworkProvider, Address, TokenPayment, Transaction
+from multiversx_sdk.core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
 
 from utils.utils_tx import broadcast_transactions
 

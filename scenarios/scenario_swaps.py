@@ -3,7 +3,7 @@ import random
 import sys
 import time
 import traceback
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 from typing import List
 from argparse import ArgumentParser
 import config
@@ -71,7 +71,7 @@ def add_initial_liquidity(context: Context):
     # add initial liquidity
     pair_contract: PairContract
     for pair_contract in context.get_contracts(config.PAIRS):
-        pair_data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_contract.address), context.network_provider.proxy.url)
+        pair_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_contract.address), context.network_provider.proxy.url)
         first_token_liquidity = pair_data_fetcher.get_token_reserve(pair_contract.firstToken)
         if first_token_liquidity == 0:
             event = AddLiquidityEvent(

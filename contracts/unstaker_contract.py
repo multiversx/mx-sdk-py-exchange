@@ -7,8 +7,7 @@ from utils.utils_tx import endpoint_call, deploy
 from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import log_step_fail, log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)

@@ -2,7 +2,7 @@ import random
 import sys
 import time
 from typing import List
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 
 import config
 from context import Context

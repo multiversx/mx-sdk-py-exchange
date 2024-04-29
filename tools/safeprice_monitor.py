@@ -2,7 +2,7 @@ import csv
 import sys
 import time
 from argparse import ArgumentParser
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 from typing import List
 from context import Context
 from utils.contract_data_fetchers import PairContractDataFetcher

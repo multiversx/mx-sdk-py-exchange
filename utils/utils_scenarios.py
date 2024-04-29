@@ -1,9 +1,8 @@
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider, ApiNetworkProvider
 from utils.utils_chain import WrapperAddress as Address, get_all_token_nonces_details_for_account
 from multiprocessing.dummy import Pool
-from multiversx_sdk_network_providers.api_network_provider import ApiNetworkProvider
-from multiversx_sdk_network_providers.interface import IPagination
-from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
+from multiversx_sdk.network_providers.interface import IPagination
+from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
 from utils.logger import get_logger
 from typing import List
 
@@ -85,19 +84,19 @@ def collect_farm_contract_users(users_count: int,
         user = tx.sender
         
         # avoid duplicates
-        if user.bech32() in set_users:
+        if user.to_bech32() in set_users:
             return
-        set_users.add(user.bech32())
+        set_users.add(user.to_bech32())
 
-        logger.debug(f'Processing user {user.bech32()} ...')
+        logger.debug(f'Processing user {user.to_bech32()} ...')
         try:
-            farming_tokens_in_account = get_all_token_nonces_details_for_account(farming_token, user.bech32(), dest_proxy)
-            farm_tokens_in_account = get_all_token_nonces_details_for_account(farm_token, user.bech32(), dest_proxy)
+            farming_tokens_in_account = get_all_token_nonces_details_for_account(farming_token, user.to_bech32(), dest_proxy)
+            farm_tokens_in_account = get_all_token_nonces_details_for_account(farm_token, user.to_bech32(), dest_proxy)
 
             if len(farming_tokens_in_account) > 0 or len(farm_tokens_in_account) > 0:
                 fetched_users.add_user(FetchedUser(user, farming_tokens_in_account, farm_tokens_in_account))
         except Exception as e:
-            logger.warning(f'Error processing user {user.bech32()}: {e}')
+            logger.warning(f'Error processing user {user.to_bech32()}: {e}')
 
     Pool(10).map(process_tx, transactions)
 

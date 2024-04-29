@@ -6,9 +6,8 @@ from typing import List
 from utils.utils_chain import Account
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
-from multiversx_sdk_network_providers import ProxyNetworkProvider
-from multiversx_sdk_core.transaction_builders import MultiESDTNFTTransferBuilder, DefaultTransactionBuildersConfiguration
-from multiversx_sdk_core import TokenPayment, Transaction
+from multiversx_sdk import ProxyNetworkProvider, TokenPayment, Transaction
+from multiversx_sdk.core.transaction_builders import MultiESDTNFTTransferBuilder, DefaultTransactionBuildersConfiguration
 
 
 def main(cli_args: List[str]):

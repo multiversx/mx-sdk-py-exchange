@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider
 from contracts.farm_contract import FarmContract
 from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.utils_chain import WrapperAddress as Address, get_all_token_nonces_details_for_account
@@ -10,7 +10,7 @@ from utils.utils_generic import ensure_folder, dump_out_json
 
 class AccountSnapshotLogData:
 
-    def __init__(self, user_address: str, token_list: list, proxy: ProxyNetworkProvider):
+    def __init__(self, user_address: str, token_list: list[str], proxy: ProxyNetworkProvider):
         self.tokens = []
 
         for token in token_list:

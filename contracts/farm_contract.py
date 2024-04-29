@@ -1,4 +1,3 @@
-from typing import Dict, Any
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
 from utils import decoding_structures
@@ -7,8 +6,7 @@ from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
     log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
@@ -438,7 +436,7 @@ class FarmContract(DEXContractInterface):
     
     def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> dict:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).serialize()])
+        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).get_public_key()])
         if not raw_results:
             return {}
         user_farm_position = decode_merged_attributes(raw_results, decoding_structures.USER_FARM_POSITION)
@@ -447,7 +445,7 @@ class FarmContract(DEXContractInterface):
     
     def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).serialize()])
+        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).get_public_key()])
         if not raw_results:
             return 0
         week = int(raw_results)
@@ -456,7 +454,7 @@ class FarmContract(DEXContractInterface):
     
     def get_user_energy_for_week(self, user_address: str, proxy: ProxyNetworkProvider, week: int) -> dict:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [Address(user_address).serialize(), week])
+        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [Address(user_address).get_public_key(), week])
         if not raw_results:
             return {}
         user_energy_for_week = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
@@ -481,7 +479,7 @@ class FarmContract(DEXContractInterface):
     
     def get_current_claim_progress_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> dict:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentClaimProgress', [Address(user_address).serialize()])
+        raw_results = data_fetcher.get_data('getCurrentClaimProgress', [Address(user_address).get_public_key()])
         if not raw_results:
             return {}
         response = decode_merged_attributes(raw_results, decoding_structures.USER_CLAIM_PROGRESS)

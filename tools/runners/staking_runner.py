@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 import json
 import os
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 import config
 from config import GRAPHQL
 from contracts.contract_identities import StakingContractVersion
@@ -103,7 +103,7 @@ def pause_staking_contract(staking_address: str):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    data_fetcher = StakingContractDataFetcher(Address.from_bech32(staking_address), network_providers.proxy.url)
+    data_fetcher = StakingContractDataFetcher(Address.new_from_bech32(staking_address), network_providers.proxy.url)
     contract_state = data_fetcher.get_data("getState")
     contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
     if contract_state != 0:

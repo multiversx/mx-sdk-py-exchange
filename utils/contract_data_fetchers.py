@@ -1,11 +1,10 @@
 import sys
 import traceback
 
-from multiversx_sdk_core import Address, ContractQueryBuilder
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import Address, ContractQueryBuilder, ProxyNetworkProvider
+
 from utils.logger import get_logger
 from utils.utils_chain import base64_to_hex
-
 
 logger = get_logger(__name__)
 

@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from enum import Enum
 
 from utils.utils_chain import Account
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider
 
 
 class DEXContractIdentityInterface(ABC):

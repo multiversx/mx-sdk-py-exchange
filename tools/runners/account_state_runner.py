@@ -2,7 +2,7 @@ import json
 import os
 from argparse import ArgumentParser
 from typing import Dict, Any, Tuple
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 
 

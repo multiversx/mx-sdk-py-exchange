@@ -1,13 +1,9 @@
-import sys
-import traceback
-
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, endpoint_call, upgrade_call
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)

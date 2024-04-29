@@ -1,4 +1,4 @@
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 from utils.contract_data_fetchers import SimpleLockEnergyContractDataFetcher
 from utils.utils_tx import ESDTToken, NetworkProviders
 from utils.utils_chain import decode_merged_attributes, base64_to_hex

@@ -3,15 +3,14 @@ import time
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List
-from multiversx_sdk_core import Address, Transaction
+from multiversx_sdk import Address, Transaction, ProxyNetworkProvider
 from ported_arrows.stress.contracts.transaction_builder import (number_as_arg,
                                                          string_as_arg,
                                                          token_id_as_arg)
 from utils.utils_chain import Account
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
-from multiversx_sdk_network_providers.network_config import NetworkConfig
+from multiversx_sdk.network_providers.network_config import NetworkConfig
 
 
 def main(cli_args: List[str]):
@@ -48,15 +47,15 @@ def create_swap_fixed_input(pair: Address, caller: Account, token_from: str, tok
 
     transaction = Transaction(
         chain_id=network.chain_id,
-        sender=caller.address.bech32(),
-        receiver=pair.bech32(),
+        sender=caller.address.to_bech32(),
+        receiver=pair.to_bech32(),
         gas_limit=8000000
     )
     transaction.nonce = caller.nonce
-    transaction.value = "0"
-    transaction.data = tx_data
-    transaction.gasPrice = network.min_gas_price
-    transaction.version = network.min_tx_version
+    transaction.value = 0
+    transaction.data = tx_data.encode()
+    transaction.gas_price = network.min_gas_price
+    transaction.version = network.min_transaction_version
 
     signature = caller.sign_transaction(transaction)
     transaction.signature = signature

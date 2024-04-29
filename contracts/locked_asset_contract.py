@@ -5,8 +5,7 @@ from contracts.contract_identities import DEXContractInterface
 from utils.utils_tx import multi_esdt_endpoint_call, prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

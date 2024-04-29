@@ -1,9 +1,8 @@
 from typing import List, Dict, Any
 import time
-from multiversx_sdk_network_providers import GenericError
+from multiversx_sdk import GenericError, ProxyNetworkProvider
 import requests
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
-from multiversx_sdk_core.constants import METACHAIN_ID
+from multiversx_sdk.core.constants import METACHAIN_ID
 
 
 class NetworkStatusOnShard:

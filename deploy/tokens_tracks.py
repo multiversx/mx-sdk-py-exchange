@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 
 from utils import utils_generic as utils
 from utils.utils_chain import WrapperAddress as Address
-from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork
+from multiversx_sdk.network_providers.tokens import FungibleTokenOfAccountOnNetwork
 
 
 class BunchOfTracks:

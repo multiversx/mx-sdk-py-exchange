@@ -1,32 +1,31 @@
 import sys
 from argparse import ArgumentParser
 from typing import List
-from multiversx_sdk_core import Address, Transaction
+from multiversx_sdk import Address, Transaction, ProxyNetworkProvider
 from ported_arrows.stress.contracts.transaction_builder import number_as_arg, string_as_arg
 from utils.utils_chain import Account
 from utils.utils_tx import broadcast_transactions
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
-from multiversx_sdk_network_providers.network_config import NetworkConfig
+from multiversx_sdk.network_providers.network_config import NetworkConfig
 
 
 def claim_metastaking_rewards(caller: Account, contract_addr: Address, number_of_tokens: int, token_identifier: str,
                               token_nonce: str, token_quantity: int, network: NetworkConfig, method: str) -> Transaction:
 
-    tx_data = f'MultiESDTNFTTransfer@{contract_addr.hex()}@{number_as_arg(number_of_tokens)}@{string_as_arg(token_identifier)}' \
+    tx_data = f'MultiESDTNFTTransfer@{contract_addr.to_hex()}@{number_as_arg(number_of_tokens)}@{string_as_arg(token_identifier)}' \
               f'@{token_nonce}@{number_as_arg(token_quantity)}@{string_as_arg(method)}'
 
     transaction = Transaction(
         chain_id=network.chain_id,
-        sender=caller.address.bech32(),
-        receiver=caller.address.bech32(),
+        sender=caller.address.to_bech32(),
+        receiver=caller.address.to_bech32(),
         gas_limit=40000000
     )
     transaction.nonce = caller.nonce
-    transaction.value = '0'
-    transaction.data = tx_data
-    transaction.gasPrice = network.min_gas_price
-    transaction.chainID = network.chain_id
-    transaction.version = network.min_tx_version
+    transaction.value = 0
+    transaction.data = tx_data.encode()
+    transaction.gas_price = network.min_gas_price
+    transaction.chain_id = network.chain_id
+    transaction.version = network.min_transaction_version
     signature = caller.sign_transaction(transaction)
     transaction.signature = signature
 

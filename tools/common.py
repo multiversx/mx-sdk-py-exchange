@@ -3,8 +3,7 @@ import binascii
 import os
 import json
 from typing import List
-from multiversx_sdk_core import Address
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from multiversx_sdk import Address, ProxyNetworkProvider
 import requests
 from tools.runners.account_state_runner import get_account_keys_online, report_key_files_compare
 from utils.utils_chain import Account, base64_to_hex
@@ -28,7 +27,7 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
     pairs_data = {}
 
     for address in contract_addresses:
-        contract_addr = Address.from_hex(address, "erd")
+        contract_addr = Address.new_from_hex(address, "erd")
         account_data = proxy.get_account(contract_addr)
         code_hash = base64_to_hex(account_data.code_hash)
 
@@ -120,7 +119,7 @@ def get_owner(proxy) -> Account:
 
     owner = Account(pem_file=config.DEFAULT_OWNER)
     if SHADOWFORK:
-        owner.address = Address.from_bech32(config.DEX_OWNER_ADDRESS)      # ONLY FOR SHADOWFORK
+        owner.address = Address.new_from_bech32(config.DEX_OWNER_ADDRESS)      # ONLY FOR SHADOWFORK
     owner.sync_nonce(proxy)
     return owner
 
