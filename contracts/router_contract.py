@@ -1,7 +1,7 @@
 import config
 from contracts.contract_identities import DEXContractInterface, RouterContractVersion
 from utils.logger import get_logger
-from utils.utils_tx import deploy, upgrade_call, get_deployed_address_from_tx, endpoint_call
+from utils.utils_tx import deploy, upgrade_call, get_deployed_address_given_deployer, endpoint_call
 from utils.utils_generic import log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
@@ -130,7 +130,7 @@ class RouterContract(DEXContractInterface):
 
         # retrieve deployed contract address
         if tx_hash != "":
-            address = get_deployed_address_from_tx(tx_hash, proxy)
+            address = get_deployed_address_given_deployer(deployer)
 
         return tx_hash, address
 

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Dict, List, Any
 
 from contracts.contract_identities import DEXContractInterface
@@ -22,7 +23,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         self.lp_proxy_token = lp_proxy_token
         self.farm_proxy_token = farm_proxy_token
 
-    def get_config_dict(self) -> dict:
+    def get_config_dict(self) -> Dict[str, Any]:
         output_dict = {
             "address": self.address,
             "base_token": self.base_token,
@@ -33,14 +34,14 @@ class SimpleLockEnergyContract(DEXContractInterface):
         return output_dict
 
     @classmethod
-    def load_config_dict(cls, config_dict: dict):
+    def load_config_dict(cls, config_dict: Dict[str, Any]):
         return SimpleLockEnergyContract(address=config_dict['address'],
                                         base_token=config_dict['base_token'],
                                         locked_token=config_dict['locked_token'],
                                         lp_proxy_token=config_dict['lp_proxy_token'],
                                         farm_proxy_token=config_dict['farm_proxy_token'])
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path: str | Path, args: List[Any]):
         """Expecting as args:
                     type[str]: legacy token id
                     type[str]: locked asset factory address
@@ -308,7 +309,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
 
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
                              "removeFromTokenTransferWhitelist", sc_args)
-    
+
     def set_energy_for_old_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: address
@@ -328,7 +329,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
             args[1],
             args[2]
         ]
-        
+
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyForOldTokens", sc_args)
 
     def lock_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list):

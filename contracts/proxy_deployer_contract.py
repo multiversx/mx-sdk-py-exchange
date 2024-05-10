@@ -3,7 +3,7 @@ import traceback
 
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, get_deployed_address_from_tx
+from utils.utils_tx import deploy, endpoint_call, get_deployed_address_given_deployer
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
@@ -79,7 +79,7 @@ class ProxyDeployerContract(DEXContractInterface):
 
         # retrieve deployed contract address
         if tx_hash != "":
-            address = get_deployed_address_from_tx(tx_hash, proxy)
+            address = get_deployed_address_given_deployer(deployer)
 
         return tx_hash, address
 
