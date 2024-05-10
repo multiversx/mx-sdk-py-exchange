@@ -2,10 +2,11 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
-from multiversx_sdk import (Address, ApiNetworkProvider, GenericError,
-                            ProxyNetworkProvider, TokenPayment, Transaction)
+from multiversx_sdk import (Address, AddressComputer, ApiNetworkProvider,
+                            GenericError, ProxyNetworkProvider, TokenPayment,
+                            Transaction)
 from multiversx_sdk.core.interfaces import ICodeMetadata
 from multiversx_sdk.core.transaction_builders import (
     ContractCallBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder,
@@ -471,16 +472,16 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
 
 
 def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
-           owner: Account, bytecode_path: str, metadata: ICodeMetadata, args: list) -> Tuple[str, str]:
+           owner: Account, bytecode_path: str | Path, metadata: ICodeMetadata, args: List[Any]) -> Tuple[str, str]:
     logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
 
     tx = prepare_deploy_tx(owner, network_config, gas, Path(bytecode_path), metadata, args)
     tx_hash = send_deploy_tx(tx, proxy)
+    contract_address = get_deployed_address_given_deployer(owner)
 
     if tx_hash:
-        contract_address = get_deployed_address_from_tx(tx_hash, proxy)
         owner.nonce += 1
 
     return tx_hash, contract_address
@@ -541,11 +542,12 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
     return event
 
 
-def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
-    event = get_event_from_tx("SCDeploy", tx_hash, proxy)
-    if event is None:
-        return ""
-    return event.address.to_bech32()
+
+def get_deployed_address_given_deployer(deployer: Account) -> str:
+    address_computer = AddressComputer()
+    assert deployer.address is not None
+    contract_address = address_computer.compute_contract_address(deployer.address, deployer.nonce).to_bech32()
+    return contract_address
 
 
 def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkProvider,

@@ -1,5 +1,7 @@
 from abc import abstractmethod, ABC
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from utils.utils_chain import Account
 from multiversx_sdk import ProxyNetworkProvider
@@ -15,20 +17,20 @@ class DEXContractInterface(ABC):
     address: str = NotImplemented
 
     @abstractmethod
-    def get_config_dict(self) -> dict:
+    def get_config_dict(self) -> Dict[str, Any]:
         pass
 
     @classmethod
     @abstractmethod
-    def load_config_dict(cls, config_dict: dict):
+    def load_config_dict(cls, config_dict: Dict[str, Any]):
         pass
 
     @abstractmethod
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path: str | Path, args: List[Any]) -> Tuple[str, str]:
         pass
 
     @abstractmethod
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: Optional[List[Any]] = None):
         pass
 
     @abstractmethod
@@ -149,5 +151,3 @@ class LockedAssetContractIdentity(DEXContractIdentityInterface):
     address: str
     unlocked_asset: str
     locked_asset: str
-
-

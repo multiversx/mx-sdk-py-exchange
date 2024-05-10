@@ -38,9 +38,9 @@ class WrapperAddress(Address):
 class Account:
     def __init__(self,
                  address: Optional[str] = None,
-                 pem_file: Optional[str] = None,
+                 pem_file: Optional[str | Path] = None,
                  pem_index: int = 0,
-                 key_file: str = "",
+                 key_file: str | Path = "",
                  password: str = "",
                  ledger: bool = False):
         self.address = Address.new_from_bech32(address) if address else None
