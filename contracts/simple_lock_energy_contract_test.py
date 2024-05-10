@@ -30,7 +30,7 @@ def test_deploy_contract():
         ]
     )
 
-    assert tx_hash == "457dd7c271a6dd0cbac78b1f0eeeca53cd567bd2d746d883b50b495552a4bd7a"
+    assert tx_hash == "cbde33c54afde0a215961568755167c60255a95c70f1a8d91f0b29dc0baa37c2"
     assert contract_address == "erd1qqqqqqqqqqqqqpgqak8zt22wl2ph4tswtyc39namqx6ysa2sd8ss4xmlj3"
 
     tx_on_network = network_provider.get_transaction(tx_hash)
