@@ -1,4 +1,4 @@
 ipykernel
 toml
 debugpy
-multiversx-sdk @ git+https://github.com/multiversx/mx-sdk-py-incubator@main
+multiversx-sdk @ git+https://github.com/multiversx/mx-sdk-py-incubator@codecs-init
