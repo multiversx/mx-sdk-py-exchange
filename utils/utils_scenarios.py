@@ -1,11 +1,11 @@
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-from utils.utils_chain import WrapperAddress as Address, get_all_token_nonces_details_for_account
+from utils.utils_chain import Account, WrapperAddress as Address, get_all_token_nonces_details_for_account, get_token_details_for_address
 from multiprocessing.dummy import Pool
 from multiversx_sdk_network_providers.api_network_provider import ApiNetworkProvider
 from multiversx_sdk_network_providers.interface import IPagination
 from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
 from utils.logger import get_logger
-from typing import List
+from typing import List, Tuple
 
 
 logger = get_logger(__name__)
@@ -107,3 +107,21 @@ def collect_farm_contract_users(users_count: int,
     logger.info(f'Number of users with both farming and farm tokens: {len(fetched_users.get_users_with_both_tokens())}')
 
     return fetched_users
+
+
+def get_token_in_account(proxy: ProxyNetworkProvider, user: Account, token: str, nonce: int = 0) -> Tuple[int, int, str]:
+    """Retrieves the token nonce and amount in the account for a specific token or any token in the account"""
+    token_nonce, token_amount, token_attributes = 0, 0, ""
+
+    if nonce > 0:
+        # looking for a specific token nonce
+        token_nonce = nonce
+        all_tokens = get_all_token_nonces_details_for_account(token, user.address.bech32(), proxy)
+        for token in all_tokens:
+            if token['nonce'] == token_nonce:
+                token_amount = int(token['balance'])
+    else:
+        # looking for whatever token in account
+        token_nonce, token_amount, token_attributes = get_token_details_for_address(token, user.address.bech32(), proxy)
+
+    return token_nonce, token_amount, token_attributes

@@ -189,9 +189,17 @@ class FeesCollectorContract(DEXContractInterface):
         function_purpose = f"Claim rewards from fees collector"
         logger.info(function_purpose)
 
-        gas_limit = 20000000
+        gas_limit = 80000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimRewards", sc_args)
+    
+    def claim_boosted_rewards(self, user: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Claim rewards from fees collector"
+        logger.info(function_purpose)
+
+        gas_limit = 80000000
+        sc_args = []
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimBoostedRewards", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass

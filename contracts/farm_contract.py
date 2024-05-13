@@ -6,7 +6,7 @@ from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
+from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
@@ -445,14 +445,41 @@ class FarmContract(DEXContractInterface):
 
         return user_farm_position
     
-    def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
+    def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> dict:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).serialize()])
+        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).serialize()])
+        if not raw_results:
+            return {}
+        user_farm_position = decode_merged_attributes(raw_results, decoding_structures.USER_FARM_POSITION)
+
+        return user_farm_position
+    
+    def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getCurrentWeek')
         if not raw_results:
             return 0
-        week = int(raw_results)
+        current_week = int(raw_results)
 
-        return week
+        return current_week
+    
+    def get_first_week_start_epoch(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getFirstWeekStartEpoch')
+        if not raw_results:
+            return 0
+        result = int(raw_results)
+
+        return result
+    
+    def get_last_global_update_week(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getLastGlobalUpdateWeek')
+        if not raw_results:
+            return 0
+        result = int(raw_results)
+
+        return result
     
     def get_user_energy_for_week(self, user_address: str, proxy: ProxyNetworkProvider, week: int) -> dict:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
@@ -463,21 +490,14 @@ class FarmContract(DEXContractInterface):
 
         return user_energy_for_week
     
-    def get_total_locked_tokens_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+    def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalLockedTokensForWeek', [week])
+        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).serialize()])
         if not raw_results:
             return 0
-        response = int(raw_results)
+        week = int(raw_results)
 
-        return response
-    
-    def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [week])
-        if not raw_results:
-            return 0
-        return int(raw_results)
+        return week
     
     def get_current_claim_progress_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> dict:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
@@ -488,14 +508,61 @@ class FarmContract(DEXContractInterface):
 
         return response
     
-    def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
+    def get_farm_supply_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentWeek')
+        raw_results = data_fetcher.get_data('getFarmSupplyForWeek', [week])
         if not raw_results:
             return 0
-        current_week = int(raw_results)
-
-        return current_week
+        return int(raw_results)
+    
+    def get_total_locked_tokens_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getTotalLockedTokensForWeek', [week])
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [week])
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_total_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getTotalRewardsForWeek', [week])
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_remaining_boosted_rewards_to_distribute(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getRemainingBoostedRewardsToDistribute', [week])
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_undistributed_boosted_rewards(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getUndistributedBoostedRewards', [week])
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_farm_token_supply(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getFarmTokenSupply')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_reward_reserve(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getRewardReserve')
+        if not raw_results:
+            return 0
+        return int(raw_results)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.start_produce_rewards(deployer, proxy)

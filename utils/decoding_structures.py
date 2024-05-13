@@ -50,6 +50,30 @@ FARM_TOKEN_ATTRIBUTES = {
     'original_owner': 'address',
 }
 
+STAKE_V1_TOKEN_ATTRIBUTES = {
+    'reward_per_share': 'biguint',
+    'compounded_reward': 'biguint',
+    'current_farm_amount': 'biguint'
+}
+
+STAKE_V2_TOKEN_ATTRIBUTES = {
+    'reward_per_share': 'biguint',
+    'compounded_reward': 'biguint',
+    'current_farm_amount': 'biguint',
+    'original_owner': 'address'
+}
+
+STAKE_UNBOND_TOKEN_ATTRIBUTES = {
+    'unlock_epoch': 'u64'
+}
+
+METASTAKE_TOKEN_ATTRIBUTES = {
+    'lp_farm_token_nonce': 'u64',
+    'lp_farm_token_amount': 'biguint',
+    'staking_farm_token_nonce': 'u64',
+    'staking_farm_token_amount': 'biguint'
+}
+
 LKMEX_ATTRIBUTES = {
     'unlock_schedule_list': {
             'unlock_epoch': 'u64',

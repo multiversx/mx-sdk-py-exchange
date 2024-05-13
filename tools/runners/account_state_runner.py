@@ -4,6 +4,10 @@ from argparse import ArgumentParser
 from typing import Dict, Any, Tuple
 from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
+from utils.logger import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def add_parsed_arguments(parser: ArgumentParser):
@@ -34,7 +38,7 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
 
         with open(with_save_in, 'w', encoding="UTF-8") as state_writer:
             json.dump(keys, state_writer, indent=4)
-            print(f'Dumped the retrieved contact state in: {with_save_in}')
+            logger.info(f'Dumped the retrieved contact state in: {with_save_in}')
 
     return keys
 
@@ -108,16 +112,16 @@ def report_key_files_compare(folder_path: str, left_prefix: str, right_prefix: s
                 if keys_in_left:
                     for key, value in keys_in_left.items():
                         log_warning(f"Data only in {left_prefix}: {key}: {value}")
-                        print(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
+                        log_warning(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
                 if keys_in_right:
                     for key, value in keys_in_right.items():
                         log_warning(f"Data only in {right_prefix}: {key}: {value}")
-                        print(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
+                        log_warning(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
                 if common_keys_diff_values:
                     for key, value in common_keys_diff_values.items():
                         log_warning(f"Common key with different values: {key}: {value}")
-                        print(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
+                        log_warning(f"Decoded key: {bytearray.fromhex(key).decode('iso-8859-1')}")
 
         compare_count += 1
 
-    print(f"\nFound and compared {compare_count} account state file pairs.")
+    logger.info(f"\nFound and compared {compare_count} account state file pairs.")
