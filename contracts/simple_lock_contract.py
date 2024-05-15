@@ -1,7 +1,7 @@
 import config
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call
+from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call, upgrade_call
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
@@ -44,6 +44,16 @@ class SimpleLockContract(DEXContractInterface):
 
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
+
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path):
+        function_purpose = "Upgrade simple lock contract"
+        logger.info(function_purpose)
+
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
+        gas_limit = 200000000
+
+        return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
+                            bytecode_path, metadata, [])
 
     def issue_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -165,6 +175,86 @@ class SimpleLockContract(DEXContractInterface):
             args[2]
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addFarmToWhitelist", sc_args)
+
+    def lock_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[List[ESDTToken]]: tokens list
+            type[int]: lock epochs
+        """
+        function_purpose = "lock tokens"
+        logger.info(function_purpose)
+
+        if len(args) < 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        return multi_esdt_endpoint_call(function_purpose, proxy, 10000000,
+                                        user, Address(self.address), "lockTokens", args)
+
+    def add_liquidity_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                    type[List[ESDTToken]]: tokens list
+                    type[int]: first token amount min
+                    type[int]: second token amount min
+        """
+        function_purpose = "add liquidity for locked token"
+        logger.info(function_purpose)
+        if len(args) != 3:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        return multi_esdt_endpoint_call(function_purpose, proxy, 20000000,
+                                        user, Address(self.address), "addLiquidityLockedToken", args)
+
+    def remove_liquidity_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                    type[List[ESDTToken]]: tokens list
+                    type[int]: first token amount min
+                    type[int]: second token amount min
+        """
+        function_purpose = "add liquidity for locked token"
+        logger.info(function_purpose)
+        if len(args) != 3:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        return multi_esdt_endpoint_call(function_purpose, proxy, 20000000,
+                                        user, Address(self.address), "removeLiquidityLockedToken", args)
+
+    def enter_farm_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                    type[List[ESDTToken]]: tokens list
+        """
+        function_purpose = "enter farm with locked token"
+        logger.info(function_purpose)
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
+                                        user, Address(self.address), "enterFarmLockedToken", args)
+
+    def exit_farm_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                    type[List[ESDTToken]]: tokens list
+        """
+        function_purpose = "exit farm with locked token"
+        logger.info(function_purpose)
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
+                                        user, Address(self.address), "exitFarmLockedToken", args)
+
+    def claim_farm_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+                    type[List[ESDTToken]]: tokens list
+        """
+        function_purpose = "claim farm with locked token"
+        logger.info(function_purpose)
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
+                                        user, Address(self.address), "farmClaimRewardsLockedToken", args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
