@@ -315,8 +315,7 @@ class BaseFarmContractDataFetcher(DataFetcher):
             "getDivisionSafetyConstant": self._get_int_view,
             "getFarmTokenId": self._get_hex_view,
             "getFarmingTokenId": self._get_hex_view,
-            "getState": self._get_int_view,
-            "getUserTotalFarmPosition": self._get_hex_view,
+            "getState": self._get_int_view
         }
 
 

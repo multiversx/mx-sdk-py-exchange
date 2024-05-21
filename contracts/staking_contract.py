@@ -1,7 +1,7 @@
 from typing import Any, Dict
 import config
 from contracts.contract_identities import StakingContractVersion
-from contracts.base_contracts import BaseBoostedContract
+from contracts.base_contracts import BaseFarmContract, BaseBoostedContract
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address
@@ -18,7 +18,7 @@ from utils import decoding_structures
 logger = get_logger(__name__)
 
 
-class StakingContract(BaseBoostedContract):
+class StakingContract(BaseFarmContract, BaseBoostedContract):
     def __init__(self, farming_token: str, max_apr: int, rewards_per_block: int, unbond_epochs: int,
                  version: StakingContractVersion, farm_token: str = "", address: str = ""):
         self.farming_token = farming_token
@@ -373,23 +373,9 @@ class StakingContract(BaseBoostedContract):
         endpoint_name = "addAdmin"
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
     
-    def get_farm_token_supply(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFarmTokenSupply')
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
     def get_reward_capacity(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getRewardCapacity')
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
-    def get_reward_reserve(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getRewardReserve')
         if not raw_results:
             return 0
         return int(raw_results)
@@ -403,7 +389,11 @@ class StakingContract(BaseBoostedContract):
     
     def get_all_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
         all_stats = {}
-        all_stats['farm_token_supply'] = self.get_farm_token_supply(proxy)
+        all_stats = {
+            'reward_capacity': self.get_reward_capacity(proxy),
+            'accumulated_rewards': self.get_accumulated_rewards(proxy)
+        }
+        all_stats.update(self.get_all_farm_global_stats(proxy))
         all_stats.update(self.get_all_boosted_global_stats(proxy, week))
         return all_stats
 

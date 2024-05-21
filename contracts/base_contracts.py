@@ -5,7 +5,7 @@
 from utils.logger import get_logger
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from contracts.contract_identities import DEXContractInterface
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from utils.utils_generic import log_unexpected_args
 from utils.utils_tx import endpoint_call
 from utils.contract_data_fetchers import BaseBoostedContractDataFetcher, BaseFarmContractDataFetcher
@@ -217,7 +217,7 @@ class BaseBoostedContract(DEXContractInterface, ABC):
         if week is None:
             week = self.get_current_week(proxy)
 
-        logger.debug(f"Fetching global stats for {self.address} on week {week}")
+        logger.debug(f"Fetching global boosted stats for {self.address} on week {week}")
         
         staking_stats = {
             "first_week": self.get_first_week_start_epoch(proxy),
@@ -233,7 +233,7 @@ class BaseBoostedContract(DEXContractInterface, ABC):
         if week is None:
             week = self.get_current_week(proxy)
 
-        logger.debug(f"Fetching user stats for {user_address} on week {week} on {self.address}")
+        logger.debug(f"Fetching user boosted stats for {user_address} on week {week} on {self.address}")
 
         user_stats = {
             "user_total_farm_position": self.get_user_total_farm_position(user_address, proxy),
@@ -243,3 +243,83 @@ class BaseBoostedContract(DEXContractInterface, ABC):
         }
         return user_stats
 
+
+class BaseFarmContract(DEXContractInterface, ABC):
+    
+    def get_farm_token_supply(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getFarmTokenSupply')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_reward_reserve(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getRewardReserve')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_last_reward_block_nonce(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getLastRewardBlockNonce')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_per_block_reward_amount(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPerBlockRewardAmount')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_reward_per_share(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getRewardPerShare')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_division_safety_constant(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getDivisionSafetyConstant')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_farm_token_id(self, proxy: ProxyNetworkProvider) -> str:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getFarmTokenId')
+        if not raw_results:
+            return ""
+        return hex_to_string(raw_results)
+    
+    def get_farming_token_id(self, proxy: ProxyNetworkProvider) -> str:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getFarmingTokenId')
+        if not raw_results:
+            return ""
+        return hex_to_string(raw_results)
+    
+    def get_state(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getState')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_all_farm_global_stats(self, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
+        """Fetches all global stats for a farm."""
+
+        logger.debug(f"Fetching global farm stats for {self.address}")
+        
+        farm_stats = {
+            "farm_token_supply": self.get_farm_token_supply(proxy),
+            "reward_reserve": self.get_reward_reserve(proxy),
+            "reward_per_share": self.get_reward_per_share(proxy),
+            "last_reward_block_nonce": self.get_last_reward_block_nonce(proxy),
+            "state": self.get_state(proxy)
+        }
+        return farm_stats
+    
