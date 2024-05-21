@@ -1,20 +1,19 @@
 import sys
 import traceback
 from operator import ne
+from typing import Any, Dict, List, Tuple
 
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity, MetaStakingContractVersion
 from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent,
                                      MergeMetastakeWithStakeEvent)
 from multiversx_sdk_network_providers.api_network_provider import ApiNetworkProvider
 from utils.logger import get_logger
-from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, deploy, upgrade_call, \
+from utils.utils_tx import NetworkProviders, deploy, upgrade_call, \
     endpoint_call, ESDTToken, multi_esdt_endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
-    log_unexpected_args
+from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 
@@ -155,9 +154,11 @@ class MetaStakingContract(DEXContractInterface):
         log_substep(f"Farm address: {self.farm_address}")
         log_substep(f"LP address: {self.lp_address}")
 
-    def enter_metastake(self, network_provider: NetworkProviders, user: Account,
-                        event: EnterMetastakeEvent, initial: bool = False) -> str:
-        # TODO: remove initial parameter by using the event data
+    def enter_metastake(self, network_provider: NetworkProviders, user: Account, args: List[Any]) -> str:
+        """Expected as args:
+            type[List[ESDTToken]]: tokens to use
+            optional: type[str]: original caller
+        """
         function_purpose = f"enterMetastaking"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
@@ -165,18 +166,16 @@ class MetaStakingContract(DEXContractInterface):
         metastake_fn = 'stakeFarmTokens'
         gas_limit = 50000000
 
-        tokens = [ESDTToken(event.metastaking_tk, event.metastaking_tk_nonce, event.metastaking_tk_amount)]
-        if not initial:
-            tokens.append(ESDTToken(event.metastake_tk, event.metastake_tk_nonce, event.metastake_tk_amount))
-
-        sc_args = [tokens]
-        if event.original_caller != "":
-            sc_args.append(Address(event.original_caller))
-
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), metastake_fn, sc_args)
+                                        user, Address(self.address), metastake_fn, args)
 
-    def exit_metastake(self, network_provider: NetworkProviders, user: Account, event: ExitMetastakeEvent):
+    def exit_metastake(self, network_provider: NetworkProviders, user: Account, args: List[Any]):
+        """Expected as args:
+            type[List[ESDTToken]]: tokens to use
+            type[int]: first token slippage
+            type[int]: second token slippage
+            optional: type[str]: original caller
+        """
         function_purpose = f"exitMetastaking"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
@@ -184,19 +183,14 @@ class MetaStakingContract(DEXContractInterface):
         gas_limit = 70000000
         exit_metastake_fn = 'unstakeFarmTokens'
 
-        tokens = [ESDTToken(self.metastake_token, event.nonce, event.amount)]
-        sc_args = [tokens,
-                   1,   # first token slippage
-                   1    # second token slippage
-                   ]
-        if event.original_caller != "":
-            sc_args.append(Address(event.original_caller))
-
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), exit_metastake_fn, sc_args)
+                                        user, Address(self.address), exit_metastake_fn, args)
 
-    def claim_rewards_metastaking(self, network_provider: NetworkProviders, user: Account,
-                                  event: ClaimRewardsMetastakeEvent):
+    def claim_rewards_metastaking(self, network_provider: NetworkProviders, user: Account, args: List[Any]):
+        """Expected as args:
+            type[List[ESDTToken]]: tokens to use
+            optional: type[str]: original caller
+        """
         function_purpose = f"claimDualYield"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
@@ -204,28 +198,8 @@ class MetaStakingContract(DEXContractInterface):
         gas_limit = 70000000
         claim_fn = 'claimDualYield'
 
-        tokens = [ESDTToken(self.metastake_token, event.nonce, event.amount)]
-        sc_args = [tokens]
-        if event.original_caller != "":
-            sc_args.append(Address(event.original_caller))
-
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), claim_fn, sc_args)
-
-    def merge_metastaking_with_staking_token(self, network_provider: NetworkProviders, user: Account,
-                                             event: MergeMetastakeWithStakeEvent):
-        function_purpose = f"mergeMetastakingWithStakingToken"
-        logger.info(function_purpose)
-        logger.debug(f"Account: {user.address}")
-
-        gas_limit = 50000000
-        function = 'mergeMetastakingWithStakingToken'
-
-        tokens = [ESDTToken(self.metastake_token, event.metastake_tk_nonce, event.metastake_tk_amount),
-                  ESDTToken(self.stake_token, event.stake_tk_nonce, event.stake_tk_amount)]
-
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), function, tokens)
+                                        user, Address(self.address), claim_fn, args)
     
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
         function_purpose = "Set energy factory address in proxy staking contract"
@@ -239,7 +213,8 @@ class MetaStakingContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
                              [energy_address])
 
-    def get_all_decoded_metastake_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, holder_address: str, token_nonce: int):
+    def get_all_decoded_metastake_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
+                                                              holder_address: str, token_nonce: int) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
         """ Get all decoded attributes of the metastake token and its underlying farm and stake tokens from the proxy. 
         Proxy usage requires to know the holder address."""
         metastake_token_on_network = proxy.get_nonfungible_token_of_account(Address(holder_address), self.metastake_token, token_nonce)
