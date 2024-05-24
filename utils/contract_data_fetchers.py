@@ -191,6 +191,7 @@ class FarmContractDataFetcher(DataFetcher):
             "getTotalRewardsForWeek": self._get_int_view,
             "getRemainingBoostedRewardsToDistribute": self._get_int_view,
             "getUndistributedBoostedRewards": self._get_int_view,
+            "getPermissions": self._get_int_view,
         }
 
 
@@ -272,6 +273,7 @@ class StakingContractDataFetcher(DataFetcher):
             "getTotalRewardsForWeek": self._get_int_view,
             "getRemainingBoostedRewardsToDistribute": self._get_int_view,
             "getUndistributedBoostedRewards": self._get_int_view,
+            "getPermissions": self._get_int_view,
         }
 
 

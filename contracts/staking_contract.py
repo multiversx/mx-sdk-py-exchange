@@ -387,6 +387,13 @@ class StakingContract(BaseFarmContract, BaseBoostedContract):
             return 0
         return int(raw_results)
     
+    def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPermissions', [Address(address).serialize()])
+        if not raw_results:
+            return -1
+        return int(raw_results)
+    
     def get_all_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
         all_stats = {}
         all_stats = {

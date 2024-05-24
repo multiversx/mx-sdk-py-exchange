@@ -436,6 +436,13 @@ class FarmContract(BaseFarmContract, BaseBoostedContract):
 
         return address
     
+    def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPermissions', [Address(address).serialize()])
+        if not raw_results:
+            return -1
+        return int(raw_results)
+    
     def get_all_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
         all_stats = {}
         all_stats.update(self.get_all_farm_global_stats(proxy))
