@@ -2,12 +2,14 @@ import sys
 import traceback
 
 from contracts.base_contracts import BaseBoostedContract
+from utils import decoding_structures
+from utils.contract_data_fetchers import FeeCollectorContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, upgrade_call
 from utils.utils_generic import log_step_pass, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
 from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk_network_providers import ApiNetworkProvider, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)
@@ -206,3 +208,95 @@ class FeesCollectorContract(BaseBoostedContract):
 
     def print_contract_info(self):
         log_step_pass(f"Deployed fees collector contract: {self.address}")
+
+    def allow_external_claim(self, user: Account, proxy: ProxyNetworkProvider, allow_external_claim: bool):
+        fn = 'setAllowExternalClaimRewards'
+        sc_args = [
+            allow_external_claim
+        ]
+        logger.info(f"{fn}")
+        # logger.debug(f"Account: {user.address}")
+
+        gas_limit = 80000000
+
+        return endpoint_call(proxy, gas_limit ,user, Address(self.address), "setAllowExternalClaimRewards", sc_args)
+    
+    
+    def get_user_energy_for_week(self, user: str, proxy: ProxyNetworkProvider, week: int) -> dict:
+        user_address = Address(user)
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url) 
+
+        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [Address(user), week])
+        print(raw_results)
+        if not raw_results:
+            return {}
+        user_energy_for_week = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
+
+        return user_energy_for_week
+    
+    def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getCurrentWeek')
+        if not raw_results:
+            return 0
+        current_week = int(raw_results)
+
+        return current_week
+    
+    def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).get_public_key()])
+        if not raw_results:
+            return 0
+        week = int(raw_results)
+
+        return week
+
+    def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [week])
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_total_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getTotalRewardsForWeek', [week])
+        if not raw_results:
+            return {}
+        for data in raw_results:
+            tokens_list = [decode_merged_attributes(data, decoding_structures.TOTAL_REWARDS_FOR_WEEK)]
+            return tokens_list
+        
+        print(raw_results)
+        print(tokens_list)
+
+        return tokens_list
+    
+    def get_all_stats(self, proxy: ProxyNetworkProvider,user: Account, week: int):
+        user_energy = self.get_user_energy_for_week(proxy, user.address.bech32())      
+        logger.debug(f'User energy: {user_energy}')
+        
+        fees_collector_stats = {
+            "first_week": self.get_first_week_start_epoch(proxy),
+            "current_week": self.get_current_week(proxy),
+            "total_rewards_for_week": self.get_total_rewards_for_week(proxy, week),
+            "total_energy_for_week": self.get_total_energy_for_week(proxy, week)
+        }
+        return user_energy, fees_collector_stats
+    
+
+    def get_tx_op(self, tx_hash: str, operation: dict, api: ApiNetworkProvider) -> dict:
+        used_api = api
+        # Get the transaction details
+        tx = used_api.get_transaction(tx_hash)
+        print(tx)
+        # Get and check transaction operations
+        ops = tx.raw_response['operations']
+
+        # Take each op in ops and match it with operation. Try to match only the fields expected in operation dictionary. 
+        # TX Operations are unordered. If any of the operations match, return it.
+        for op in ops:
+            # print(f'Matching with {operation}')
+            if all(op.get(key) == operation.get(key) for key in operation.keys()):
+                return op
