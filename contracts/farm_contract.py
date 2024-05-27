@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
+from contracts.base_contracts import BaseFarmContract, BaseBoostedContract
 from utils import decoding_structures
 from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
@@ -9,15 +10,14 @@ from utils.utils_tx import NetworkProviders, ESDTToken, \
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
-from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_warning, \
-    log_unexpected_args
+from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
                                 CompoundRewardsFarmEvent, MigratePositionFarmEvent)
 
 logger = get_logger(__name__)
 
 
-class FarmContract(DEXContractInterface):
+class FarmContract(BaseFarmContract, BaseBoostedContract):
     def __init__(self, farming_token, farm_token, farmed_token, address, version: FarmContractVersion,
                  proxy_contract=None):
         self.farmingToken = farming_token
@@ -436,66 +436,18 @@ class FarmContract(DEXContractInterface):
 
         return address
     
-    def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> dict:
+    def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).serialize()])
+        raw_results = data_fetcher.get_data('getPermissions', [Address(address).serialize()])
         if not raw_results:
-            return {}
-        user_farm_position = decode_merged_attributes(raw_results, decoding_structures.USER_FARM_POSITION)
-
-        return user_farm_position
-    
-    def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).serialize()])
-        if not raw_results:
-            return 0
-        week = int(raw_results)
-
-        return week
-    
-    def get_user_energy_for_week(self, user_address: str, proxy: ProxyNetworkProvider, week: int) -> dict:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [Address(user_address).serialize(), week])
-        if not raw_results:
-            return {}
-        user_energy_for_week = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
-
-        return user_energy_for_week
-    
-    def get_total_locked_tokens_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalLockedTokensForWeek', [week])
-        if not raw_results:
-            return 0
-        response = int(raw_results)
-
-        return response
-    
-    def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [week])
-        if not raw_results:
-            return 0
+            return -1
         return int(raw_results)
     
-    def get_current_claim_progress_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> dict:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentClaimProgress', [Address(user_address).serialize()])
-        if not raw_results:
-            return {}
-        response = decode_merged_attributes(raw_results, decoding_structures.USER_CLAIM_PROGRESS)
-
-        return response
-    
-    def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentWeek')
-        if not raw_results:
-            return 0
-        current_week = int(raw_results)
-
-        return current_week
+    def get_all_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
+        all_stats = {}
+        all_stats.update(self.get_all_farm_global_stats(proxy))
+        all_stats.update(self.get_all_boosted_global_stats(proxy, week))
+        return all_stats
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.start_produce_rewards(deployer, proxy)

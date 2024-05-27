@@ -1,19 +1,24 @@
+from typing import Any, Dict
 import config
-from contracts.contract_identities import DEXContractInterface, StakingContractVersion
+from contracts.contract_identities import StakingContractVersion
+from contracts.base_contracts import BaseFarmContract, BaseBoostedContract
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address
+from utils.contract_data_fetchers import StakingContractDataFetcher
 from multiversx_sdk_core import CodeMetadata
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
                                 ClaimRewardsFarmEvent, CompoundRewardsFarmEvent)
 
+from utils import decoding_structures
+
 
 logger = get_logger(__name__)
 
 
-class StakingContract(DEXContractInterface):
+class StakingContract(BaseFarmContract, BaseBoostedContract):
     def __init__(self, farming_token: str, max_apr: int, rewards_per_block: int, unbond_epochs: int,
                  version: StakingContractVersion, farm_token: str = "", address: str = ""):
         self.farming_token = farming_token
@@ -149,7 +154,8 @@ class StakingContract(DEXContractInterface):
             self.farming_token,
             1000000000000,
             self.max_apr,
-            self.unbond_epochs
+            self.unbond_epochs,
+            0, 0
         ]
         if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
             arguments.extend(args)
@@ -366,10 +372,42 @@ class StakingContract(DEXContractInterface):
 
         endpoint_name = "addAdmin"
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
+    
+    def get_reward_capacity(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getRewardCapacity')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_accumulated_rewards(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getAccumulatedRewards')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPermissions', [Address(address).serialize()])
+        if not raw_results:
+            return -1
+        return int(raw_results)
+    
+    def get_all_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
+        all_stats = {}
+        all_stats = {
+            'reward_capacity': self.get_reward_capacity(proxy),
+            'accumulated_rewards': self.get_accumulated_rewards(proxy)
+        }
+        all_stats.update(self.get_all_farm_global_stats(proxy))
+        all_stats.update(self.get_all_boosted_global_stats(proxy, week))
+        return all_stats
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         _ = self.start_produce_rewards(deployer, proxy)
         _ = self.resume(deployer, proxy)
+        pass
 
     def print_contract_info(self):
         log_step_pass(f"Deployed staking contract: {self.address}")

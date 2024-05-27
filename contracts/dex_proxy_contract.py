@@ -456,7 +456,7 @@ class DexProxyContract(DEXContractInterface):
         log_substep(f"Proxy LP token: {self.proxy_lp_token}")
         log_substep(f"Proxy Farm token: {self.proxy_farm_token}")
 
-    def get_all_decoded_farm_token_attributes_from_network(self, api: ApiNetworkProvider, farm_token_nonce: int):
+    def get_all_decoded_farm_token_attributes_from_api(self, api: ApiNetworkProvider, farm_token_nonce: int):
         # Get token details for a given farm token
         farm_token_on_network = api.get_non_fungible_token(self.proxy_farm_token, farm_token_nonce)
 
@@ -469,11 +469,11 @@ class DexProxyContract(DEXContractInterface):
         if xmex_lp_token_id != self.proxy_lp_token:
             logger.error(f"Wrong token contained by XMEXFARM token: {xmex_lp_token_id} expected {self.proxy_lp_token}")
 
-        decoded_xmex_lp_attributes, decoded_lk_token_attributes = self.get_all_decoded_lp_token_attributes_from_network(api, decoded_xmex_farm_attributes.get('proxy_token_nonce'))
+        decoded_xmex_lp_attributes, decoded_lk_token_attributes = self.get_all_decoded_lp_token_attributes_from_api(api, decoded_xmex_farm_attributes.get('proxy_token_nonce'))
 
         return decoded_xmex_farm_attributes, decoded_xmex_lp_attributes, decoded_lk_token_attributes
     
-    def get_all_decoded_lp_token_attributes_from_network(self, api: ApiNetworkProvider, lp_token_nonce: int):
+    def get_all_decoded_lp_token_attributes_from_api(self, api: ApiNetworkProvider, lp_token_nonce: int):
         # Decode the LP token attributes
         lp_token_on_network = api.get_non_fungible_token(self.proxy_lp_token, lp_token_nonce)
 

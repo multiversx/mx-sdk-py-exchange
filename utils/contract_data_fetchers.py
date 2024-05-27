@@ -5,6 +5,7 @@ from multiversx_sdk_core import Address, ContractQueryBuilder
 from multiversx_sdk_network_providers import ProxyNetworkProvider
 from utils.logger import get_logger
 from utils.utils_chain import base64_to_hex
+from typing import List, Any
 
 
 logger = get_logger(__name__)
@@ -16,14 +17,14 @@ class DataFetcher:
         self.contract_address = contract_address
         self.view_handler_map = {}
 
-    def get_data(self, view_name: str, attrs: list = []):
+    def get_data(self, view_name: str, attrs: List[Any] = []) -> Any:
         if view_name in self.view_handler_map:
             return self.view_handler_map[view_name](view_name, attrs)
         else:
             logger.error(f"View name not registered in {type(self).__name__}")
             raise ValueError(f"View name not registered in {type(self).__name__}")
 
-    def _query_contract(self, view_name: str, attrs: list = []):
+    def _query_contract(self, view_name: str, attrs: List[Any] = []):
         builder = ContractQueryBuilder(
             contract=self.contract_address,
             function=view_name,
@@ -32,11 +33,11 @@ class DataFetcher:
         query = builder.build()
         return self.proxy.query_contract(query)
 
-    def _get_int_view(self, view_name: str, attrs) -> int:
+    def _get_int_view(self, view_name: str, attrs: List[Any]) -> int:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            if result.return_data[0] == '':
+            if len(result.return_data) == 0 or result.return_data[0] == "":
                 return 0
             return int(base64_to_hex(result.return_data[0]), base=16)
         except Exception as ex:
@@ -45,7 +46,7 @@ class DataFetcher:
                 logger.debug(f"Response content: {result.to_dictionary()}")
         return -1
 
-    def _get_int_list_view(self, view_name: str, attrs) -> list:
+    def _get_int_list_view(self, view_name: str, attrs: List[Any]) -> List[int]:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
@@ -56,10 +57,12 @@ class DataFetcher:
                 logger.debug(f"Response content: {result.to_dictionary()}")
         return []
 
-    def _get_hex_view(self, view_name: str, attrs) -> str:
+    def _get_hex_view(self, view_name: str, attrs: List[Any]) -> str:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
+            if len(result.return_data) == 0 or result.return_data[0] == "":
+                return ""
             return base64_to_hex(result.return_data[0])
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
@@ -67,7 +70,7 @@ class DataFetcher:
                 logger.debug(f"Response content: {result.to_dictionary()}")
         return ""
 
-    def _get_hex_list_view(self, view_name: str, attrs) -> list:
+    def _get_hex_list_view(self, view_name: str, attrs: List[Any]) -> List[str]:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
@@ -176,12 +179,19 @@ class FarmContractDataFetcher(DataFetcher):
             "getState": self._get_int_view,
             "getPairContractManagedAddress": self._get_hex_view,
             "getUserTotalFarmPosition": self._get_hex_view,
+            "getCurrentWeek": self._get_int_view,            
+            "getFirstWeekStartEpoch": self._get_int_view,
+            "getLastGlobalUpdateWeek": self._get_int_view,
             "getUserEnergyForWeek": self._get_hex_view,
-            "getCurrentWeek": self._get_int_view,
             "getLastActiveWeekForUser": self._get_int_view,
+            "getCurrentClaimProgress": self._get_hex_view,
+            "getFarmSupplyForWeek": self._get_int_view,
             "getTotalLockedTokensForWeek": self._get_int_view,
             "getTotalEnergyForWeek": self._get_int_view,
-            "getCurrentClaimProgress": self._get_hex_view,
+            "getTotalRewardsForWeek": self._get_int_view,
+            "getRemainingBoostedRewardsToDistribute": self._get_int_view,
+            "getUndistributedBoostedRewards": self._get_int_view,
+            "getPermissions": self._get_int_view,
         }
 
 
@@ -221,8 +231,11 @@ class FeeCollectorContractDataFetcher(DataFetcher):
             "getEquivalent": self._get_int_view,
             "updateAndGetSafePrice": self._get_hex_view,
             "getLpTokenIdentifier": self._get_hex_view,
+            "getTotalRewardsForWeek": self._get_hex_view,
             "getTokensForGivenPosition": self._get_int_list_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
+            "getUserEnergyForWeek": self._get_hex_view,
+            "getTotalEnergyForWeek": self._get_int_view,
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
@@ -239,12 +252,28 @@ class StakingContractDataFetcher(DataFetcher):
             "getPerBlockRewardAmount": self._get_int_view,
             "getAnnualPercentageRewards": self._get_int_view,
             "getRewardCapacity": self._get_int_view,
+            "getRewardReserve": self._get_int_view,
+            "getAccumulatedRewards": self._get_int_view,
             "getRewardPerShare": self._get_int_view,
             "getMinUnbondEpochs": self._get_int_view,
             "getDivisionSafetyConstant": self._get_int_view,
             "getFarmTokenId": self._get_hex_view,
             "getFarmingTokenId": self._get_hex_view,
             "getState": self._get_int_view,
+            "getUserTotalFarmPosition": self._get_hex_view,
+            "getCurrentWeek": self._get_int_view,            
+            "getFirstWeekStartEpoch": self._get_int_view,
+            "getLastGlobalUpdateWeek": self._get_int_view,
+            "getUserEnergyForWeek": self._get_hex_view,
+            "getLastActiveWeekForUser": self._get_int_view,
+            "getCurrentClaimProgress": self._get_hex_view,
+            "getFarmSupplyForWeek": self._get_int_view,
+            "getTotalLockedTokensForWeek": self._get_int_view,
+            "getTotalEnergyForWeek": self._get_int_view,
+            "getTotalRewardsForWeek": self._get_int_view,
+            "getRemainingBoostedRewardsToDistribute": self._get_int_view,
+            "getUndistributedBoostedRewards": self._get_int_view,
+            "getPermissions": self._get_int_view,
         }
 
 
@@ -273,6 +302,42 @@ class LiquidLockingContractDataFetcher(DataFetcher):
             "unlockedTokens": self._get_hex_list_view,
             "whitelistedTokens": self._get_hex_list_view,
             "unbondPeriod": self._get_int_view
+        }
+
+
+class BaseFarmContractDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "getFarmTokenSupply": self._get_int_view,
+            "getLastRewardBlockNonce": self._get_int_view,
+            "getPerBlockRewardAmount": self._get_int_view,
+            "getRewardReserve": self._get_int_view,
+            "getRewardPerShare": self._get_int_view,
+            "getDivisionSafetyConstant": self._get_int_view,
+            "getFarmTokenId": self._get_hex_view,
+            "getFarmingTokenId": self._get_hex_view,
+            "getState": self._get_int_view
+        }
+
+
+class BaseBoostedContractDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "getCurrentWeek": self._get_int_view,            
+            "getFirstWeekStartEpoch": self._get_int_view,
+            "getLastGlobalUpdateWeek": self._get_int_view,
+            "getUserTotalFarmPosition": self._get_hex_view,
+            "getUserEnergyForWeek": self._get_hex_view,
+            "getLastActiveWeekForUser": self._get_int_view,
+            "getCurrentClaimProgress": self._get_hex_view,
+            "getFarmSupplyForWeek": self._get_int_view,
+            "getTotalLockedTokensForWeek": self._get_int_view,
+            "getTotalEnergyForWeek": self._get_int_view,
+            "getTotalRewardsForWeek": self._get_int_view,
+            "getRemainingBoostedRewardsToDistribute": self._get_int_view,
+            "getUndistributedBoostedRewards": self._get_int_view,
         }
 
 
