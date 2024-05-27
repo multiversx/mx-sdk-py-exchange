@@ -150,67 +150,6 @@ class BaseBoostedContract(DEXContractInterface, ABC):
         if not raw_results:
             return 0
         return int(raw_results)
-        return user_energy_for_week
-    
-    def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).serialize()])
-        if not raw_results:
-            return 0
-        week = int(raw_results)
-
-        return week
-    
-    def get_current_claim_progress_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentClaimProgress', [Address(user_address).serialize()])
-        if not raw_results:
-            return {}
-        response = decode_merged_attributes(raw_results, decoding_structures.USER_CLAIM_PROGRESS)
-
-        return response
-    
-    def get_farm_supply_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFarmSupplyForWeek', [week])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
-    def get_total_locked_tokens_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalLockedTokensForWeek', [week])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
-    def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [week])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
-    def get_total_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalRewardsForWeek', [week])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
-    def get_remaining_boosted_rewards_to_distribute(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getRemainingBoostedRewardsToDistribute', [week])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
-    def get_undistributed_boosted_rewards(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUndistributedBoostedRewards', [week])
-        if not raw_results:
-            return 0
-        return int(raw_results)
 
     def get_all_boosted_global_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
         """Fetches all global stats for a given week. If no week is provided, it will fetch the current week."""
