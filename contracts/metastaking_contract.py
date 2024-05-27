@@ -154,7 +154,7 @@ class MetaStakingContract(DEXContractInterface):
         log_substep(f"Farm address: {self.farm_address}")
         log_substep(f"LP address: {self.lp_address}")
 
-    def enter_metastake(self, network_provider: NetworkProviders, user: Account, args: List[Any]) -> str:
+    def enter_metastake(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]) -> str:
         """Expected as args:
             type[List[ESDTToken]]: tokens to use
             optional: type[str]: original caller
@@ -166,10 +166,10 @@ class MetaStakingContract(DEXContractInterface):
         metastake_fn = 'stakeFarmTokens'
         gas_limit = 50000000
 
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
                                         user, Address(self.address), metastake_fn, args)
 
-    def exit_metastake(self, network_provider: NetworkProviders, user: Account, args: List[Any]):
+    def exit_metastake(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
         """Expected as args:
             type[List[ESDTToken]]: tokens to use
             type[int]: first token slippage
@@ -183,10 +183,10 @@ class MetaStakingContract(DEXContractInterface):
         gas_limit = 70000000
         exit_metastake_fn = 'unstakeFarmTokens'
 
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
                                         user, Address(self.address), exit_metastake_fn, args)
 
-    def claim_rewards_metastaking(self, network_provider: NetworkProviders, user: Account, args: List[Any]):
+    def claim_rewards_metastaking(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
         """Expected as args:
             type[List[ESDTToken]]: tokens to use
             optional: type[str]: original caller
@@ -198,7 +198,7 @@ class MetaStakingContract(DEXContractInterface):
         gas_limit = 70000000
         claim_fn = 'claimDualYield'
 
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
                                         user, Address(self.address), claim_fn, args)
     
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
