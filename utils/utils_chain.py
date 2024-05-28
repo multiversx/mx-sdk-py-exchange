@@ -355,7 +355,7 @@ def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
         result = 0
         if payload_size:
             _, hex, index = fixed_length_primitive(attributes, index, payload_size)
-            result = int.from_bytes(hex, byteorder="big", signed=True)
+            result = int.from_bytes(bytes.fromhex(hex), byteorder="big", signed=True)
         return result, index
 
     def string(attributes: str, start_index: int):
