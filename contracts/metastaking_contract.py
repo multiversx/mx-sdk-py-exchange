@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity, MetaStakingContractVersion
 from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent,
                                      MergeMetastakeWithStakeEvent)
-from multiversx_sdk_network_providers.api_network_provider import ApiNetworkProvider
+from multiversx_sdk import ApiNetworkProvider
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, deploy, upgrade_call, \
     endpoint_call, ESDTToken, multi_esdt_endpoint_call

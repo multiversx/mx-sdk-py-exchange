@@ -1,4 +1,4 @@
-from multiversx_sdk import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider, ApiNetworkProvider
 from utils.utils_chain import Account, WrapperAddress as Address, get_all_token_nonces_details_for_account, get_token_details_for_address
 from multiprocessing.dummy import Pool
 from multiversx_sdk.network_providers.interface import IPagination

@@ -20,7 +20,7 @@ from multiversx_sdk.network_providers.transaction_status import \
 from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
 
 from utils.logger import get_logger
-from utils.utils_chain import Account, log_explorer_transaction
+from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
                                  log_unexpected_args, split_to_chunks)
 
@@ -268,7 +268,7 @@ def _prep_args_for_addresses(args: List):
     new_args = []
     for item in args:
         if type(item) is str and "erd" in item:
-            item = Address.new_from_bech32(item)
+            item = WrapperAddress(item)
         new_args.append(item)
     return new_args
 
@@ -570,4 +570,5 @@ def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkP
         if sleep is not None:
             time.sleep(sleep)
 
+    logger.debug(f"Hashes: {hashes}")
     return hashes

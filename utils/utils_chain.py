@@ -60,9 +60,9 @@ class Account:
         if self.address:
             self.nonce = proxy.get_account(self.address).nonce
             logger.debug(f"Account.sync_nonce() done: {self.nonce}")
-        
-        logger.exception(f"Account.address is not set. Can't sync nonce for address={self.address}")
-        raise Exception("Account.address is not set.")
+        else:
+            logger.exception(f"Account.address is not set. Can't sync nonce for address={self.address}")
+            raise Exception("Account.address is not set.")
 
     def sign_transaction(self, transaction: Transaction) -> ISignature:
         assert self.signer is not None

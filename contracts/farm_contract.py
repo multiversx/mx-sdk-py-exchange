@@ -11,6 +11,7 @@ from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
                                 CompoundRewardsFarmEvent, MigratePositionFarmEvent)
+from typing import Dict, Any
 
 logger = get_logger(__name__)
 
@@ -436,7 +437,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract):
     
     def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPermissions', [Address(address).serialize()])
+        raw_results = data_fetcher.get_data('getPermissions', [Address(address).get_public_key()])
         if not raw_results:
             return -1
         return int(raw_results)
