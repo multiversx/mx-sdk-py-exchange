@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 import json
 import os
 
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 from config import GRAPHQL
 from contracts.contract_identities import FarmContractVersion
 from contracts.farm_contract import FarmContract
@@ -143,7 +143,7 @@ def pause_farm_contract(farm_address: str):
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
 
-    data_fetcher = FarmContractDataFetcher(Address.from_bech32(farm_address), network_providers.proxy.url)
+    data_fetcher = FarmContractDataFetcher(Address.new_from_bech32(farm_address), network_providers.proxy.url)
     contract_state = data_fetcher.get_data("getState")
     contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
     if contract_state != 0:
@@ -398,7 +398,7 @@ def replace_v2_ownership(old_owner: str, compare_states: bool = False):
     dex_owner = get_owner(network_providers.proxy)
 
     all_addresses = get_all_farm_v2_addresses()
-    cleaned_address = Address(old_owner).bech32()   # pass it through the Address class to check if it's valid
+    cleaned_address = Address(old_owner).to_bech32()   # pass it through the Address class to check if it's valid
 
     print(f"Searching farm ownership for {cleaned_address}...")
 
@@ -408,7 +408,7 @@ def replace_v2_ownership(old_owner: str, compare_states: bool = False):
         contract = FarmContract("", "", "", address, FarmContractVersion.V2Boosted)
         data_fetcher = FarmContractDataFetcher(Address(address), network_providers.proxy.url)
 
-        permissions = data_fetcher.get_data("getPermissions", [Address(cleaned_address).pubkey()])
+        permissions = data_fetcher.get_data("getPermissions", [Address(cleaned_address).get_public_key()])
         if not permissions:
             continue
         print(f"Found permissions {permissions} for {cleaned_address} in contract {address}. Replace it?")

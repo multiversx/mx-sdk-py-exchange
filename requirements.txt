@@ -1,6 +1,4 @@
 ipykernel
-multiversx-sdk-core~=0.6.0
-multiversx-sdk-network-providers~=0.11.1
-multiversx-sdk-wallet~=0.7.0
 toml
 debugpy
+multiversx-sdk==0.9.0

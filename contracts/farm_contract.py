@@ -1,4 +1,3 @@
-from typing import Dict, Any
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
 from contracts.base_contracts import BaseFarmContract, BaseBoostedContract
@@ -8,11 +7,11 @@ from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
                                 CompoundRewardsFarmEvent, MigratePositionFarmEvent)
+from typing import Dict, Any
 
 logger = get_logger(__name__)
 
@@ -438,7 +437,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract):
     
     def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPermissions', [Address(address).serialize()])
+        raw_results = data_fetcher.get_data('getPermissions', [Address(address).get_public_key()])
         if not raw_results:
             return -1
         return int(raw_results)

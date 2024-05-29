@@ -14,7 +14,7 @@ from contracts.router_contract import RouterContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.staking_contract import StakingContract
 from contracts.unstaker_contract import UnstakerContract
-from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher, \
+from utils.contract_data_fetchers import PairContractDataFetcher, \
     FarmContractDataFetcher, SimpleLockEnergyContractDataFetcher, StakingContractDataFetcher, \
     MetaStakingContractDataFetcher, ProxyContractDataFetcher, LockedAssetContractDataFetcher
 from utils.utils_chain import hex_to_string, WrapperAddress as Address

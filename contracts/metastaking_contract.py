@@ -6,15 +6,13 @@ from typing import Any, Dict, List, Tuple
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity, MetaStakingContractVersion
 from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent,
                                      MergeMetastakeWithStakeEvent)
-from multiversx_sdk_network_providers.api_network_provider import ApiNetworkProvider
+from multiversx_sdk import ApiNetworkProvider
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, deploy, upgrade_call, \
     endpoint_call, ESDTToken, multi_esdt_endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
-
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 
 logger = get_logger(__name__)

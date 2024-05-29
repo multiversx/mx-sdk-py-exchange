@@ -8,7 +8,7 @@ from itertools import count
 from typing import List, Optional
 from argparse import ArgumentParser
 
-from multiversx_sdk_network_providers import ApiNetworkProvider, ProxyNetworkProvider
+from multiversx_sdk import AddressComputer, ApiNetworkProvider, ProxyNetworkProvider
 
 import config
 from contracts.egld_wrap_contract import EgldWrapContract
@@ -181,7 +181,7 @@ def stress(context: Context, threads: int, repeats: int, contract: MetaStakingCo
             for _ in range(jobs):
                 account = random.choice(accounts)
                 future = executor.submit(stress_per_account, context, account, contract)
-                futures_per_account[account.address.bech32()] = future
+                futures_per_account[account.address.to_bech32()] = future
 
             # feed the thread workers as they complete each job
             while finished_jobs < repeats or repeats == 0:
@@ -205,12 +205,12 @@ def stress(context: Context, threads: int, repeats: int, contract: MetaStakingCo
 
                         # get a new account that is not already running
                         account = random.choice(accounts)
-                        while account.address.bech32() in futures_per_account.keys():
+                        while account.address.to_bech32() in futures_per_account.keys():
                             account = random.choice(accounts)
                         
                         # spawn a new job
                         new_future = executor.submit(stress_per_account, context, account, contract)
-                        futures_per_account[account.address.bech32()] = new_future
+                        futures_per_account[account.address.to_bech32()] = new_future
                         
                 except Exception as ex:
                     traceback.print_exception(*sys.exc_info())
@@ -223,8 +223,9 @@ def stress(context: Context, threads: int, repeats: int, contract: MetaStakingCo
 def stress_per_account(context: Context, account: Account, metastaking_contract: MetaStakingContract):
     min_time = 2
     max_time = 10
-    deployer_shard = context.deployer_account.address.get_shard()
-    sleep_time = config.CROSS_SHARD_DELAY if account.address.get_shard() is not deployer_shard \
+    address_computer = AddressComputer()
+    deployer_shard = address_computer.get_shard_of_address(context.deployer_account.address)
+    sleep_time = config.CROSS_SHARD_DELAY if address_computer.get_shard_of_address(account.address) is not deployer_shard \
         else config.INTRA_SHARD_DELAY
 
     account.sync_nonce(context.network_provider.proxy)

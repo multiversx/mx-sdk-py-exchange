@@ -1,4 +1,4 @@
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 from utils.utils_tx import NetworkProviders
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable

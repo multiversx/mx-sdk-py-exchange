@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 import config
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
@@ -83,8 +83,8 @@ def upgrade_template_pair_contract(compare_states: bool = False):
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
 
-    router_data_fetcher = RouterContractDataFetcher(Address.from_bech32(router_address), network_providers.proxy.url)
-    template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
+    router_data_fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), network_providers.proxy.url)
+    template_pair_address = Address.new_from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").to_bech32()
     template_pair = retrieve_pair_by_address(template_pair_address)
 
     if compare_states:

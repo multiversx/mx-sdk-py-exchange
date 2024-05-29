@@ -3,7 +3,7 @@ import random
 import sys
 import time
 import traceback
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 from typing import List
 from argparse import ArgumentParser
 
@@ -15,7 +15,7 @@ from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from events.event_generators import generate_swap_fixed_input
 from utils.contract_data_fetchers import PairContractDataFetcher, SimpleLockEnergyContractDataFetcher
 from utils.utils_tx import ESDTToken
-from utils.utils_chain import nominated_amount, \
+from utils.utils_chain import Account, nominated_amount, \
     get_all_token_nonces_details_for_account
 from utils.utils_generic import log_step_fail, log_step_pass
 from ported_arrows.stress.send_token_from_minter import main as send_token_from_minter
@@ -75,7 +75,7 @@ def add_initial_liquidity(context: Context):
     # add initial liquidity
     pair_contract: PairContract
     for pair_contract in context.get_contracts(config.PAIRS_V2):
-        pair_data_fetcher = PairContractDataFetcher(Address.from_bech32(pair_contract.address), context.network_provider.proxy.url)
+        pair_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_contract.address), context.network_provider.proxy.url)
         first_token_liquidity = pair_data_fetcher.get_token_reserve(pair_contract.firstToken)
         if first_token_liquidity == 0:
             event = AddLiquidityEvent(
@@ -143,7 +143,7 @@ def scenarios_per_account(context: Context, account: Account):
 
     simple_lock_energy_contract: SimpleLockEnergyContract
     simple_lock_energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
-    simple_lock_energy_data_fetcher = SimpleLockEnergyContractDataFetcher(Address.from_bech32(simple_lock_energy_contract.address),
+    simple_lock_energy_data_fetcher = SimpleLockEnergyContractDataFetcher(Address.new_from_bech32(simple_lock_energy_contract.address),
                                                                           context.network_provider.proxy.url)
     lock_options = simple_lock_energy_data_fetcher.get_data('getLockOptions')
 
@@ -164,7 +164,7 @@ def scenarios_per_account(context: Context, account: Account):
     # unlock tokens early - 20% chance
     if random.randint(0, 100) <= 20:
         user_tokens = get_all_token_nonces_details_for_account(simple_lock_energy_contract.locked_token,
-                                                               account.address.bech32(),
+                                                               account.address.to_bech32(),
                                                                context.network_provider.proxy)
         if len(user_tokens) > 0:    # if user has locked tokens, unlock some from one of them
             token_to_unlock = random.choice(user_tokens)
@@ -180,7 +180,7 @@ def scenarios_per_account(context: Context, account: Account):
     # claim rewards once in a while - 35% chance
     if random.randint(0, 100) <= 35:
         _ = fees_collector_contract.claim_rewards(account, context.network_provider.proxy)
-        print(f"User: {account.address.bech32()}")
+        print(f"User: {account.address.to_bech32()}")
         time.sleep(sleep_time)
 
     wait_time = random.randint(min_time, max_time)

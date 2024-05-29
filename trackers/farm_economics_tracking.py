@@ -1,5 +1,5 @@
 from typing import Dict
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 from utils.utils_chain import Account
 from utils.contract_data_fetchers import FarmContractDataFetcher, ChainDataFetcher
 from utils.utils_tx import NetworkProviders
@@ -476,9 +476,9 @@ class FarmEconomics(Subscriber):
         log_step_pass("Checked claim rewards tx data!")
 
     def __enter_farm_event_for_account(self, account: Account, block: int, lp_staked: int):
-        if account.address.bech32() not in self.accounts:
-            self.accounts[account.address.bech32()] = FarmAccountEconomics(account.address)
-        self.accounts[account.address.bech32()].enter_farm(self.rewards_per_share, block, lp_staked)
+        if account.address.to_bech32() not in self.accounts:
+            self.accounts[account.address.to_bech32()] = FarmAccountEconomics(account.address)
+        self.accounts[account.address.to_bech32()].enter_farm(self.rewards_per_share, block, lp_staked)
         # TODO: integrate this tracker in the enter farm event and care for the proper initialization of LP staked when
         # there are already existing positions in farm
 

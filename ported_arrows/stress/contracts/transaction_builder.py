@@ -3,7 +3,7 @@ from typing import Any, List, Tuple
 
 from utils.utils_chain import Account, Address
 from utils.utils_tx import Transaction
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider
 
 
 class ArgLengths:

@@ -10,7 +10,7 @@ from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_pa
 from utils.utils_chain import WrapperAddress, Account
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 from tools.runners.account_state_runner import get_account_keys_online
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider
 
 
 SIMULATOR_URL = "http://localhost:8085"

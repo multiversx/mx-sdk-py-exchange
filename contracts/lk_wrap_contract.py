@@ -1,5 +1,4 @@
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from contracts.contract_identities import DEXContractInterface
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils.logger import get_logger

@@ -2,9 +2,8 @@ import logging
 import sys
 from argparse import ArgumentParser
 from typing import List
-from multiversx_sdk_core import Transaction
-from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
+from multiversx_sdk import Transaction, ProxyNetworkProvider
+from multiversx_sdk.core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
 import config
 from utils.utils_tx import broadcast_transactions
 from utils.utils_chain import BunchOfAccounts
@@ -52,8 +51,8 @@ def main(cli_args: List[str]):
             )
             contract_call = ContractCallBuilder(
                 tx_config,
-                caller=account.address.bech32(),
-                contract=account.address.bech32(),
+                caller=account.address.to_bech32(),
+                contract=account.address.to_bech32(),
                 function_name="ESDTLocalMint",
                 call_arguments=sc_args,
                 gas_limit=args.gas_limit,

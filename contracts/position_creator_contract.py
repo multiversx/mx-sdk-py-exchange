@@ -2,8 +2,7 @@
 EnergyUpdateContract module
 """
 
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call

@@ -1,24 +1,28 @@
 import sys
 import time
 import traceback
-from os import read
 from pathlib import Path
-from typing import List, Dict, Union, Tuple
+from typing import Dict, List, Tuple, Union
 
-from multiversx_sdk_core import Transaction, TokenPayment, Address
-from multiversx_sdk_core.interfaces import ICodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider, ApiNetworkProvider, GenericError
-from multiversx_sdk_network_providers.network_config import NetworkConfig
-from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
-from multiversx_sdk_network_providers.transaction_events import TransactionEvent
-from multiversx_sdk_network_providers.transaction_status import TransactionStatus
-from multiversx_sdk_network_providers.transactions import TransactionOnNetwork
-from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration, \
-    MultiESDTNFTTransferBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder
+from multiversx_sdk import (Address, ApiNetworkProvider, GenericError,
+                            ProxyNetworkProvider, TokenPayment, Transaction)
+from multiversx_sdk.core.interfaces import ICodeMetadata
+from multiversx_sdk.core.transaction_builders import (
+    ContractCallBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder,
+    DefaultTransactionBuildersConfiguration, MultiESDTNFTTransferBuilder)
+from multiversx_sdk.network_providers.network_config import NetworkConfig
+from multiversx_sdk.network_providers.tokens import (
+    FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork)
+from multiversx_sdk.network_providers.transaction_events import \
+    TransactionEvent
+from multiversx_sdk.network_providers.transaction_status import \
+    TransactionStatus
+from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
+
 from utils.logger import get_logger
-from utils.utils_chain import Account, log_explorer_transaction
-from utils.utils_generic import log_step_fail, log_warning, split_to_chunks, get_continue_confirmation, \
-    log_unexpected_args
+from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction
+from utils.utils_generic import (get_continue_confirmation, log_step_fail,
+                                 log_unexpected_args, split_to_chunks)
 
 TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
@@ -264,7 +268,7 @@ def _prep_args_for_addresses(args: List):
     new_args = []
     for item in args:
         if type(item) is str and "erd" in item:
-            item = Address.from_bech32(item)
+            item = WrapperAddress(item)
         new_args.append(item)
     return new_args
 
@@ -541,7 +545,7 @@ def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> s
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""
-    return event.address.bech32()
+    return event.address.to_bech32()
 
 
 def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkProvider,
@@ -566,4 +570,5 @@ def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkP
         if sleep is not None:
             time.sleep(sleep)
 
+    logger.debug(f"Hashes: {hashes}")
     return hashes

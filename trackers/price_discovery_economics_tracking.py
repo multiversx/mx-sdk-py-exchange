@@ -1,12 +1,11 @@
 from typing import Dict
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address, ProxyNetworkProvider
 from utils.contract_data_fetchers import PriceDiscoveryContractDataFetcher
 from events.price_discovery_events import DepositPDLiquidityEvent, WithdrawPDLiquidityEvent, \
     RedeemPDLPTokensEvent
 from contracts.contract_identities import PriceDiscoveryContractIdentity
 from utils.utils_chain import get_all_token_nonces_details_for_account, get_token_details_for_address
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep
-from multiversx_sdk_network_providers.proxy_network_provider import ProxyNetworkProvider
 
 
 class PriceDiscoveryAccountEconomics:
@@ -85,7 +84,7 @@ class PriceDiscoveryEconomics:
                                                 user_address.bech32()].second_redeem_tokens_owned + event.amount
 
         chain_tokens_on_account = get_all_token_nonces_details_for_account(self.pd_contract_identity.redeem_token,
-                                                                           user_address.bech32(),
+                                                                           user_address.to_bech32(),
                                                                            self.proxy
                                                                            )
         # check for redeem tokens conformity
@@ -120,8 +119,8 @@ class PriceDiscoveryEconomics:
 
 
         # update redeem tokens data on account
-        self.account_tracker[user_address.bech32()].first_redeem_tokens_owned = chain_first_redeem_tokens
-        self.account_tracker[user_address.bech32()].second_redeem_tokens_owned = chain_second_redeem_tokens
+        self.account_tracker[user_address.to_bech32()].first_redeem_tokens_owned = chain_first_redeem_tokens
+        self.account_tracker[user_address.to_bech32()].second_redeem_tokens_owned = chain_second_redeem_tokens
 
         log_step_pass("Tracked and checked deposit account data!")
 
@@ -163,25 +162,25 @@ class PriceDiscoveryEconomics:
         log_step_pass("Checked withdraw event data!")
 
     def __withdraw_event_account_tracking(self, event: WithdrawPDLiquidityEvent, user_address: Address):
-        if user_address.bech32() not in self.account_tracker.keys():
-            self.account_tracker[user_address.bech32()] = PriceDiscoveryAccountEconomics(user_address)
+        if user_address.to_bech32() not in self.account_tracker.keys():
+            self.account_tracker[user_address.to_bech32()] = PriceDiscoveryAccountEconomics(user_address)
 
         # TODO: check first/second_token_deposited conformity starting from an account init
         if event.nonce == self.pd_contract_identity.first_redeem_token_nonce:
-            self.account_tracker[user_address.bech32()].first_token_deposited -= event.amount
+            self.account_tracker[user_address.to_bech32()].first_token_deposited -= event.amount
             exp_first_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].first_redeem_tokens_owned - event.amount
+                                                user_address.to_bech32()].first_redeem_tokens_owned - event.amount
             exp_second_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].second_redeem_tokens_owned
+                                                user_address.to_bech32()].second_redeem_tokens_owned
         else:
-            self.account_tracker[user_address.bech32()].second_token_deposited -= event.amount
+            self.account_tracker[user_address.to_bech32()].second_token_deposited -= event.amount
             exp_first_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].first_redeem_tokens_owned
+                                                user_address.to_bech32()].first_redeem_tokens_owned
             exp_second_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].second_redeem_tokens_owned - event.amount
+                                                user_address.to_bech32()].second_redeem_tokens_owned - event.amount
 
         chain_tokens_on_account = get_all_token_nonces_details_for_account(self.pd_contract_identity.redeem_token,
-                                                                           user_address.bech32(),
+                                                                           user_address.to_bech32(),
                                                                            self.proxy
                                                                            )
         # check for redeem tokens match
@@ -216,8 +215,8 @@ class PriceDiscoveryEconomics:
 
 
         # update redeem tokens data on account
-        self.account_tracker[user_address.bech32()].first_redeem_tokens_owned = chain_first_redeem_tokens
-        self.account_tracker[user_address.bech32()].second_redeem_tokens_owned = chain_second_redeem_tokens
+        self.account_tracker[user_address.to_bech32()].first_redeem_tokens_owned = chain_first_redeem_tokens
+        self.account_tracker[user_address.to_bech32()].second_redeem_tokens_owned = chain_second_redeem_tokens
 
         log_step_pass("Tracked and checked withdraw account data!")
 
@@ -260,31 +259,31 @@ class PriceDiscoveryEconomics:
         log_step_pass("Checked redeem event data!")
 
     def __redeem_event_account_tracking(self, event: RedeemPDLPTokensEvent, user_address: Address):
-        if user_address.bech32() not in self.account_tracker.keys():
-            self.account_tracker[user_address.bech32()] = PriceDiscoveryAccountEconomics(user_address)
+        if user_address.to_bech32() not in self.account_tracker.keys():
+            self.account_tracker[user_address.to_bech32()] = PriceDiscoveryAccountEconomics(user_address)
 
         # TODO: check first/second_token_deposited conformity starting from an account init
         if event.nonce == self.pd_contract_identity.first_redeem_token_nonce:
             exp_first_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].first_redeem_tokens_owned - event.amount
+                                                user_address.to_bech32()].first_redeem_tokens_owned - event.amount
             exp_second_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].second_redeem_tokens_owned
-            exp_lp_tokens_owned = self.account_tracker[user_address.bech32()].lp_tokens_redeemed + \
+                                                user_address.to_bech32()].second_redeem_tokens_owned
+            exp_lp_tokens_owned = self.account_tracker[user_address.to_bech32()].lp_tokens_redeemed + \
                                   self.__get_exp_lp_tokens_redeemed(event.amount, self.final_first_token_reserve)
         else:
             exp_first_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].first_redeem_tokens_owned
+                                                user_address.to_bech32()].first_redeem_tokens_owned
             exp_second_redeem_tokens_owned = self.account_tracker[
-                                                user_address.bech32()].second_redeem_tokens_owned - event.amount
-            exp_lp_tokens_owned = self.account_tracker[user_address.bech32()].lp_tokens_redeemed + \
+                                                user_address.to_bech32()].second_redeem_tokens_owned - event.amount
+            exp_lp_tokens_owned = self.account_tracker[user_address.to_bech32()].lp_tokens_redeemed + \
                                   self.__get_exp_lp_tokens_redeemed(event.amount, self.second_redeem_tokens_reserve)
 
         chain_redeem_tokens_on_account = get_all_token_nonces_details_for_account(self.pd_contract_identity.redeem_token,
-                                                                           user_address.bech32(),
+                                                                           user_address.to_bech32(),
                                                                            self.proxy
                                                                            )
         _, chain_lp_tokens_on_account, _ = get_token_details_for_address(self.pd_contract_identity.lp_token,
-                                                                   user_address.bech32(),
+                                                                   user_address.to_bech32(),
                                                                    self.proxy)
 
         # check for redeem tokens proper decrease (kinda overkill)
@@ -324,9 +323,9 @@ class PriceDiscoveryEconomics:
             log_substep(f"Expected LP on account: {exp_lp_tokens_owned}")
 
         # update redeem tokens data on account
-        self.account_tracker[user_address.bech32()].first_redeem_tokens_owned = chain_first_redeem_tokens
-        self.account_tracker[user_address.bech32()].second_redeem_tokens_owned = chain_second_redeem_tokens
-        self.account_tracker[user_address.bech32()].lp_tokens_redeemed = chain_lp_tokens_on_account
+        self.account_tracker[user_address.to_bech32()].first_redeem_tokens_owned = chain_first_redeem_tokens
+        self.account_tracker[user_address.to_bech32()].second_redeem_tokens_owned = chain_second_redeem_tokens
+        self.account_tracker[user_address.to_bech32()].lp_tokens_redeemed = chain_lp_tokens_on_account
 
         log_step_pass("Tracked and checked redeem account data!")
 

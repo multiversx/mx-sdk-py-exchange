@@ -8,8 +8,7 @@ from deploy.tokens_tracks import BunchOfTracks
 from utils.logger import get_logger
 from utils.utils_chain import BunchOfAccounts
 from utils.utils_chain import WrapperAddress as Address
-from multiversx_sdk_network_providers.errors import GenericError
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import GenericError, ProxyNetworkProvider
 
 logger = get_logger(__name__)
 

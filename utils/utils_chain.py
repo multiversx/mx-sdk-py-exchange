@@ -3,46 +3,47 @@ import time
 from multiprocessing.dummy import Pool
 from os import path
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Set, Tuple, cast
-from multiversx_sdk_network_providers.tokens import FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork
-from multiversx_sdk_core import Address, Transaction, MessageV1
-from multiversx_sdk_core.interfaces import ISignature
-from multiversx_sdk_wallet.user_signer import UserSigner
-from multiversx_sdk_wallet.pem_entry import PemEntry
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
+
+from multiversx_sdk import (Address, AddressComputer, Message, MessageComputer,
+                            ProxyNetworkProvider, Transaction,
+                            TransactionComputer, UserSigner)
+from multiversx_sdk.wallet.pem_entry import PemEntry
+from multiversx_sdk.core.interfaces import ISignature
+from multiversx_sdk.network_providers.tokens import (
+    FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork)
 
 from utils import utils_generic
 from utils.logger import get_logger
-
 
 logger = get_logger(__name__)
 
 
 class WrapperAddress(Address):
     def __init__(self, address: str):
-        self_instance = Address.from_bech32(address)
+        self_instance = Address.new_from_bech32(address)
         super().__init__(self_instance.pubkey, "erd")
 
     @classmethod
     def from_hex(cls, value: str, hrp: str = "erd") -> 'Address':
-        return Address.from_hex(value, hrp)
+        return Address.new_from_hex(value, hrp)
 
     def __str__(self):
-        return self.bech32()
+        return self.to_bech32()
 
     def __repr__(self):
-        return self.bech32()
+        return self.to_bech32()
 
 
 class Account:
     def __init__(self,
-                 address: str = None,
+                 address: Optional[str] = None,
                  pem_file: Optional[str] = None,
                  pem_index: int = 0,
                  key_file: str = "",
                  password: str = "",
                  ledger: bool = False):
-        self.address = Address.from_bech32(address) if address else None
+        self.address = Address.new_from_bech32(address) if address else None
         self.pem_file = pem_file
         self.pem_index = int(pem_index)
         self.nonce: int = 0
@@ -50,25 +51,31 @@ class Account:
 
         if self.pem_file:
             self.signer = UserSigner.from_pem_file(Path(self.pem_file), self.pem_index)
-            self.address = Address.from_hex(self.signer.get_pubkey().hex(), "erd")
+            self.address = Address.new_from_hex(self.signer.get_pubkey().hex(), "erd")
         elif key_file and password:
             self.signer = UserSigner.from_wallet(Path(key_file), password)
-            self.address = Address.from_hex(self.signer.get_pubkey().hex(), "erd")
+            self.address = Address.new_from_hex(self.signer.get_pubkey().hex(), "erd")
 
     def sync_nonce(self, proxy: ProxyNetworkProvider):
-        self.nonce = proxy.get_account(self.address).nonce
-        logger.debug(f"Account.sync_nonce() done: {self.nonce}")
+        if self.address:
+            self.nonce = proxy.get_account(self.address).nonce
+            logger.debug(f"Account.sync_nonce() done: {self.nonce}")
+        else:
+            raise Exception("Account.address is not set.")
 
     def sign_transaction(self, transaction: Transaction) -> ISignature:
         assert self.signer is not None
-        return self.signer.sign(transaction)
+        tx_computer = TransactionComputer()
+        return self.signer.sign(tx_computer.compute_bytes_for_signing(transaction))
     
     def sign_message(self, data: bytes) -> ISignature:
         assert self.signer is not None
-        message = MessageV1(data)
-        signature = self.signer.sign(message)
+        message = Message(data)
+        msg_computer = MessageComputer()
+        serialized_message = msg_computer.compute_bytes_for_signing(message)
+        signature = self.signer.sign(serialized_message)
 
-        logger.debug(f"Account.sign_message(): raw_data_to_sign = {data.hex()}, message_data_to_sign = {message.serialize_for_signing().hex()}, signature = {signature.hex()}")
+        logger.debug(f"Account.sign_message(): raw_data_to_sign = {data.hex()}, message_data_to_sign = {serialized_message.hex()}, signature = {signature.hex()}")
         return signature
 
 
@@ -91,7 +98,7 @@ class BunchOfAccounts:
         addresses: Set[str] = set()
         deduplicated: List[Account] = []
         for account in loaded:
-            address = account.address.bech32()
+            address = account.address.to_bech32()
             if address not in addresses:
                 addresses.add(address)
                 deduplicated.append(account)
@@ -100,7 +107,7 @@ class BunchOfAccounts:
         return BunchOfAccounts(deduplicated)
 
     def get_account(self, address: Address) -> Account:
-        return next(account for account in self.accounts if account.address.bech32() == address.bech32())
+        return next(account for account in self.accounts if account.address.to_bech32() == address.to_bech32())
 
     def get_all(self) -> List[Account]:
         return self.accounts
@@ -109,10 +116,12 @@ class BunchOfAccounts:
         return len(self.accounts)
 
     def get_not_in_shard(self, shard: int):
-        return [account for account in self.accounts if account.address.get_shard() != shard]
+        address_computer = AddressComputer()
+        return [account for account in self.accounts if address_computer.get_shard_of_address(account.address) != shard]
 
     def get_in_shard(self, shard: int) -> List[Account]:
-        return [account for account in self.accounts if account.address.get_shard() == shard]
+        address_computer = AddressComputer()
+        return [account for account in self.accounts if address_computer.get_shard_of_address(account.address) == shard]
 
     def sync_nonces(self, proxy: ProxyNetworkProvider):
         logger.debug(f"Sync nonces for {len(self.accounts)} accounts")
@@ -129,7 +138,7 @@ class BunchOfAccounts:
         data: Any = utils_generic.read_json_file(file) or dict() if path.exists(file) else dict()
 
         for account in self.accounts:
-            address = account.address.bech32()
+            address = account.address.to_bech32()
             previous_nonce = data.get(address, 0)
             current_nonce = account.nonce
             data[address] = current_nonce
@@ -147,7 +156,7 @@ class BunchOfAccounts:
         data = utils_generic.read_json_file(file) or dict()
 
         for account in self.accounts:
-            address = account.address.bech32()
+            address = account.address.to_bech32()
             account.nonce = data.get(address, 0)
 
         print("Loaded nonces for", len(self.accounts), "accounts")

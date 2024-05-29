@@ -5,9 +5,8 @@ from typing import List
 import config
 from utils.logger import get_logger
 from utils.utils_chain import (Account, build_token_name, build_token_ticker)
-from multiversx_sdk_network_providers import ProxyNetworkProvider
-from multiversx_sdk_core import Address, TokenPayment, Transaction
-from multiversx_sdk_core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
+from multiversx_sdk import ProxyNetworkProvider, Address, TokenPayment, Transaction
+from multiversx_sdk.core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
 
 from utils.utils_tx import broadcast_transactions
 
@@ -47,14 +46,14 @@ def main(cli_args: List[str]):
     supply = pow(10, args.supply_exp)
     num_decimals = args.num_decimals
     prefix = args.tokens_prefix
-    print("Supply: ", supply, "Decimals: ", num_decimals, "Prefix: ", prefix)
-    print("Number of tokens: ", args.num_tokens)
+    logger.info("Supply: ", supply, "Decimals: ", num_decimals, "Prefix: ", prefix)
+    logger.info("Number of tokens: ", args.num_tokens)
 
     def issue_token():
         for i in range(0, args.num_tokens):
             token_name, token_name_hex = build_token_name(account.address, prefix)
             token_ticker, token_ticker_hex = build_token_ticker(account.address, prefix)
-            value = args.value
+            value = int(args.value)
 
             builder = ContractCallBuilder(
                 config=builder_config,
@@ -79,9 +78,9 @@ def main(cli_args: List[str]):
             tx.nonce = account.nonce
             tx.signature = account.sign_transaction(tx)
 
-            print("Holder account: ", account.address.bech32())
-            print("Token name: ", token_name)
-            print("Token ticker: ", token_ticker)
+            logger.info("Holder account: ", account.address.bech32())
+            logger.info("Token name: ", token_name)
+            logger.info("Token ticker: ", token_ticker)
 
             transactions.append(tx)
             account.nonce += 1

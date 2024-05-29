@@ -2,15 +2,13 @@ import config
 from contracts.contract_identities import DEXContractInterface, ProxyContractVersion
 from contracts.farm_contract import FarmContract
 from contracts.pair_contract import PairContract
-from multiversx_sdk_network_providers.api_network_provider import ApiNetworkProvider
+from multiversx_sdk import ApiNetworkProvider, ProxyNetworkProvider, CodeMetadata
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
     endpoint_call, multi_esdt_endpoint_call, ESDTToken
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, \
     log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, dec_to_padded_hex, decode_merged_attributes
-from multiversx_sdk_network_providers import ProxyNetworkProvider
-from multiversx_sdk_core import CodeMetadata
 
 from utils.decoding_structures import LKMEX_ATTRIBUTES, XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES, XMEXLP_ATTRIBUTES
 

@@ -5,8 +5,7 @@ from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call, upgr
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from utils import decoding_structures
-from multiversx_sdk_core import CodeMetadata
-from multiversx_sdk_network_providers import ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from typing import List, Dict, Any
 
 
