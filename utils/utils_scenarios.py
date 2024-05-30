@@ -81,7 +81,7 @@ def collect_farm_contract_users(users_count: int,
     set_users = set()
 
     def process_tx(tx: TransactionOnNetwork):
-        user = tx.sender
+        user = Address(tx.sender.to_bech32())
         
         # avoid duplicates
         if user.to_bech32() in set_users:

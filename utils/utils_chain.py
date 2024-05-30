@@ -26,7 +26,8 @@ class WrapperAddress(Address):
 
     @classmethod
     def from_hex(cls, value: str, hrp: str = "erd") -> 'Address':
-        return Address.new_from_hex(value, hrp)
+        self_instance = Address.new_from_hex(value, hrp)
+        return cls(self_instance.bech32())
     
     def get_shard(self) -> int:
         return AddressComputer().get_shard_of_address(self)
