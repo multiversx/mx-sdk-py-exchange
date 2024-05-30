@@ -27,6 +27,9 @@ class WrapperAddress(Address):
     @classmethod
     def from_hex(cls, value: str, hrp: str = "erd") -> 'Address':
         return Address.new_from_hex(value, hrp)
+    
+    def get_shard(self) -> int:
+        return AddressComputer().get_shard_of_address(self)
 
     def __str__(self):
         return self.to_bech32()
@@ -43,7 +46,7 @@ class Account:
                  key_file: str = "",
                  password: str = "",
                  ledger: bool = False):
-        self.address = Address.new_from_bech32(address) if address else None
+        self.address = WrapperAddress(address) if address else None
         self.pem_file = pem_file
         self.pem_index = int(pem_index)
         self.nonce: int = 0
@@ -51,10 +54,10 @@ class Account:
 
         if self.pem_file:
             self.signer = UserSigner.from_pem_file(Path(self.pem_file), self.pem_index)
-            self.address = Address.new_from_hex(self.signer.get_pubkey().hex(), "erd")
+            self.address = WrapperAddress.from_hex(self.signer.get_pubkey().hex(), "erd")
         elif key_file and password:
             self.signer = UserSigner.from_wallet(Path(key_file), password)
-            self.address = Address.new_from_hex(self.signer.get_pubkey().hex(), "erd")
+            self.address = WrapperAddress.from_hex(self.signer.get_pubkey().hex(), "erd")
 
     def sync_nonce(self, proxy: ProxyNetworkProvider):
         if self.address:
