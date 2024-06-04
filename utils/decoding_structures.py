@@ -104,11 +104,3 @@ XMEXFARM_ATTRIBUTES = {
     'proxy_token_nonce': 'u64',
     'proxy_token_amount': 'biguint'
 }
-
-TOTAL_REWARDS_FOR_WEEK = {
-    'rewards_for_week_list': {
-            'token_id': 'string',
-            'nonce': 'u64',
-            'amount': 'biguint'
-        }
-}

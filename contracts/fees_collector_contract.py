@@ -1,15 +1,33 @@
-from contracts.base_contracts import BaseBoostedContract
+from copy import copy, deepcopy
+from typing import Any, cast
+from multiversx_sdk import ApiNetworkProvider, CodeMetadata, ProxyNetworkProvider, AddressComputer, SmartContractQueryResponse
+from multiversx_sdk.network_providers.transaction_decoder import TransactionDecoder
+from contracts.contract_identities import DEXContractInterface
+from contracts.farm_contract import FarmContract
+from contracts.metastaking_contract import MetaStakingContract
+from contracts.staking_contract import StakingContract
+from utils import decoding_structures
+from utils.contract_data_fetchers import FeeCollectorContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, upgrade_call
-from utils.utils_generic import log_step_pass, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address
-from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
-
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, endpoint_call, upgrade_call
+from utils.utils_generic import log_step_fail, log_step_pass, log_warning, log_unexpected_args
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string, log_explorer_transaction, dec_to_padded_hex, string_to_base64
+from multiversx_sdk.abi.serializer import Serializer
+import re
+from multiversx_sdk.abi.biguint_value import BigUIntValue
+from multiversx_sdk.abi.small_int_values import *
+from multiversx_sdk.abi.string_value import StringValue
+from multiversx_sdk.abi.struct_value import StructValue
+from multiversx_sdk.abi.values_multi import *
+from multiversx_sdk.abi.field import Field
+from multiversx_sdk.abi.list_value import ListValue
 
 logger = get_logger(__name__)
 
 
-class FeesCollectorContract(BaseBoostedContract):
+class FeesCollectorContract(DEXContractInterface):
+    transaction_decoder = TransactionDecoder() 
+   
     def __init__(self, address: str = ""):
         self.address = address
 
@@ -55,7 +73,7 @@ class FeesCollectorContract(BaseBoostedContract):
 
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-
+        
         if no_init:
             arguments = []
         else:
@@ -188,17 +206,141 @@ class FeesCollectorContract(BaseBoostedContract):
         gas_limit = 80000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimRewards", sc_args)
+
+    def claim_rewards_original_caller(self, user: Account, proxy: ProxyNetworkProvider, opt_original_caller: Account):
+        function_purpose = f"Claim rewards from fees collector"
+        logger.info(function_purpose)
+
+        gas_limit = 80000000
+        opt_original_caller = user.address.bech32()
+        sc_args = [
+            opt_original_caller
+        ]
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimBoostedRewards", sc_args)
     
     def claim_boosted_rewards(self, user: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Claim rewards from fees collector"
+        function_purpose = f"Claim boosted rewards from fees collector"
         logger.info(function_purpose)
 
         gas_limit = 80000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimBoostedRewards", sc_args)
 
+
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass
 
     def print_contract_info(self):
         log_step_pass(f"Deployed fees collector contract: {self.address}")
+
+    def allow_external_claim(self, user: Account, proxy: ProxyNetworkProvider, allow_external_claim: bool):
+        fn = 'setAllowExternalClaimRewards'
+        sc_args = [
+            allow_external_claim
+        ]
+        logger.info(f"{fn}")
+        # logger.debug(f"Account: {user.address}")
+
+        gas_limit = 80000000
+
+        return endpoint_call(proxy, gas_limit ,user, Address(self.address), "setAllowExternalClaimRewards", sc_args)
+    
+    
+    def get_user_energy_for_week(self, user: str, proxy: ProxyNetworkProvider, week: int) -> dict:
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url) 
+        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [Address(user).get_public_key(), week])
+        print(raw_results)
+        if not raw_results:
+            return {}
+        decoder = TransactionDecoder()
+        user_energy_for_week = decoder.hex_to_number(raw_results)
+
+        return user_energy_for_week
+    
+    def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getCurrentWeek')
+        if not raw_results:
+            return 0
+        current_week = int(raw_results)
+
+        return current_week
+    
+    def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [week])
+        if not raw_results:
+            return 0
+        return int(raw_results)
+    
+    def get_total_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int):
+        serializer = Serializer("@")
+
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getTotalRewardsForWeek', [week])
+        
+        if not raw_results:
+            return {}
+        
+        b = bytes.fromhex(raw_results)
+        
+        data = b
+
+        def create_esdt_token_payment() -> StructValue:
+            return StructValue([
+                Field("token_identifier", StringValue()),
+                Field("token_nonce", U64Value()),
+                Field("amount", BigUIntValue()),
+            ])
+
+        destination = ListValue(
+            item_creator=create_esdt_token_payment
+        )
+
+        s = serializer.deserialize_parts([data], [destination])
+
+        tokens = []
+
+        for i, item in enumerate(destination.items):
+            fields = cast(StructValue, item).fields
+            for field in fields:
+                fvalue: Any = field.value
+                tokens.append([field.name, fvalue.value])
+       
+        tokens_list = [tokens[i:i+3] for i in range(0, len(tokens), 3)] 
+
+        return tokens_list
+    
+    def get_all_stats(self, proxy: ProxyNetworkProvider, user: str, week: int):        
+        fees_collector_stats = {
+            "current_week": self.get_current_week(proxy),
+            "total_rewards_for_week": self.get_total_rewards_for_week(proxy, week),
+            "total_energy_for_week": self.get_total_energy_for_week(proxy, week)
+        }
+
+        return fees_collector_stats
+    
+
+    def get_tx_op(self, tx_hash: str, operation: dict, api: ApiNetworkProvider) -> dict:
+        used_api = api
+        # Get the transaction details
+        tx = used_api.get_transaction(tx_hash)
+        # Get and check transaction operations
+        ops = tx.raw_response['operations']
+        
+
+        tx_decoded = tx
+        new = self.transaction_decoder.get_transaction_metadata(tx_decoded)
+
+        print(new.function_name)
+        print(new.function_args)
+
+        # Take each op in ops and match it with operation. Try to match only the fields expected in operation dictionary. 
+        # TX Operations are unordered. If any of the operations match, return it.
+        for op in ops:
+            # print(f'Matching with {operation}')
+            if all(op.get(key) == operation.get(key) for key in operation.keys()):
+                return op
+            
+    def wrap(self, source: str, width: int):
+        return [source[i:i + width] for i in range(0, len(source), width)]
