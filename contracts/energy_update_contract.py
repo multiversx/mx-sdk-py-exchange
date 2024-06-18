@@ -31,6 +31,10 @@ class EnergyUpdateContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return EnergyUpdateContract(address=config_dict['address'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(
             self,
             deployer: Account,

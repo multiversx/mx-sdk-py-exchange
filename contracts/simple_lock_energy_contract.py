@@ -6,8 +6,10 @@ from utils import decoding_structures
 from utils.logger import get_logger
 from utils.utils_tx import multi_esdt_endpoint_call, endpoint_call, deploy, upgrade_call
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
+
+import config
 
 
 logger = get_logger(__name__)
@@ -39,6 +41,14 @@ class SimpleLockEnergyContract(DEXContractInterface):
                                         locked_token=config_dict['locked_token'],
                                         lp_proxy_token=config_dict['lp_proxy_token'],
                                         farm_proxy_token=config_dict['farm_proxy_token'])
+
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        data_fetcher = SimpleLockEnergyContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+        base_token = hex_to_string(data_fetcher.get_data("getBaseAssetTokenId"))
+        locked_token = hex_to_string(data_fetcher.get_data("getLockedTokenId"))
+
+        return SimpleLockEnergyContract(base_token, locked_token, address)
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:

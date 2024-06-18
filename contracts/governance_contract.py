@@ -29,6 +29,10 @@ class GovernanceContract(DEXContractInterface):
         return GovernanceContract(address=config_dict['address'],
                                   fee_token=config_dict['fee_token'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         """ Expected as args:
             type[int]: min_energy_for_propose

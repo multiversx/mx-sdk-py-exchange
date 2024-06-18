@@ -32,6 +32,10 @@ class ProxyDeployerContract(DEXContractInterface):
         return ProxyDeployerContract(address=config_dict['address'],
                                      template_name=config_dict['template'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
         type[str]: template sc address

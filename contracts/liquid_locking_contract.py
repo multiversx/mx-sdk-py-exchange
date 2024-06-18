@@ -30,6 +30,10 @@ class LiquidLockingContract(DEXContractInterface):
         return LiquidLockingContract(address=config_dict['address'],
                                      whitelisted_tokens=config_dict['whitelisted_tokens'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         """ Expected as args:
             type[int]: unbond period

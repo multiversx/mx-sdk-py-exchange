@@ -1,11 +1,13 @@
 import sys
 import traceback
+import config
 
 from contracts.contract_identities import (DEXContractInterface, PairContractVersion)
+from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, endpoint_call, upgrade_call, deploy, ESDTToken, multi_esdt_endpoint_call
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
@@ -78,6 +80,18 @@ class PairContract(DEXContractInterface):
                             lpToken=config_dict['lpToken'],
                             address=config_dict['address'],
                             version=PairContractVersion(config_dict['version']))
+
+    @classmethod
+    def load_contract_by_address(cls, address: str, version=PairContractVersion.V2, proxy_contract=None):
+        data_fetcher = PairContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+        first_token = hex_to_string(data_fetcher.get_data("getFirstTokenId"))
+        second_token = hex_to_string(data_fetcher.get_data("getSecondTokenId"))
+        lp_token = hex_to_string(data_fetcher.get_data("getLpTokenIdentifier"))
+
+        if not first_token or not second_token:
+            return None
+
+        return PairContract(first_token, second_token, version, lp_token, address, proxy_contract)
 
     def hasProxy(self) -> bool:
         if self.proxy_contract is not None:

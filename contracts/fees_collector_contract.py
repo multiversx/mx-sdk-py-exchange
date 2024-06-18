@@ -23,6 +23,10 @@ class FeesCollectorContract(BaseBoostedContract):
     def load_config_dict(cls, config_dict: dict):
         return FeesCollectorContract(address=config_dict['address'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        return FeesCollectorContract(address=address)
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None):
         """ Expected as args:
             type[str]: locked token
