@@ -1,6 +1,6 @@
 import json
 import sys
-from typing import List
+from typing import Any, List
 from argparse import ArgumentParser
 from multiversx_sdk import Address
 from context import Context
@@ -16,66 +16,40 @@ from utils.utils_tx import NetworkProviders
 
 
 def main(cli_args: List[str]):
-    parser = ArgumentParser()
-    subparser = parser.add_subparsers(dest='command')
-    pair = subparser.add_parser('pair', help='handle pairs')
-    farms = subparser.add_parser('farms', help='handle farms')
-    stakings = subparser.add_parser('stakings', help='handle stakings')
-    metastakings = subparser.add_parser('metastakings', help='handle metastakings')
-    router = subparser.add_parser('router', help='handle router')
-    proxy = subparser.add_parser('proxy', help='handle proxy')
-    locked_asset = subparser.add_parser('locked-asset', help='handle locked asset')
-    fees_collector = subparser.add_parser('fees-collector', help='handle fees collector')
-    energy_factory = subparser.add_parser('energy-factory', help='handle energy factory')
-    position_creator = subparser.add_parser('position-creator', help='handle position creator')
-    account_state = subparser.add_parser('account-state', help='handle account state')
-
-    pair_runner.add_parsed_arguments(pair)
-    farm_runner.add_parsed_arguments(farms)
-    staking_runner.add_parsed_arguments(stakings)
-    metastaking_runner.add_parsed_arguments(metastakings)
-    router_runner.add_parsed_arguments(router)
-    proxy_runner.add_parsed_arguments(proxy)
-    locked_asset_runner.add_parsed_arguments(locked_asset)
-    fees_collector_runner.add_parsed_arguments(fees_collector)
-    energy_factory_runner.add_parsed_arguments(energy_factory)
-    position_creator_runner.add_parsed_arguments(position_creator)
-    account_state_runner.add_parsed_arguments(account_state)
-
-    parser.add_argument('--fetch-pause-state', action='store_true', help='fetch pause state')
-    parser.add_argument('--fetch-all-states', type=ascii, default='pre',
-                        help='fetch all contracts states; specify prefix; default is pre')
-    parser.add_help = True
+    parser = setup_parser()
     args = parser.parse_args(cli_args)
 
-    if args.command == 'pair':
-        pair_runner.handle_command(args)
-    elif args.command == 'farms':
-        farm_runner.handle_command(args)
-    elif args.command == 'stakings':
-        staking_runner.handle_command(args)
-    elif args.command == 'metastakings':
-        metastaking_runner.handle_command(args)
-    elif args.command == 'router':
-        router_runner.handle_command(args)
-    elif args.command == 'proxy':
-        proxy_runner.handle_command(args)
-    elif args.command == 'locked-asset':
-        locked_asset_runner.handle_command(args)
-    elif args.command == 'fees-collector':
-        fees_collector_runner.handle_command(args)
-    elif args.command == 'energy-factory':
-        energy_factory_runner.handle_command(args)
-    elif args.command == 'position-creator':
-        position_creator_runner.handle_command(args)
-    elif args.command == 'account-state':
-        account_state_runner.get_account_keys_online(args.address, args.proxy_url, args.block_number, args.with_save_in)
-    elif args.fetch_pause_state:
-        fetch_and_save_pause_state()
-    elif args.fetch_all_states:
-        fetch_all_contracts_states(args.fetch_all_states)
-    elif args.command == 'help':
+    if not hasattr(args, 'func'):
         parser.print_help()
+        return
+
+    args.func(args)
+
+
+def setup_parser():
+    parser = ArgumentParser()
+
+    parser.add_argument('--fetch-pause-state', action='store_true', help='fetch pause state')
+    parser.set_defaults(func=fetch_and_save_pause_state)
+    parser.add_argument('--fetch-all-states', type=ascii, default='pre',
+                        help='fetch all contracts states; specify prefix; default is pre')
+    parser.set_defaults(func=fetch_all_contracts_states)
+
+    subparsers = parser.add_subparsers()
+    commands: List[Any] = []
+
+    commands.append(pair_runner.setup_parser(subparsers))
+    commands.append(farm_runner.setup_parser(subparsers))
+    commands.append(staking_runner.setup_parser(subparsers))
+    commands.append(metastaking_runner.setup_parser(subparsers))
+    commands.append(router_runner.setup_parser(subparsers))
+    commands.append(proxy_runner.setup_parser(subparsers))
+    commands.append(locked_asset_runner.setup_parser(subparsers))
+    commands.append(fees_collector_runner.setup_parser(subparsers))
+    commands.append(energy_factory_runner.setup_parser(subparsers))
+    commands.append(position_creator_runner.setup_parser(subparsers))
+
+    return parser
 
 
 def fetch_and_save_pause_state():

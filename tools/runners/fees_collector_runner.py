@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
 from tools.common import API, PROXY, get_owner, get_user_continue
+from tools.runners.common_runner import add_upgrade_command
 from tools.runners.pair_runner import get_all_pair_addresses
 from utils.contract_retrievers import retrieve_pair_by_address
 
@@ -10,25 +11,20 @@ from utils.utils_tx import NetworkProviders
 
 FEES_COLLECTOR_LABEL = 'fees_collector'
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
-                        help='compare states before and after upgrade')
-    mutex = parser.add_mutually_exclusive_group()
-    mutex.add_argument('--upgrade', action='store_true', help='upgrade fees collector')
-    mutex.add_argument('--set-pairs', action='store_true', help='set pairs in fees collector')
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for fees collector commands"""
+    group_parser = subparsers.add_parser('fees-collector', help='fees collector group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
+    contract_parser = subgroup_parser.add_parser('contract', help='fees collector contract commands')
 
-def handle_command(args):
-    """Handle the command passed to the runner"""
+    contract_group = contract_parser.add_subparsers()
 
-    if args.upgrade:
-        print('upgrade fees collector')
-    elif args.set_pairs:
-        set_pairs_in_fees_collector()
-    else:
-        print('invalid arguments')
+    command_parser = contract_group.add_parser('set-pairs', help='set pairs contracts command')
+    command_parser.set_defaults(func=set_pairs_in_fees_collector)
+
+    return group_parser
 
 
 def set_pairs_in_fees_collector():

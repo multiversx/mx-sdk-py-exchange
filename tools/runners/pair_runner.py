@@ -1,6 +1,5 @@
 from argparse import ArgumentParser
-import json
-import os
+from typing import Any
 from multiversx_sdk import Address
 from common import fetch_and_save_contracts, get_saved_contract_addresses
 from context import Context
@@ -10,55 +9,49 @@ from contracts.pair_contract import PairContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue, run_graphql_query
+from tools.runners.common_runner import add_upgrade_all_command
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
 from utils.contract_retrievers import retrieve_router_by_address, retrieve_pair_by_address
 from utils.utils_tx import NetworkProviders
+
 import config
+import json
+import os
 
 
 PAIRS_LABEL = "pairs"
 OUTPUT_PAIR_CONTRACTS_FILE = OUTPUT_FOLDER / "pairs_data.json"
 
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for pair commands"""
+    group_parser = subparsers.add_parser('pairs', help='pairs group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
-                        help='compare states before and after upgrade')
+    contract_parser = subgroup_parser.add_parser('contract', help='pairs contract commands')
 
-    mutex = parser.add_mutually_exclusive_group()
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_all_command(contract_group, upgrade_pair_contracts)
 
-    mutex.add_argument('--fetch-all', action='store_true', help='fetch pairs from blockchain')
-    mutex.add_argument('--pause-all', action='store_true', help='pause all pairs')
-    mutex.add_argument('--resume-all', action='store_true', help='resume all pairs')
-    mutex.add_argument('--upgrade-all', action='store_true', help='upgrade all pairs')
-    mutex.add_argument('--set-fees-collector', action='store_true',
-                       help='set fees collector for all pairs')
-    mutex.add_argument('--remove-from-fees-collector', action='store_true',
-                       help='remove fees collector from all pairs')
-    mutex.add_argument('--update fees', action='store_true',
-                       help='update fees percentage in all pairs')
+    command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
+    command_parser.set_defaults(func=fetch_and_save_pairs_from_chain)
 
+    command_parser = contract_group.add_parser('pause-all', help='pause all contracts command')
+    command_parser.set_defaults(func=pause_pair_contracts)
 
-def handle_command(args):
-    """Handle the command"""
+    command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
+    command_parser.set_defaults(func=resume_pair_contracts)
 
-    if args.fetch_all:
-        fetch_and_save_pairs_from_chain()
-    elif args.pause_all:
-        pause_pair_contracts()
-    elif args.resume_all:
-        resume_pair_contracts()
-    elif args.upgrade_all:
-        upgrade_pair_contracts(args.compare_states)
-    elif args.set_fees_collector:
-        set_fees_collector_in_pairs()
-    elif args.remove_from_fees_collector:
-        remove_pairs_from_fees_collector()
-    elif args.update_fees:
-        update_fees_percentage()
-    else:
-        print('invalid arguments')
+    command_parser = contract_group.add_parser('set-fees-collector', help='set fees collector in all contracts command')
+    command_parser.set_defaults(func=set_fees_collector_in_pairs)
+
+    command_parser = contract_group.add_parser('remove-from-fees-collector', help='remove fees collector from all contracts command')
+    command_parser.set_defaults(func=remove_pairs_from_fees_collector)
+
+    command_parser = contract_group.add_parser('update-fees', help='update fees percentage in all contracts command')
+    command_parser.set_defaults(func=update_fees_percentage)
+
+    return group_parser
 
 
 def fetch_and_save_pairs_from_chain():
@@ -150,8 +143,10 @@ def resume_pair_contracts():
         count += 1
 
 
-def upgrade_pair_contracts(compare_states: bool = False):
+def upgrade_pair_contracts(args: Any):
     """Upgrade pair contracts"""
+
+    compare_states = args.compare_states
 
     print(f"Upgrading pair contracts with compare states: {compare_states}")
 

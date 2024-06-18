@@ -1,42 +1,43 @@
 from argparse import ArgumentParser
+from typing import Any
 from contracts.contract_identities import MetaStakingContractVersion
+from contracts.metastaking_contract import MetaStakingContract
 from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
-import config
+from tools.runners.common_runner import add_generate_transaction_command, \
+    add_upgrade_all_command, \
+    add_upgrade_command, \
+    get_acounts_with_token, \
+    read_accounts_from_json
 from utils.contract_retrievers import retrieve_proxy_staking_by_address
-from utils.utils_tx import NetworkProviders
+from utils.utils_chain import Account, WrapperAddress
+from utils.utils_tx import ESDTToken, NetworkProviders
+
+import config
 
 
 METASTAKINGS_LABEL = "metastakings"
 OUTPUT_METASTAKING_CONTRACTS_FILE = OUTPUT_FOLDER / "metastaking_data.json"
 
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for metastaking commands"""
+    group_parser = subparsers.add_parser('metastakings', help='metastaking group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
-    parser.add_argument('--compare-states', action='store_true',
-                        help='compare states before and after upgrade')
-    parser.add_argument('--address', type=str, help='metastaking contract address')
-    mutex = parser.add_mutually_exclusive_group()
-    mutex.add_argument('--fetch-all', action='store_true',
-                       help='fetch metastakings from blockchain')
-    mutex.add_argument('--upgrade-all', action='store_true', help='upgrade all metastakings')
-    mutex.add_argument('--upgrade', action='store_true', help='upgrade metastaking contract by address')
+    contract_parser = subgroup_parser.add_parser('contract', help='metastaking contract commands')
 
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_command(contract_group, upgrade_metastaking_contract)
+    add_upgrade_all_command(contract_group, upgrade_metastaking_contracts)
 
-def handle_command(args):
-    """Handle metastaking commands"""
+    transactions_parser = subgroup_parser.add_parser('generate-transactions', help='metastaking transactions commands')
 
-    if args.fetch_all:
-        fetch_and_save_metastakings_from_chain()
-    elif args.upgrade_all:
-        upgrade_metastaking_contracts(args.compare_states)
-    elif args.upgrade:
-        upgrade_metastaking_contract(args.address, args.compare_states)
-    else:
-        print('invalid arguments')
+    transactions_group = transactions_parser.add_subparsers()
+    add_generate_transaction_command(transactions_group, generate_unstake_farm_tokens_transaction, 'unstakeFarmTokens', 'unstake farm tokens command')
+    add_generate_transaction_command(transactions_group, generate_stake_farm_tokens_transaction, 'stakeFarmTokens', 'stake farm tokens command')
 
 
 def fetch_and_save_metastakings_from_chain():
@@ -50,8 +51,10 @@ def fetch_and_save_metastakings_from_chain():
     fetch_and_save_contracts(metastakings, METASTAKINGS_LABEL, OUTPUT_METASTAKING_CONTRACTS_FILE, network_providers.proxy)
 
 
-def upgrade_metastaking_contracts(compare_states: bool = False):
+def upgrade_metastaking_contracts(args: Any):
     """Upgrade metastaking contracts"""
+
+    compare_states = args.compare_states
 
     print("Upgrade metastaking contracts")
 
@@ -96,10 +99,17 @@ def upgrade_metastaking_contracts(compare_states: bool = False):
         count += 1
 
 
-def upgrade_metastaking_contract(metastaking_address: str, compare_states: bool = False):
+def upgrade_metastaking_contract(args: Any):
     """Upgrade metastaking contract by address"""
 
-    print(f"Upgrade metastaking contract {metastaking_address}")
+    compare_states = args.compare_states
+    metastaking_address = args.address
+
+    if not metastaking_address:
+        print("Missing required arguments!")
+        return
+
+    print(f"Upgrade metastaking contract {metastaking_address} with compare states: {compare_states}")
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -127,6 +137,77 @@ def upgrade_metastaking_contract(metastaking_address: str, compare_states: bool 
 
     if not get_user_continue():
         return
+
+
+def generate_unstake_farm_tokens_transaction(args: Any):
+    """Generate unstake farm tokens transaction"""
+
+    metastaking_address = args.address
+    exported_accounts_path = args.accounts_export
+
+    if not metastaking_address or not exported_accounts_path:
+        print("Missing required arguments!")
+        return
+
+    print(f"Generate unstake farm tokens transaction for metastaking contract {metastaking_address}")
+
+    network_providers = NetworkProviders(API, PROXY)
+    metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V2)
+
+    exported_accounts = read_accounts_from_json(exported_accounts_path)
+    accounts_with_token = get_acounts_with_token(exported_accounts, metastaking_contract.metastake_token)
+
+    for account_with_token in accounts_with_token:
+        account = Account(account_with_token.address, config.DEFAULT_OWNER)
+        account.address = WrapperAddress.from_bech32(account_with_token.address)
+        account.sync_nonce(network_providers.proxy)
+        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == metastaking_contract.metastake_token]
+        for token in tokens:
+            metastaking_contract.exit_metastake(
+                network_providers.proxy,
+                account,
+                [
+                    [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply))],
+                    1,
+                    1
+                ],
+            )
+
+
+def generate_stake_farm_tokens_transaction(args: Any):
+    """Generate unstake farm tokens transaction"""
+
+    metastaking_address = args.address
+    exported_accounts_path = args.accounts_export
+
+    metastaking_address = args.address
+    exported_accounts_path = args.accounts_export
+
+    if not metastaking_address or not exported_accounts_path:
+        print("Missing required arguments!")
+        return
+
+    print(f"Generate stake farm tokens transaction for metastaking contract {metastaking_address}")
+
+    network_providers = NetworkProviders(API, PROXY)
+    metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V2)
+
+    exported_accounts = read_accounts_from_json(exported_accounts_path)
+    accounts_with_token = get_acounts_with_token(exported_accounts, metastaking_contract.metastake_token)
+
+    for account_with_token in accounts_with_token:
+        account = Account(account_with_token.address, config.DEFAULT_OWNER)
+        account.address = WrapperAddress.from_bech32(account_with_token.address)
+        account.sync_nonce(network_providers.proxy)
+        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == metastaking_contract.metastake_token]
+        for token in tokens:
+            metastaking_contract.enter_metastake(
+                network_providers.proxy,
+                Account(account.address, config.DEFAULT_OWNER),
+                [
+                    [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply))],
+                ],
+            )
 
 
 def get_metastaking_addresses_from_chain() -> list:

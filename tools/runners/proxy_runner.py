@@ -3,26 +3,22 @@ from context import Context
 from contracts.contract_identities import ProxyContractVersion
 from contracts.dex_proxy_contract import DexProxyContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
+from tools.runners.common_runner import add_upgrade_command
 from utils.utils_tx import NetworkProviders
 import config
 
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for proxy dex commands"""
+    group_parser = subparsers.add_parser('proxy-dex', help='proxy dex group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
-    parser.add_argument('--compare-states', action='store_true',
-                        help='compare states before and after upgrade')
-    mutex = parser.add_mutually_exclusive_group()
-    mutex.add_argument('--upgrade', action='store_true', help='upgrade proxy dex')
+    contract_parser = subgroup_parser.add_parser('contract', help='proxy dex contract commands')
 
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_command(contract_group, upgrade_proxy_dex_contracts)
 
-def handle_command(args):
-    """Handle proxy dex commands"""
-
-    if args.upgrade:
-        upgrade_proxy_dex_contracts(args.compare_states)
-    else:
-        print('invalid arguments')
+    return group_parser
 
 
 def upgrade_proxy_dex_contracts(compare_states: bool = False):
