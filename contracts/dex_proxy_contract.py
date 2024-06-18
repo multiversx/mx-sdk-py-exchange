@@ -3,12 +3,13 @@ from contracts.contract_identities import DEXContractInterface, ProxyContractVer
 from contracts.farm_contract import FarmContract
 from contracts.pair_contract import PairContract
 from multiversx_sdk import ApiNetworkProvider, ProxyNetworkProvider, CodeMetadata
+from utils.contract_data_fetchers import ProxyContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
     endpoint_call, multi_esdt_endpoint_call, ESDTToken
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, \
     log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, dec_to_padded_hex, decode_merged_attributes
+from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, dec_to_padded_hex, decode_merged_attributes, hex_to_string
 
 from utils.decoding_structures import LKMEX_ATTRIBUTES, XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES, XMEXLP_ATTRIBUTES
 
@@ -105,6 +106,17 @@ class DexProxyContract(DEXContractInterface):
                                 proxy_lp_token=config_dict['proxy_lp_token'],
                                 address=config_dict['address'],
                                 version=ProxyContractVersion(config_dict['version']))
+
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        data_fetcher = ProxyContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+        locked_tokens = [hex_to_string(res) for res in data_fetcher.get_data("getLockedTokenIds")]
+        token = hex_to_string(data_fetcher.get_data("getAssetTokenId"))
+        proxy_lp_token = data_fetcher.get_data("getWrappedLpTokenId")
+        proxy_farm_token = data_fetcher.get_data("getWrappedFarmTokenId")
+        version = ProxyContractVersion.V2
+
+        return DexProxyContract(locked_tokens, token, version, address, proxy_lp_token, proxy_farm_token)
 
     def add_liquidity_proxy(self, user: Account, proxy: ProxyNetworkProvider, event: DexProxyAddLiquidityEvent):
         function_purpose = "add liquidity via proxy"

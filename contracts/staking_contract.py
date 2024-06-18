@@ -4,7 +4,7 @@ from contracts.contract_identities import StakingContractVersion
 from contracts.base_contracts import BaseFarmContract, BaseBoostedContract
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
@@ -50,6 +50,25 @@ class StakingContract(BaseFarmContract, BaseBoostedContract):
                                rewards_per_block=config_dict['rewards_per_block'],
                                unbond_epochs=config_dict['unbond_epochs'],
                                version=StakingContractVersion(config_dict['version']))
+
+    @classmethod
+    def load_contract_by_address(cls, address: str, version=StakingContractVersion.V3Boosted):
+        data_fetcher = StakingContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+        farming_token = hex_to_string(data_fetcher.get_data("getFarmingTokenId"))
+        farm_token = hex_to_string(data_fetcher.get_data("getFarmTokenId"))
+        max_apr = data_fetcher.get_data("getAnnualPercentageRewards")
+        unbond_epochs = data_fetcher.get_data("getMinUnbondEpochs")
+        rewards_per_block = data_fetcher.get_data("getPerBlockRewardAmount")
+
+        return StakingContract(
+            farming_token,
+            max_apr,
+            rewards_per_block,
+            unbond_epochs,
+            version,
+            farm_token,
+            address
+        )
 
     def stake_farm(self, network_provider: NetworkProviders, user: Account, event: EnterFarmEvent,
                    initial: bool = False) -> str:

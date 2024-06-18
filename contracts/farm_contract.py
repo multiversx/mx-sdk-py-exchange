@@ -6,7 +6,7 @@ from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
@@ -44,6 +44,19 @@ class FarmContract(BaseFarmContract, BaseBoostedContract):
                             farmed_token=config_dict['farmedToken'],
                             address=config_dict['address'],
                             version=FarmContractVersion(config_dict['version']))
+
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        data_fetcher = FarmContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+        farming_token = hex_to_string(data_fetcher.get_data("getFarmingTokenId"))
+        farm_token = hex_to_string(data_fetcher.get_data("getFarmTokenId"))
+        farmed_token = hex_to_string(data_fetcher.get_data("getRewardTokenId"))
+        version = FarmContractVersion.V2Boosted    # TODO: find a way to determine this automatically
+
+        if not farming_token or not farmed_token:
+            return None
+
+        return FarmContract(farming_token, farm_token, farmed_token, address, version)
 
     def has_proxy(self) -> bool:
         if self.proxyContract is not None:

@@ -33,6 +33,10 @@ class PositionCreatorContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return PositionCreatorContract(address=config_dict['address'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        return PositionCreatorContract(address)
+
     def contract_deploy(
             self,
             deployer: Account,

@@ -97,6 +97,10 @@ class PriceDiscoveryContract(DEXContractInterface):
                                       max_penalty_percentage=config_dict['max_penalty_percentage'],
                                       fixed_penalty_percentage=config_dict['fixed_penalty_percentage'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def deposit_liquidity(self, network_provider: NetworkProviders, user: Account, event: DepositPDLiquidityEvent) -> str:
         function_purpose = f"Deposit Price Discovery liquidity"
         logger.info(function_purpose)

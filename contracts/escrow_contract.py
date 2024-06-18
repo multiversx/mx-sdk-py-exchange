@@ -22,6 +22,10 @@ class EscrowContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return EscrowContract(address=config_dict['address'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
             type[str]: energy factory address

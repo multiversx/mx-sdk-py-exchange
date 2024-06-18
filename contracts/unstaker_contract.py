@@ -27,6 +27,10 @@ class UnstakerContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return UnstakerContract(address=config_dict['address'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        return UnstakerContract(address)
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
             type[int]: unbond epochs

@@ -23,6 +23,11 @@ class DEXContractInterface(ABC):
     def load_config_dict(cls, config_dict: dict):
         pass
 
+    @classmethod
+    @abstractmethod
+    def load_contract_by_address(cls, address: str):
+        pass
+
     @abstractmethod
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         pass

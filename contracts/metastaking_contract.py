@@ -1,19 +1,14 @@
-import sys
-import traceback
-from operator import ne
-from typing import Any, Dict, List, Tuple
-
-from contracts.contract_identities import DEXContractInterface, MetaStakingContractIdentity, MetaStakingContractVersion
-from events.metastake_events import (EnterMetastakeEvent, ExitMetastakeEvent, ClaimRewardsMetastakeEvent,
-                                     MergeMetastakeWithStakeEvent)
-from multiversx_sdk import ApiNetworkProvider
+from typing import Any, Dict, List, Tuple, override
+from contracts.contract_identities import DEXContractInterface, MetaStakingContractVersion
+from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import NetworkProviders, deploy, upgrade_call, \
-    endpoint_call, ESDTToken, multi_esdt_endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes
+from utils.utils_tx import deploy, upgrade_call, \
+    endpoint_call, multi_esdt_endpoint_call
+from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
+import config
 
 logger = get_logger(__name__)
 
@@ -60,6 +55,32 @@ class MetaStakingContract(DEXContractInterface):
                                    farm_address=config_dict['farm_address'],
                                    stake_address=config_dict['stake_address'],
                                    version=MetaStakingContractVersion(config_dict['version']))
+
+    @classmethod
+    def load_contract_by_address(cls, address: str, version=MetaStakingContractVersion.V3Boosted):
+        data_fetcher = MetaStakingContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+
+        staking_token = hex_to_string(data_fetcher.get_data("getStakingTokenId"))
+        lp_token = hex_to_string(data_fetcher.get_data("getLpTokenId"))
+        farm_token = hex_to_string(data_fetcher.get_data("getLpFarmTokenId"))
+        stake_token = hex_to_string(data_fetcher.get_data("getFarmTokenId"))
+        lp_address = Address.from_hex(data_fetcher.get_data("getPairAddress")).bech32()
+        farm_address = Address.from_hex(data_fetcher.get_data("getLpFarmAddress")).bech32()
+        stake_address = Address.from_hex(data_fetcher.get_data("getStakingFarmAddress")).bech32()
+        metastake_token = hex_to_string(data_fetcher.get_data("getDualYieldTokenId"))
+
+        return MetaStakingContract(
+            staking_token,
+            lp_token,
+            farm_token,
+            stake_token,
+            lp_address,
+            farm_address,
+            stake_address,
+            version,
+            metastake_token,
+            address
+        )
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         function_purpose = f"Deploy metastaking contract"

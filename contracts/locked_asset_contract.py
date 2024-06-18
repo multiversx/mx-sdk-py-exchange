@@ -2,9 +2,10 @@ import sys
 import traceback
 
 from contracts.contract_identities import DEXContractInterface
+from utils.contract_data_fetchers import LockedAssetContractDataFetcher
 from utils.utils_tx import multi_esdt_endpoint_call, prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address, log_explorer_transaction
+from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string, log_explorer_transaction
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.logger import get_logger
 
@@ -30,6 +31,14 @@ class LockedAssetContract(DEXContractInterface):
         return LockedAssetContract(address=config_dict['address'],
                                    unlocked_asset=config_dict['unlocked_asset'],
                                    locked_asset=config_dict['locked_asset'])
+
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        data_fetcher = LockedAssetContractDataFetcher(Address(address), config.DEFAULT_PROXY)
+        base_token = hex_to_string(data_fetcher.get_data("getAssetTokenId"))
+        locked_token = hex_to_string(data_fetcher.get_data("getLockedAssetTokenId"))
+
+        return LockedAssetContract(locked_token, base_token, address)
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         function_purpose = f"deploy {type(self).__name__} contract"
