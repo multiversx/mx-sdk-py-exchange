@@ -79,9 +79,8 @@ def upgrade_metastaking_contracts(args: Any):
         if not get_user_continue():
             return
 
-        metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, MetaStakingContractVersion.V2)
+        metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V3Boosted)
 
-        metastaking_contract.version = MetaStakingContractVersion.V3Boosted
         tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
                                                         config.STAKING_PROXY_BYTECODE_PATH, [])
 
@@ -121,9 +120,8 @@ def upgrade_metastaking_contract(args: Any):
     if not get_user_continue():
         return
 
-    metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, MetaStakingContractVersion.V2)
+    metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V3Boosted)
 
-    metastaking_contract.version = MetaStakingContractVersion.V3Boosted
     tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
                                                     config.STAKING_PROXY_V3_BYTECODE_PATH, [], True)
 
