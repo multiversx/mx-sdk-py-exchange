@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 import json
 import os
+from typing import Any
 
 from multiversx_sdk import Address
 from config import GRAPHQL
@@ -95,8 +96,13 @@ def pause_farm_contracts():
         count += 1
 
 
-def pause_farm_contract(farm_address: str):
+def pause_farm_contract(args: Any):
     """Pause farm contract"""
+
+    farm_address = args.address
+    if not farm_address:
+        print("Missing required arguments!")
+        return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -160,8 +166,14 @@ def resume_farm_contracts():
         count += 1
 
 
-def resume_farm_contract(farm_address: str):
+def resume_farm_contract(args: Any):
     """Resume farm contract"""
+
+    farm_address = args.address
+
+    if not farm_address:
+        print("Missing required arguments!")
+        return
 
     print(f"Resuming farm {farm_address} ...")
 
@@ -256,7 +268,10 @@ def upgrade_farmv13_contracts():
         count += 1
 
 
-def upgrade_farmv2_contracts(compare_states: bool):
+def upgrade_farmv2_contracts(args: Any):
+    """Upgrade all v2 farms"""
+
+    compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
@@ -274,7 +289,7 @@ def upgrade_farmv2_contracts(compare_states: bool):
         lp_address = contract.get_lp_address(network_providers.proxy)
 
         if compare_states:
-            print(f"Fetching contract state before upgrade...")
+            print("Fetching contract state before upgrade...")
             fetch_contracts_states("pre", network_providers, [address], FARMSV2_LABEL)
 
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -297,7 +312,16 @@ def upgrade_farmv2_contracts(compare_states: bool):
         count += 1
 
 
-def upgrade_farmv2_contract(compare_states: bool, farm_address: str):
+def upgrade_farmv2_contract(args: Any):
+    """Upgrade farm v2 contract by address"""
+
+    compare_states = args.compare_states
+    farm_address = args.address
+
+    if not farm_address:
+        print("Missing required arguments!")
+        return
+
     print(f"Upgrading farm contract: {farm_address}")
 
     network_providers = NetworkProviders(API, PROXY)
@@ -309,7 +333,7 @@ def upgrade_farmv2_contract(compare_states: bool, farm_address: str):
     contract = retrieve_farm_by_address(farm_address)
 
     if compare_states:
-        print(f"Fetching contract state before upgrade...")
+        print("Fetching contract state before upgrade...")
         fetch_contracts_states("pre", network_providers, [farm_address], FARMSV2_LABEL)
 
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
