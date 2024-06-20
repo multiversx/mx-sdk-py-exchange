@@ -288,6 +288,7 @@ class MetaStakingContractDataFetcher(DataFetcher):
             "getPairAddress": self._get_hex_view,
             "getLpFarmAddress": self._get_hex_view,
             "getStakingFarmAddress": self._get_hex_view,
+            "getEnergyFactoryAddress": self._get_hex_view,
         }
 
 

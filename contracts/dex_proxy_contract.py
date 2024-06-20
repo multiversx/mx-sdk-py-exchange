@@ -181,8 +181,7 @@ class DexProxyContract(DEXContractInterface):
 
         sc_args = [
             tokens,
-            Address(event.farmContract.address),
-            event.amount
+            Address(event.farmContract.address)
         ]
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
                                         "exitFarmProxy", sc_args)

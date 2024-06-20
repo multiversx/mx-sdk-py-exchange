@@ -1,8 +1,13 @@
 from abc import abstractmethod, ABC
 from enum import Enum
 
-from utils.utils_chain import Account
+from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_tx import endpoint_call
+from utils.logger import get_logger
 from multiversx_sdk import ProxyNetworkProvider
+
+
+logger = get_logger(__name__)
 
 
 class DEXContractIdentityInterface(ABC):
@@ -39,6 +44,24 @@ class DEXContractInterface(ABC):
     @abstractmethod
     def print_contract_info(self):
         pass
+
+    def change_owner_address(self, deployer: Account, proxy: ProxyNetworkProvider, new_address: str) -> str:
+        function_purpose = "Change owner address of the contract"
+        logger.info(function_purpose)
+        
+        gas_limit = 20000000
+        sc_args = [new_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "ChangeOwnerAddress", sc_args)
+    
+    def claim_developer_rewards(self, deployer: Account, proxy: ProxyNetworkProvider) -> str:
+        function_purpose = "Claim developer rewards"
+        logger.info(function_purpose)
+        
+        gas_limit = 20000000
+        sc_args = []
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "ClaimDeveloperRewards", sc_args)
 
 
 class PriceDiscoveryContractIdentity(DEXContractIdentityInterface):

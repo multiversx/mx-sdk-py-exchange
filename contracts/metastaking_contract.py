@@ -10,6 +10,8 @@ from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 import config
 
+from utils.contract_data_fetchers import MetaStakingContractDataFetcher
+
 logger = get_logger(__name__)
 
 
@@ -231,6 +233,15 @@ class MetaStakingContract(DEXContractInterface):
         gas_limit = 50000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
                              [energy_address])
+    
+    def get_energy_factory_address(self, proxy: ProxyNetworkProvider) -> str:
+        data_fetcher = MetaStakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getEnergyFactoryAddress')
+        if not raw_results:
+            return ""
+        address = Address.from_hex(raw_results).bech32()
+
+        return address
 
     def get_all_decoded_metastake_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
                                                               holder_address: str, token_nonce: int) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:

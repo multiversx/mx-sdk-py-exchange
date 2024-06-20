@@ -391,6 +391,15 @@ class StakingContract(BaseFarmContract, BaseBoostedContract):
         endpoint_name = "addAdmin"
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
     
+    def update_owner_or_admin(self, deployer: Account, proxy: ProxyNetworkProvider, old_address: str):
+        function_purpose = "Update owner or admin"
+        logger.info(function_purpose)
+        
+        gas_limit = 70000000
+        sc_args = [old_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "updateOwnerOrAdmin", sc_args)
+    
     def get_reward_capacity(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getRewardCapacity')

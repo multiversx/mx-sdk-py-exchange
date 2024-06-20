@@ -1,7 +1,8 @@
+import config
 from argparse import ArgumentParser
 from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
-from tools.common import API, PROXY, get_owner, get_user_continue
+from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
 from tools.runners.pair_runner import get_all_pair_addresses
 from utils.contract_retrievers import retrieve_pair_by_address
 
@@ -24,7 +25,7 @@ def handle_command(args):
     """Handle the command passed to the runner"""
 
     if args.upgrade:
-        print('upgrade fees collector')
+        upgrade_fees_collector_contract(args.compare_states)
     elif args.set_pairs:
         set_pairs_in_fees_collector()
     else:
@@ -58,3 +59,37 @@ def set_pairs_in_fees_collector():
             return
 
         count += 1
+
+
+def upgrade_fees_collector_contract(compare_states: bool):
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    context = Context()
+    fees_collector_contract: FeesCollectorContract
+    fees_collector_contract = context.get_contracts(FEES_COLLECTOR_LABEL)[0]
+
+    print(f"Upgrading fees collector contract...")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    if compare_states:
+        print(f"Fetching contract state before upgrade...")
+        fetch_contracts_states("pre", network_providers, [fees_collector_contract.address], FEES_COLLECTOR_LABEL)
+
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            return
+
+    tx_hash = fees_collector_contract.contract_upgrade(dex_owner, network_providers.proxy,
+                                        config.FEES_COLLECTOR_BYTECODE_PATH,
+                                        [], True)
+
+    if not network_providers.check_simple_tx_status(tx_hash, f"upgrade fees collector: {fees_collector_contract.address}"):
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            return
+
+    if compare_states:
+        fetch_new_and_compare_contract_states(FEES_COLLECTOR_LABEL, fees_collector_contract.address, network_providers)
+
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return

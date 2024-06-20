@@ -66,8 +66,7 @@ def upgrade_energy_factory(compare_states: bool = False):
 
     tx_hash = energy_contract.contract_upgrade(context.deployer_account, context.network_provider.proxy,
                                                config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH,
-                                               [locked_asset_contract.locked_asset, locked_asset_contract.address,
-                                                0, [], []])
+                                               [], True)
 
     if not context.network_provider.check_complex_tx_status(tx_hash, f"upgrade energy contract: {energy_contract}"):
         return

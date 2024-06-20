@@ -309,7 +309,6 @@ def upgrade_farmv2_contracts(compare_states: bool):
         print(f"Processing contract {count} / {len(all_addresses)}: {address}")
         contract: FarmContract
         contract = retrieve_farm_by_address(address)
-        lp_address = contract.get_lp_address(network_providers.proxy)
 
         if compare_states:
             print(f"Fetching contract state before upgrade...")
@@ -319,8 +318,8 @@ def upgrade_farmv2_contracts(compare_states: bool):
                 return
 
         tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                            config.FARM_V2_BYTECODE_PATH,
-                                            [lp_address, dex_owner.address.bech32()])
+                                            config.FARM_V3_BYTECODE_PATH,
+                                            [], True)
 
         if not network_providers.check_simple_tx_status(tx_hash, f"upgrade farm v2 contract: {address}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -354,7 +353,7 @@ def upgrade_farmv2_contract(compare_states: bool, farm_address: str):
             return
 
     tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                        config.FARM_V2_BYTECODE_PATH,
+                                        config.FARM_V3_BYTECODE_PATH,
                                         [], True)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
