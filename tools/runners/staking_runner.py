@@ -48,6 +48,11 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
     command_parser.set_defaults(func=resume_all_staking_contracts)
 
+    command_parser = contract_group.add_parser('setup-boost-all', help='setup boost for all contracts command')
+    command_parser.add_argument('--compare-states', action='store_true',
+                        help='compare states before and after the setup')
+    command_parser.set_defaults(func=setup_boosted_parameters_for_all_stakings)
+
     command_parser = contract_group.add_parser('pause', help='pause contract command')
     command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.set_defaults(func=pause_staking_contract)
@@ -55,6 +60,12 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume', help='resume contract command')
     command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.set_defaults(func=resume_staking_contract)
+
+    command_parser = contract_group.add_parser('setup-boost', help='setup boost for specific contract command')
+    command_parser.add_argument('--compare-states', action='store_true',
+                        help='compare states before and after the setup')
+    command_parser.add_argument('--address', type=str, help='contract address')
+    command_parser.set_defaults(func=setup_boosted_parameters_for_staking)
 
     return group_parser
 
@@ -274,9 +285,14 @@ def setup_boosted_parameters_with_energy_address(staking_address: str, energy_ad
         return
     
 
-def setup_boosted_parameters_for_staking(staking_address: str, compare_states: bool = False):
+def setup_boosted_parameters_for_staking(args: Any):
     """Setup boosted parameters for staking contract"""
     print("Setup boosted parameters for staking contract")
+    staking_address = args.address
+    compare_states = args.compare_states
+    if not staking_address:
+        print("Staking address is required!")
+        return
 
     context = Context()
     energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
@@ -284,9 +300,10 @@ def setup_boosted_parameters_for_staking(staking_address: str, compare_states: b
     setup_boosted_parameters_with_energy_address(staking_address, energy_contract.address, compare_states)
 
 
-def setup_boosted_parameters_for_all_stakings(compare_states: bool = False):
+def setup_boosted_parameters_for_all_stakings(args: Any):
     """Setup boosted parameters for all staking contracts"""
     print("Setup boosted parameters for all staking contracts")
+    compare_states = args.compare_states
 
     context = Context()
     energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]

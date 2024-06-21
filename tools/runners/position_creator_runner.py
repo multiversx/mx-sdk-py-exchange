@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from typing import Any
 from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue
@@ -37,7 +38,8 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser.set_defaults(func=pause_position_creator_contract)
     command_parser = contract_group.add_parser('resume', help='resume contract command')
     command_parser.set_defaults(func=resume_position_creator_contract)
-    command_parser = contract_group.add_parser('setup-whitelist', help='whitelist contract command')
+    command_parser = contract_group.add_parser('setup-whitelist', help='whitelist contract where needed command')
+    command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.set_defaults(func=setup_whitelist)
 
     return group_parser
@@ -112,13 +114,14 @@ def deploy_position_creator_contract():
     print(f"Deployed position creator contract at address: {address}")
     
 
-def setup_whitelist():
+def setup_whitelist(args: Any):
     """Setup whitelist for position creator contract"""
 
     print("Setting up whitelist for position creator contract")
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
+    address = args.address
     _ = Address(address)    # check if address is valid
     position_creator_contract = retrieve_position_creator_by_address(address)
 

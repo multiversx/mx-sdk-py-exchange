@@ -52,7 +52,7 @@ def get_acounts_with_token(accounts: List[ExportedAccount], token_name: str) -> 
 def add_upgrade_command(subparsers, func: Any) -> None:
     """Add upgrade command"""
 
-    command_parser = subparsers.add_parser('upgrade', help='upgrade contarct command')
+    command_parser = subparsers.add_parser('upgrade', help='upgrade contract command')
     command_parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after upgrade')
     command_parser.add_argument('--address', type=str, help='contract address')
