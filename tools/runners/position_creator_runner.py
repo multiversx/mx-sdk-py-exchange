@@ -3,6 +3,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue
 from context import Context
+from tools.runners.common_runner import add_upgrade_command
 from utils.contract_retrievers import retrieve_position_creator_by_address
 from utils.utils_tx import NetworkProviders
 from deploy import populate_deploy_lists
@@ -12,31 +13,22 @@ POSITION_CREATOR_LABEL = "position_creator"
 OUTPUT_POSITION_CREATOR_FILE = OUTPUT_FOLDER / "position_creator_data.json"
 
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for position creator commands"""
+    group_parser = subparsers.add_parser('position-creator', help='position creator group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
-                        help='compare states before and after upgrade')
-    parser.add_argument('--address', type=str, help='position creator contract address')
+    contract_parser = subgroup_parser.add_parser('contract', help='position creator contract commands')
 
-    mutex = parser.add_mutually_exclusive_group()
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_command(contract_group, upgrade_position_creator_contract)
 
-    mutex.add_argument('--pause', action='store_true', help='pause position creator contract')
-    mutex.add_argument('--resume', action='store_true', help='resume position creator contract')
-    mutex.add_argument('--upgrade', action='store_true', help='upgrade position creator by address')
+    command_parser = contract_group.add_parser('pause', help='pause contract command')
+    command_parser.set_defaults(func=pause_position_creator_contract)
+    command_parser = contract_group.add_parser('resume', help='resume contract command')
+    command_parser.set_defaults(func=resume_position_creator_contract)
 
-
-def handle_command(args):
-    """Handle the command"""
-
-    if args.pause:
-        pause_position_creator_contract()
-    elif args.resume:
-        resume_position_creator_contract()
-    elif args.upgrade:
-        upgrade_position_creator_contract(args.compare_states)
-    else:
-        print('invalid arguments')
+    return group_parser
 
 
 def pause_position_creator_contract():
