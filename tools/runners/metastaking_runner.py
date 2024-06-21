@@ -116,10 +116,10 @@ def upgrade_metastaking_contracts(label: str, file: str, compare_states: bool = 
             return
 
         version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
+        bytecode = config.STAKING_V2_BYTECODE_PATH if version == MetaStakingContractVersion.V1 else config.STAKING_V3_BYTECODE_PATH
         metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, version)
 
-        tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                                        config.STAKING_PROXY_V3_BYTECODE_PATH, [])
+        tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode, [])
 
         if not network_providers.check_complex_tx_status(tx_hash,
                                                          f"upgrade metastaking contract: {metastaking_address}"):
