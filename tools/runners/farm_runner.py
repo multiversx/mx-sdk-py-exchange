@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 import json
 import os
+from typing import Any
 
 from multiversx_sdk import Address
 from config import GRAPHQL
@@ -9,6 +10,7 @@ from contracts.farm_contract import FarmContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
+from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command
 from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.contract_retrievers import retrieve_farm_by_address
 from utils.utils_tx import NetworkProviders
@@ -24,66 +26,27 @@ OUTPUT_FARMV12_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv12_data.json"
 OUTPUT_FARMV2_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv2_data.json"
 
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for farms commands"""
+    group_parser = subparsers.add_parser('farms', help='farms group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
-    parser.add_argument('--compare-states', action='store_true',
-                        help='compare states before and after upgrade')
-    parser.add_argument('--address', type=str, help='farm contract address')
-    mutex = parser.add_mutually_exclusive_group()
-    mutex.add_argument('--fetch-all', action='store_true',
-                       help='fetch farms from blockchain')
-    mutex.add_argument('--pause-all', action='store_true', help='pause all farms')
-    mutex.add_argument('--pause', action='store_true', help='pause farm by address')
-    mutex.add_argument('--resume-all', action='store_true', help='resume all farms')
-    mutex.add_argument('--resume', action='store_true', help='resume farm by address')
-    mutex.add_argument('--upgrade-all-v1_2', action='store_true', help='upgrade all v1.2 farms')
-    mutex.add_argument('--upgrade-all-v1_3', action='store_true',
-                       help='upgrade all v1.3 farms')
-    mutex.add_argument('--upgrade-all-v2', action='store_true',
-                       help='upgrade all v2 farms')
-    mutex.add_argument('--upgrade', action='store_true',
-                       help='upgrade farm contract by address')
-    mutex.add_argument('--set-transfer-role', action='store_true',
-                       help='set transfer role for v1.3 farms')
-    mutex.add_argument('--stop-produce-rewards', action='store_true',
-                       help='stop producing rewards for farms')
-    mutex.add_argument('--replace-v2-ownership',
-                       help='replace v2 soft ownership; specify old owner address to be replaced')
-    mutex.add_argument('--remove-penalty', action='store_true', help='remove penalty from farms')
+    contract_parser = subgroup_parser.add_parser('contract', help='farms contract commands')
 
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_command(contract_group, upgrade_farmv2_contract)
+    add_upgrade_all_command(contract_group, upgrade_farmv2_contracts)
 
-def handle_command(args):
-    """Handle the command passed to the runner"""
+    command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
+    command_parser.set_defaults(func=fetch_and_save_farms_from_chain)
 
-    if args.fetch_all:
-        fetch_and_save_farms_from_chain()
-    elif args.pause_all:
-        pause_farm_contracts()
-    elif args.pause:
-        pause_farm_contract(args.address)
-    elif args.resume_all:
-        resume_farm_contracts()
-    elif args.resume:
-        resume_farm_contract(args.address)
-    elif args.upgrade_all_v1_2:
-        upgrade_farmv12_contracts()
-    elif args.upgrade_all_v1_3:
-        upgrade_farmv13_contracts()
-    elif args.upgrade_all_v2:
-        upgrade_farmv2_contracts(args.compare_states)
-    elif args.upgrade:
-        upgrade_farmv2_contract(args.compare_states, args.address)
-    elif args.set_transfer_role:
-        set_transfer_role_farmv13_contracts()
-    elif args.stop_produce_rewards:
-        stop_produce_rewards_farms()
-    elif args.replace_v2_ownership:
-        replace_v2_ownership(args.replace_v2_ownership, args.compare_states)
-    elif args.remove_penalty:
-        remove_penalty_farms()
-    else:
-        print('invalid arguments')
+    command_parser = contract_group.add_parser('pause-all', help='pause all contracts command')
+    command_parser.set_defaults(func=pause_farm_contracts)
+
+    command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
+    command_parser.set_defaults(func=resume_farm_contracts)
+
+    return group_parser
 
 
 def fetch_and_save_farms_from_chain():
@@ -133,8 +96,13 @@ def pause_farm_contracts():
         count += 1
 
 
-def pause_farm_contract(farm_address: str):
+def pause_farm_contract(args: Any):
     """Pause farm contract"""
+
+    farm_address = args.address
+    if not farm_address:
+        print("Missing required arguments!")
+        return
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -198,8 +166,14 @@ def resume_farm_contracts():
         count += 1
 
 
-def resume_farm_contract(farm_address: str):
+def resume_farm_contract(args: Any):
     """Resume farm contract"""
+
+    farm_address = args.address
+
+    if not farm_address:
+        print("Missing required arguments!")
+        return
 
     print(f"Resuming farm {farm_address} ...")
 
@@ -294,7 +268,10 @@ def upgrade_farmv13_contracts():
         count += 1
 
 
-def upgrade_farmv2_contracts(compare_states: bool):
+def upgrade_farmv2_contracts(args: Any):
+    """Upgrade all v2 farms"""
+
+    compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
@@ -311,7 +288,7 @@ def upgrade_farmv2_contracts(compare_states: bool):
         contract = retrieve_farm_by_address(address)
 
         if compare_states:
-            print(f"Fetching contract state before upgrade...")
+            print("Fetching contract state before upgrade...")
             fetch_contracts_states("pre", network_providers, [address], FARMSV2_LABEL)
 
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -334,7 +311,16 @@ def upgrade_farmv2_contracts(compare_states: bool):
         count += 1
 
 
-def upgrade_farmv2_contract(compare_states: bool, farm_address: str):
+def upgrade_farmv2_contract(args: Any):
+    """Upgrade farm v2 contract by address"""
+
+    compare_states = args.compare_states
+    farm_address = args.address
+
+    if not farm_address:
+        print("Missing required arguments!")
+        return
+
     print(f"Upgrading farm contract: {farm_address}")
 
     network_providers = NetworkProviders(API, PROXY)
@@ -346,7 +332,7 @@ def upgrade_farmv2_contract(compare_states: bool, farm_address: str):
     contract = retrieve_farm_by_address(farm_address)
 
     if compare_states:
-        print(f"Fetching contract state before upgrade...")
+        print("Fetching contract state before upgrade...")
         fetch_contracts_states("pre", network_providers, [farm_address], FARMSV2_LABEL)
 
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):

@@ -3,33 +3,31 @@ from argparse import ArgumentParser
 from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
+from tools.runners.common_runner import add_upgrade_command
 from tools.runners.pair_runner import get_all_pair_addresses
 from utils.contract_retrievers import retrieve_pair_by_address
+from typing import Any
 
 from utils.utils_tx import NetworkProviders
 
 
 FEES_COLLECTOR_LABEL = 'fees_collector'
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
 
-    parser.add_argument('--compare-states', action='store_false', default=False,
-                        help='compare states before and after upgrade')
-    mutex = parser.add_mutually_exclusive_group()
-    mutex.add_argument('--upgrade', action='store_true', help='upgrade fees collector')
-    mutex.add_argument('--set-pairs', action='store_true', help='set pairs in fees collector')
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for fees collector commands"""
+    group_parser = subparsers.add_parser('fees-collector', help='fees collector group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
+    contract_parser = subgroup_parser.add_parser('contract', help='fees collector contract commands')
 
-def handle_command(args):
-    """Handle the command passed to the runner"""
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_command(contract_group, upgrade_fees_collector_contract)
 
-    if args.upgrade:
-        upgrade_fees_collector_contract(args.compare_states)
-    elif args.set_pairs:
-        set_pairs_in_fees_collector()
-    else:
-        print('invalid arguments')
+    command_parser = contract_group.add_parser('set-pairs', help='set pairs contracts command')
+    command_parser.set_defaults(func=set_pairs_in_fees_collector)
+
+    return group_parser
 
 
 def set_pairs_in_fees_collector():
@@ -61,7 +59,9 @@ def set_pairs_in_fees_collector():
         count += 1
 
 
-def upgrade_fees_collector_contract(compare_states: bool):
+def upgrade_fees_collector_contract(args: Any):
+    compare_states = args.compare_states
+
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 

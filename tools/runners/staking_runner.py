@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 import json
 import os
 import time
+from typing import Any
 from multiversx_sdk import Address
 import config
 from config import GRAPHQL
@@ -11,6 +12,7 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
+from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.contract_retrievers import retrieve_staking_by_address
 from utils.utils_tx import NetworkProviders
@@ -26,47 +28,35 @@ STAKINGS_LABEL = "stakings"
 OUTPUT_STAKING_CONTRACTS_FILE = OUTPUT_FOLDER / "staking_data.json"
 
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for staking commands"""
+    group_parser = subparsers.add_parser('stakings', help='stakings group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
-    parser.add_argument('--compare-states', action='store_true', help='compare states before and after upgrade')
-    parser.add_argument('--address', type=str, help='staking contract address')
-    mutex = parser.add_mutually_exclusive_group()
-    mutex.add_argument('--fetch-all', action='store_true',
-                       help='fetch stakings from blockchain')
-    mutex.add_argument('--upgrade-all', action='store_true', help='upgrade all stakings')
-    mutex.add_argument('--upgrade', action='store_true', help='upgrade staking contract by address')
-    mutex.add_argument('--setup-boost-all', action='store_true', help='setup boosted parameters for all contracts')
-    mutex.add_argument('--setup-boost', action='store_true', help='setup boosted parameters for contract by address')
-    mutex.add_argument('--pause-all', action='store_true', help='pause all stakings')
-    mutex.add_argument('--resume-all', action='store_true', help='resume all stakings')
-    mutex.add_argument('--pause', action='store_true', help='pause staking contract by address')
-    mutex.add_argument('--resume', action='store_true', help='resume staking contract by address')
+    contract_parser = subgroup_parser.add_parser('contract', help='stakings contract commands')
 
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_command(contract_group, upgrade_staking_contract)
+    add_upgrade_all_command(contract_group, upgrade_staking_contracts)
 
-def handle_command(args):
-    """Handle staking commands"""
+    command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
+    command_parser.set_defaults(func=fetch_and_save_stakings_from_chain)
 
-    if args.fetch_all:
-        fetch_and_save_stakings_from_chain()
-    elif args.pause_all:
-        pause_all_staking_contracts()
-    elif args.resume_all:
-        resume_staking_contracts()
-    elif args.pause:
-        pause_staking_contract(args.address)
-    elif args.resume:
-        resume_staking_contract(args.address)
-    elif args.upgrade_all:
-        upgrade_staking_contracts(args.compare_states)
-    elif args.upgrade:
-        upgrade_staking_contract(args.address, args.compare_states)
-    elif args.setup_boost_all:
-        setup_boosted_parameters_for_all_stakings(args.compare_states)
-    elif args.setup_boost:
-        setup_boosted_parameters_for_staking(args.address, args.compare_states)
-    else:
-        print('invalid arguments')
+    command_parser = contract_group.add_parser('pause-all', help='pause all contracts command')
+    command_parser.set_defaults(func=pause_all_staking_contracts)
+
+    command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
+    command_parser.set_defaults(func=resume_all_staking_contracts)
+
+    command_parser = contract_group.add_parser('pause', help='pause contract command')
+    command_parser.add_argument('--address', type=str, help='contract address')
+    command_parser.set_defaults(func=pause_staking_contract)
+
+    command_parser = contract_group.add_parser('resume', help='resume contract command')
+    command_parser.add_argument('--address', type=str, help='contract address')
+    command_parser.set_defaults(func=resume_staking_contract)
+
+    return group_parser
 
 
 def fetch_and_save_stakings_from_chain():
@@ -111,7 +101,8 @@ def pause_all_staking_contracts():
     pause_staking_contracts(staking_addresses)
 
 
-def pause_staking_contract(staking_address: str):
+def pause_staking_contract(args: Any):
+    staking_address = args.address
     pause_staking_contracts([staking_address])
 
 
@@ -156,12 +147,15 @@ def resume_all_staking_contracts():
     resume_staking_contracts(staking_addresses)
 
 
-def resume_staking_contract(staking_address: str):
+def resume_staking_contract(args: Any):
+    staking_address = args.address
     resume_staking_contracts([staking_address])
 
 
-def upgrade_staking_contracts(compare_states: bool = False):
+def upgrade_staking_contracts(args: Any):
     """Upgrade staking contracts"""
+
+    compare_states = args.compare_states
 
     print("Upgrade staking contracts")
 
@@ -205,8 +199,15 @@ def upgrade_staking_contracts(compare_states: bool = False):
         count += 1
 
 
-def upgrade_staking_contract(staking_address: str, compare_states: bool = False):
+def upgrade_staking_contract(args: Any):
     """Upgrade staking contract"""
+
+    staking_address = args.address
+    compare_states = args.compare_states
+
+    if not staking_address:
+        print("Staking address is required!")
+        return
 
     print("Upgrade staking contract")
 

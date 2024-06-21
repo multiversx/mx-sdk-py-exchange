@@ -4,33 +4,28 @@ import config
 from context import Context
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tools.common import get_user_continue, fetch_contracts_states, fetch_new_and_compare_contract_states
+from tools.runners.common_runner import add_upgrade_command
 from utils.contract_retrievers import retrieve_simple_lock_energy_by_address, retrieve_locked_asset_factory_by_address
 
 from utils.utils_tx import NetworkProviders
 
 
-def add_parsed_arguments(parser: ArgumentParser):
-    """Add arguments to the parser"""
+def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
+    """Set up argument parser for energy factory commands"""
+    group_parser = subparsers.add_parser('energy-factory', help='energy factory group commands')
+    subgroup_parser = group_parser.add_subparsers()
 
-    parser.add_argument('--compare-states', action='store_true',
-                        help='compare states before and after upgrade')
-    mutex = parser.add_mutually_exclusive_group()
-    mutex.add_argument('--pause', action='store_true', help='pause energy factory')
-    mutex.add_argument('--resume', action='store_true', help='resume energy factory')
-    mutex.add_argument('--upgrade', action='store_true', help='upgrade energy factory')
+    contract_parser = subgroup_parser.add_parser('contract', help='energy factory contract commands')
 
+    contract_group = contract_parser.add_subparsers()
+    add_upgrade_command(contract_group, upgrade_energy_factory)
 
-def handle_command(args):
-    """Handle the command passed to the runner"""
+    command_parser = contract_group.add_parser('pause', help='pause contract command')
+    command_parser.set_defaults(func=pause_energy_factory)
+    command_parser = contract_group.add_parser('resume', help='resume contract command')
+    command_parser.set_defaults(func=resume_energy_factory)
 
-    if args.upgrade:
-        upgrade_energy_factory(args.compare_states)
-    elif args.pause:
-        pause_energy_factory()
-    elif args.resume:
-        resume_energy_factory()
-    else:
-        print('invalid arguments')
+    return group_parser
 
 
 def pause_energy_factory():
