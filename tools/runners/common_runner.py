@@ -87,14 +87,14 @@ def get_default_signature() -> str:
     return funding_account.sign_transaction(transaction)
 
 
-def fund_accounts(accounts: List[ExportedAccount]) -> None:
+def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
     """Fund accounts"""
 
     network_providers = NetworkProviders(API, PROXY)
     chain_id = network_providers.proxy.get_network_config().chain_id
     tx_config = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
     funding_account = Account(address=None, pem_file=config.DEFAULT_OWNER)
-    funding_account.address = WrapperAddress.from_bech32("erd1v4ms58e22zjcp08suzqgm9ajmumwxcy4hfkdc23gvynnegjdflmsj6gmaq")
+    funding_account.address = WrapperAddress.from_bech32(config.SHADOWFORK_FUNDING_ADDRESS)
     funding_account.sync_nonce(network_providers.proxy)
     signature = get_default_signature()
 
