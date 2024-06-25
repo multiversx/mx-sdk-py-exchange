@@ -454,6 +454,15 @@ class DexProxyContract(DEXContractInterface):
 
         gas_limit = 50000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addFarmToIntermediate", [farm_address])
+    
+    def add_contract_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
+        function_purpose = "Add contract to proxy dex whitelist"
+        logger.info(function_purpose)
+        
+        gas_limit = 30000000
+        sc_args = [whitelisted_sc_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
