@@ -1995,6 +1995,7 @@ class DeployStructure:
                 return
             log_step_pass(f"Position creator contract address: {contract_address}")
             position_creator_contract.address = contract_address
+            
             deployed_contracts.append(position_creator_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
@@ -2033,6 +2034,21 @@ class DeployStructure:
                 return
             log_step_pass(f"Locked token position creator contract address: {contract_address}")
             locked_token_position_creator_contract.address = contract_address
+
+            # setup whitelist for contract in proxy dex
+            proxy_dex_contract: DexProxyContract
+            proxy_dex_contract = self.contracts[config.PROXIES_V2].get_deployed_contract_by_index(contract_config['proxy_dex'])
+            tx_hash = proxy_dex_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy, contract_address)
+            network_providers.check_simple_tx_status(tx_hash, "whitelist in proxy dex")
+
+            # setup whitelist for contract in energy factory
+            energy_factory_contract: SimpleLockEnergyContract
+            energy_factory_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(contract_config['energy_factory'])
+            tx_hash = energy_factory_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy, contract_address)
+            network_providers.check_simple_tx_status(tx_hash, "whitelist in energy factory")
+            tx_hash = energy_factory_contract.add_sc_to_token_transfer_whitelist(deployer_account, network_providers.proxy, contract_address)
+            network_providers.check_simple_tx_status(tx_hash, "whitelist for transfers in energy factory")
+
             deployed_contracts.append(locked_token_position_creator_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
@@ -2124,7 +2140,7 @@ class DeployStructure:
             voting_period_in_blocks = contract_config['voting_period_in_blocks']
             withdraw_percentage_defeated = contract_config['withdraw_percentage_defeated']
 
-            contract = GovernanceContract(locking_contract.locked_token)
+            contract = GovernanceContract(locking_contract.base_token)
             tx_hash, contract_address = contract.contract_deploy(
                 deployer_account,
                 network_providers.proxy,
@@ -2145,5 +2161,10 @@ class DeployStructure:
                 return
             log_step_pass(f"Governance contract address: {contract_address}")
             contract.address = contract_address
+            
+            # setup whitelist in fees collector
+            tx_hash = fees_collector.add_known_contracts(deployer_account, network_providers.proxy, contract_address)
+            network_providers.check_simple_tx_status(tx_hash, "whitelist in fees collector")
+            
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
