@@ -46,6 +46,16 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
     command_parser.set_defaults(func=resume_farm_contracts)
 
+    command_parser = contract_group.add_parser('resume-v2-ownership', help='overwrite ownership address for all contracts command')
+    command_parser.add_argument('--compare-states', action='store_true',
+                        help='compare states before and after change')
+    command_parser.add_argument('--old-owner', type=str, help='old owner address to replace')
+    command_parser.set_defaults(func=replace_v2_ownership)
+
+    command_parser = contract_group.add_parser('update-boosted-factors', help='update boosted factors for all contracts command')
+    command_parser.set_defaults(func=update_boosted_factors)
+    
+
     return group_parser
 
 
@@ -378,7 +388,9 @@ def set_transfer_role_farmv13_contracts():
         count += 1
 
 
-def replace_v2_ownership(old_owner: str, compare_states: bool = False):
+def replace_v2_ownership(args: Any):
+    old_owner = args.old_owner
+    compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
@@ -418,6 +430,29 @@ def replace_v2_ownership(old_owner: str, compare_states: bool = False):
 
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
+
+        count += 1
+
+
+def update_boosted_factors():
+    """Update boosted factors for all farms"""
+
+    print("Updating boosted factors for all farms...")
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    farm_addresses = get_all_farm_v2_addresses()
+
+    count = 1
+    for farm_address in farm_addresses:
+        print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
+        contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
+        tx_hash = contract.set_boosted_yields_factors(dex_owner, network_providers.proxy,
+                                                      [2, 1, 0, 1, 1000])
+        if not network_providers.check_simple_tx_status(tx_hash, f"set boosted yields for farm contract: {farm_address}"):
+            if not get_user_continue():
+                return
 
         count += 1
 

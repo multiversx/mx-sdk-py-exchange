@@ -36,6 +36,8 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     contract_group = contract_parser.add_subparsers()
     
+    command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
+    command_parser.set_defaults(func=fetch_and_save_metastakings_from_chain)
 
     command_parser = contract_group.add_parser('upgrade-all-v1', help='upgrade all v1 contracts command')
     command_parser.add_argument('--compare-states', action='store_true',
