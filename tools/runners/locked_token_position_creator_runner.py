@@ -5,6 +5,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, get_owner, \
 from context import Context
 from contracts.locked_token_position_creator_contract import LockedTokenPositionCreatorContract
 from contracts.dex_proxy_contract import DexProxyContract
+from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from utils.utils_chain import WrapperAddress as Address
 from utils.utils_tx import NetworkProviders
 from context import Context
@@ -26,7 +27,6 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('deploy', help='deploy contract command')
     command_parser.set_defaults(func=deploy_position_creator_contract)
     command_parser = contract_group.add_parser('setup-whitelist', help='whitelist contract where needed command')
-    command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.set_defaults(func=setup_whitelist)
 
     return group_parser
@@ -64,24 +64,28 @@ def deploy_position_creator_contract():
     print(f"Deployed locked token position creator contract at address: {address}")
     
 
-def setup_whitelist(args: Any):
+def setup_whitelist():
     """Setup whitelist for locked token position creator contract"""
 
     print("Setting up whitelist for locked token position creator contract")
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    address = args.address
-    _ = Address(address)    # check if address is valid
-
     context = Context()
+    address = context.get_contracts(config.LOCKED_TOKEN_POSITION_CREATOR)[0].address
 
     proxy_dex_contract: DexProxyContract
     proxy_dex_contract = context.get_contracts(config.PROXIES_V2)[0]
+    energy_factory_contract: SimpleLockEnergyContract
+    energy_factory_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
 
     print("Whitelisting locked token position creator in proxy dex...")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
-
     proxy_dex_contract.add_contract_to_whitelist(dex_owner, network_providers.proxy, address)
     
+    print("Whitelisting locked token position creator in energy factory...")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+    energy_factory_contract.add_sc_to_whitelist(dex_owner, network_providers.proxy, address)
+    energy_factory_contract.add_sc_to_token_transfer_whitelist(dex_owner, network_providers.proxy, address)

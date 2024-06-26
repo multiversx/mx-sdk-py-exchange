@@ -1,9 +1,10 @@
 from argparse import ArgumentParser
+from typing import Any
 from context import Context
 from contracts.contract_identities import ProxyContractVersion
 from contracts.dex_proxy_contract import DexProxyContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_upgrade_all_command
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import WrapperAddress as Address
 import config
@@ -21,16 +22,17 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_parser = subgroup_parser.add_parser('contract', help='proxy dex contract commands')
 
     contract_group = contract_parser.add_subparsers()
-    add_upgrade_command(contract_group, upgrade_proxy_dex_contracts)
+    add_upgrade_all_command(contract_group, upgrade_proxy_dex_contracts)
 
     return group_parser
 
 
-def upgrade_proxy_dex_contracts(compare_states: bool = False):
+def upgrade_proxy_dex_contracts(args: Any):
     """Upgrade proxy dex contracts"""
 
     print("Upgrade proxy dex contract")
 
+    compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
     context = Context()

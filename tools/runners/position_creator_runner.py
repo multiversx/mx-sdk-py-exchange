@@ -4,7 +4,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue
 from context import Context
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_upgrade_all_command
 from contracts.position_creator_contract import PositionCreatorContract
 from contracts.farm_contract import FarmContract, FarmContractVersion
 from contracts.staking_contract import StakingContract, StakingContractVersion
@@ -30,7 +30,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_parser = subgroup_parser.add_parser('contract', help='position creator contract commands')
 
     contract_group = contract_parser.add_subparsers()
-    add_upgrade_command(contract_group, upgrade_position_creator_contract)
+    add_upgrade_all_command(contract_group, upgrade_position_creator_contract)
 
     command_parser = contract_group.add_parser('deploy', help='deploy contract command')
     command_parser.set_defaults(func=deploy_position_creator_contract)
@@ -39,7 +39,6 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume', help='resume contract command')
     command_parser.set_defaults(func=resume_position_creator_contract)
     command_parser = contract_group.add_parser('setup-whitelist', help='whitelist contract where needed command')
-    command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.set_defaults(func=setup_whitelist)
 
     return group_parser
@@ -57,11 +56,12 @@ def resume_position_creator_contract():
     print("Resuming position creator contract")
 
 
-def upgrade_position_creator_contract(compare_states: bool = False):
+def upgrade_position_creator_contract(args: Any):
     """Upgrade position creator contract"""
 
     print("Upgrading position creator contract")
 
+    compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
@@ -114,16 +114,16 @@ def deploy_position_creator_contract():
     print(f"Deployed position creator contract at address: {address}")
     
 
-def setup_whitelist(args: Any):
+def setup_whitelist():
     """Setup whitelist for position creator contract"""
 
     print("Setting up whitelist for position creator contract")
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    address = args.address
-    _ = Address(address)    # check if address is valid
-    position_creator_contract = retrieve_position_creator_by_address(address)
+    context = Context()
+    position_creator_address = context.get_contracts(config.POSITION_CREATOR)[0].address
+    position_creator_contract = retrieve_position_creator_by_address(position_creator_address)
 
     farm_addresses = get_farm_addresses_from_chain("v2")
     staking_addresses = get_staking_addresses_from_chain()
@@ -135,6 +135,9 @@ def setup_whitelist(args: Any):
 
     for address in farm_addresses:
         farm_contract = FarmContract("", "", "", address, FarmContractVersion.V2Boosted)
+        if farm_contract.is_contract_whitelisted(position_creator_contract.address, network_providers.proxy):
+            print(f"Position creator already whitelisted in farm: {address}")
+            continue
         farm_contract.add_contract_to_whitelist(dex_owner, network_providers.proxy, position_creator_contract.address)
 
     print("Whitelisting position creator in staking contracts...")
@@ -142,6 +145,9 @@ def setup_whitelist(args: Any):
         return
     
     for address in staking_addresses:
+        if staking_contract.is_contract_whitelisted(position_creator_contract.address, network_providers.proxy):
+            print(f"Position creator already whitelisted in staking contract: {address}")
+            continue
         staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", address)
         staking_contract.whitelist_contract(dex_owner, network_providers.proxy, position_creator_contract.address)
 
@@ -150,6 +156,9 @@ def setup_whitelist(args: Any):
         return
     
     for address in staking_proxy_addresses:
+        if metastaking_contract.is_contract_whitelisted(position_creator_contract.address, network_providers.proxy):
+            print(f"Position creator already whitelisted in metastaking contract: {address}")
+            continue
         metastaking_contract = MetaStakingContract("", "", "", "", "", "", "", MetaStakingContractVersion.V3Boosted, "", address)
         metastaking_contract.whitelist_contract(dex_owner, network_providers.proxy, position_creator_contract.address)
     
