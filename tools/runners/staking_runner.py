@@ -267,7 +267,7 @@ def setup_boosted_parameters_with_energy_address(staking_address: str, energy_ad
     staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", staking_address)
 
     hashes = []
-    hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, 6000))
+    hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, 4000))
     hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, 
                                                   [2, 1, 0, 1, 1]))
     hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
