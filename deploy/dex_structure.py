@@ -30,6 +30,7 @@ from contracts.contract_identities import FarmContractVersion, DEXContractInterf
 from contracts.metastaking_contract import MetaStakingContract
 from contracts.staking_contract import StakingContract
 from contracts.dex_proxy_contract import DexProxyContract
+from contracts.governance_contract import GovernanceContract
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import hex_to_string
 from utils.utils_chain import Account, WrapperAddress as Address
@@ -229,6 +230,9 @@ class DeployStructure:
             config.LK_WRAPS:
                 ContractStructure(config.LK_WRAPS, LkWrapContract, config.LK_WRAP_BYTECODE_PATH,
                                   self.lk_wrap_deploy, False),
+            config.GOVERNANCES:
+                ContractStructure(config.GOVERNANCES, GovernanceContract, config.GOVERNANCE_BYTECODE_PATH,
+                                  self.governance_deploy, False),
         }
 
     # main entry method to deploy tokens (either deploy fresh ones or reuse existing ones)
@@ -2085,7 +2089,7 @@ class DeployStructure:
                 ]
             )
 
-            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "position creator contract"):
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "Lk Token Wrapping contract"):
                 return
             log_step_pass(f"Lk Token Wrapping contract address: {contract_address}")
             contract.address = contract_address
@@ -2098,5 +2102,48 @@ class DeployStructure:
                                                           network_providers.proxy.url).get_data("getWrappedTokenId")
             contract.wrapped_token = hex_to_string(wrapped_token_hex)
 
+            deployed_contracts.append(contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def governance_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for contract_config in contract_structure.deploy_structure_list:
+            locking_contract: Optional[SimpleLockEnergyContract] = None
+            locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                contract_config.get('energy_factory', 0)
+            )
+            fees_collector: Optional[FeesCollectorContract] = None
+            fees_collector = self.contracts[config.FEES_COLLECTORS].get_deployed_contract_by_index(
+                contract_config.get('fees_collector', 0)
+            )
+            min_energy_for_propose = contract_config['min_energy_for_propose']
+            min_fee_for_propose = contract_config['min_fee_for_propose']
+            quorum_percentage = contract_config['quorum_percentage']
+            voting_delay_in_blocks = contract_config['voting_delay_in_blocks']
+            voting_period_in_blocks = contract_config['voting_period_in_blocks']
+            withdraw_percentage_defeated = contract_config['withdraw_percentage_defeated']
+
+            contract = GovernanceContract(locking_contract.locked_token)
+            tx_hash, contract_address = contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    min_energy_for_propose,
+                    min_fee_for_propose,
+                    quorum_percentage,
+                    voting_delay_in_blocks,
+                    voting_period_in_blocks,
+                    withdraw_percentage_defeated,
+                    locking_contract.address,
+                    fees_collector.address
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "governance contract"):
+                return
+            log_step_pass(f"Governance contract address: {contract_address}")
+            contract.address = contract_address
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
