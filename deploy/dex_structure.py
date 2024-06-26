@@ -8,6 +8,7 @@ from contracts.escrow_contract import EscrowContract
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.lk_wrap_contract import LkWrapContract
 from contracts.position_creator_contract import PositionCreatorContract
+from contracts.locked_token_position_creator_contract import LockedTokenPositionCreatorContract
 from contracts.proxy_deployer_contract import ProxyDeployerContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.unstaker_contract import UnstakerContract
@@ -219,6 +220,9 @@ class DeployStructure:
             config.POSITION_CREATOR:
                 ContractStructure(config.POSITION_CREATOR, PositionCreatorContract, config.POSITION_CREATOR_BYTECODE_PATH,
                                   self.position_creator_deploy, False),
+            config.LOCKED_TOKEN_POSITION_CREATOR:
+                ContractStructure(config.LOCKED_TOKEN_POSITION_CREATOR, LockedTokenPositionCreatorContract, config.LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH,
+                                  self.locked_token_position_creator_deploy, False),
             config.ESCROWS:
                 ContractStructure(config.ESCROWS, EscrowContract, config.ESCROW_BYTECODE_PATH,
                                   self.escrow_deploy, False),
@@ -1961,17 +1965,25 @@ class DeployStructure:
     def position_creator_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]
         deployed_contracts = []
+
         for contract_config in contract_structure.deploy_structure_list:
+            if contract_config.get('egld_wrap_address'):
+                egld_wrapper_contract_address = contract_config.get('egld_wrap_address')
+            else: 
+                egld_wrapper_contract_address = self.contracts[config.EGLD_WRAPS].get_deployed_contract_by_index(contract_config['egld_wrap']).address
+            
+            router_contract_address = self.contracts[config.ROUTER_V2].get_deployed_contract_by_index(contract_config['router_v2']).address
+
             position_creator_contract = PositionCreatorContract(
-                "", contract_config['egld_wrapped_address'], contract_config['wrapped_token_id']
+                "", egld_wrapper_contract_address, router_contract_address
             )
             tx_hash, contract_address = position_creator_contract.contract_deploy(
                 deployer_account,
                 network_providers.proxy,
                 contract_structure.bytecode,
                 [
-                    position_creator_contract.egld_wrapper_address,
-                    position_creator_contract.wrapped_token_id
+                    egld_wrapper_contract_address,
+                    router_contract_address
                 ]
             )
 
@@ -1980,6 +1992,44 @@ class DeployStructure:
             log_step_pass(f"Position creator contract address: {contract_address}")
             position_creator_contract.address = contract_address
             deployed_contracts.append(position_creator_contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def locked_token_position_creator_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+
+        for contract_config in contract_structure.deploy_structure_list:
+            energy_factory_address = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(contract_config['energy_factory']).address
+            egld_wrapper_contract_address = self.contracts[config.EGLD_WRAPS].get_deployed_contract_by_index(contract_config['egld_wrap']).address
+            mex_wegld_pair_address = self.contracts[config.PAIRS_V2].get_deployed_contract_by_index(contract_config['mex_wegld_pair']).address
+            mex_wegld_farm_address = self.contracts[config.FARMS_V2].get_deployed_contract_by_index(contract_config['mex_wegld_farm']).address
+            proxy_dex_address = self.contracts[config.PROXIES_V2].get_deployed_contract_by_index(contract_config['proxy_dex']).address
+            router_contract_address = self.contracts[config.ROUTER_V2].get_deployed_contract_by_index(contract_config['router_v2']).address
+            
+            locked_token_position_creator_contract = LockedTokenPositionCreatorContract(
+                "", energy_factory_address, egld_wrapper_contract_address, 
+                mex_wegld_pair_address, mex_wegld_farm_address, proxy_dex_address,
+                router_contract_address
+            )
+            tx_hash, contract_address = locked_token_position_creator_contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    energy_factory_address,
+                    egld_wrapper_contract_address,
+                    mex_wegld_pair_address,
+                    mex_wegld_farm_address,
+                    proxy_dex_address,
+                    router_contract_address
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "locked token position creator contract"):
+                return
+            log_step_pass(f"Locked token position creator contract address: {contract_address}")
+            locked_token_position_creator_contract.address = contract_address
+            deployed_contracts.append(locked_token_position_creator_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
     def escrow_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
