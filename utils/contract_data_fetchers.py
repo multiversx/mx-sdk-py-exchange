@@ -231,10 +231,11 @@ class FeeCollectorContractDataFetcher(DataFetcher):
             "updateAndGetSafePrice": self._get_hex_view,
             "getLpTokenIdentifier": self._get_hex_view,
             "getTotalRewardsForWeek": self._get_hex_view,
+            "getTotalEnergyForWeek": self._get_int_view,
+            "getUserEnergyForWeek": self._get_hex_view,
             "getTokensForGivenPosition": self._get_int_list_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
-            "getUserEnergyForWeek": self._get_hex_view,
-            "getTotalEnergyForWeek": self._get_int_view,
+            "getCurrentWeek": self._get_int_view
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
