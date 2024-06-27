@@ -16,7 +16,7 @@ from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 logger = get_logger(__name__)
 
 
-class MetaStakingContract(DEXContractInterface, BaseSCWhitelistContract):
+class MetaStakingContract(BaseSCWhitelistContract):
     def __init__(self, staking_token: str, lp_token: str, farm_token: str, stake_token: str,
                  lp_address: str, farm_address: str, stake_address: str,
                  version: MetaStakingContractVersion, metastake_token: str = "", address: str = ""):
