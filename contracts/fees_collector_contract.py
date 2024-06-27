@@ -13,13 +13,11 @@ from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, depl
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string, log_explorer_transaction, dec_to_padded_hex, string_to_base64
 from multiversx_sdk.abi.serializer import Serializer
-import re
 from multiversx_sdk.abi.biguint_value import BigUIntValue
 from multiversx_sdk.abi.small_int_values import *
 from multiversx_sdk.abi.string_value import StringValue
 from multiversx_sdk.abi.struct_value import StructValue
-from multiversx_sdk.abi.values_multi import *
-from multiversx_sdk.abi.field import Field
+from multiversx_sdk.abi.fields import Field
 from multiversx_sdk.abi.list_value import ListValue
 
 logger = get_logger(__name__)
@@ -245,7 +243,6 @@ class FeesCollectorContract(DEXContractInterface):
 
         return endpoint_call(proxy, gas_limit ,user, Address(self.address), "setAllowExternalClaimRewards", sc_args)
     
-    
     def get_user_energy_for_week(self, user: str, proxy: ProxyNetworkProvider, week: int) -> dict:
         data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url) 
         raw_results = data_fetcher.get_data('getUserEnergyForWeek', [Address(user).get_public_key(), week])
@@ -319,28 +316,3 @@ class FeesCollectorContract(DEXContractInterface):
         }
 
         return fees_collector_stats
-    
-
-    def get_tx_op(self, tx_hash: str, operation: dict, api: ApiNetworkProvider) -> dict:
-        used_api = api
-        # Get the transaction details
-        tx = used_api.get_transaction(tx_hash)
-        # Get and check transaction operations
-        ops = tx.raw_response['operations']
-        
-
-        tx_decoded = tx
-        new = self.transaction_decoder.get_transaction_metadata(tx_decoded)
-
-        print(new.function_name)
-        print(new.function_args)
-
-        # Take each op in ops and match it with operation. Try to match only the fields expected in operation dictionary. 
-        # TX Operations are unordered. If any of the operations match, return it.
-        for op in ops:
-            # print(f'Matching with {operation}')
-            if all(op.get(key) == operation.get(key) for key in operation.keys()):
-                return op
-            
-    def wrap(self, source: str, width: int):
-        return [source[i:i + width] for i in range(0, len(source), width)]
