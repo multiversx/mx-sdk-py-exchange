@@ -34,26 +34,10 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     command_parser = contract_group.add_parser('deploy', help='deploy contract command')
     command_parser.set_defaults(func=deploy_position_creator_contract)
-    command_parser = contract_group.add_parser('pause', help='pause contract command')
-    command_parser.set_defaults(func=pause_position_creator_contract)
-    command_parser = contract_group.add_parser('resume', help='resume contract command')
-    command_parser.set_defaults(func=resume_position_creator_contract)
     command_parser = contract_group.add_parser('setup-whitelist', help='whitelist contract where needed command')
     command_parser.set_defaults(func=setup_whitelist)
 
     return group_parser
-
-
-def pause_position_creator_contract():
-    """Pause position creator contract"""
-
-    print("Pausing position creator contract")
-
-
-def resume_position_creator_contract():
-    """Resume position creator contract"""
-
-    print("Resuming position creator contract")
 
 
 def upgrade_position_creator_contract(args: Any):

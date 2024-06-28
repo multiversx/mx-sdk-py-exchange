@@ -56,7 +56,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     add_upgrade_command(contract_group, upgrade_metastaking_contract)
 
-    command_parser = contract_group.add_parser('set-energy-factory', help='set energy factory for all v2 contracts command')
+    command_parser = contract_group.add_parser('set-energy-factory-all', help='set energy factory for all v2 contracts command')
     command_parser.set_defaults(func=set_energy_factory)
 
     transactions_parser = subgroup_parser.add_parser('generate-transactions', help='metastaking transactions commands')
@@ -118,7 +118,7 @@ def upgrade_metastaking_contracts(label: str, file: str, compare_states: bool = 
             return
 
         version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
-        bytecode = config.STAKING_V2_BYTECODE_PATH if version == MetaStakingContractVersion.V1 else config.STAKING_V3_BYTECODE_PATH
+        bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V1 else config.STAKING_PROXY_V2_BYTECODE_PATH
         metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, version)
 
         tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode, [])

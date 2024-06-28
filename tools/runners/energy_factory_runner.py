@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from typing import Any
 
 import config
 from context import Context
@@ -44,13 +45,11 @@ def resume_energy_factory():
     context.network_provider.check_simple_tx_status(tx_hash, f"resume energy contract: {energy_contract}")
 
 
-def upgrade_energy_factory(compare_states: bool = False):
+def upgrade_energy_factory(args: Any):
+    compare_states = args.compare_states
     context = Context()
     energy_factory_address = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0].address
     energy_contract = retrieve_simple_lock_energy_by_address(energy_factory_address)
-
-    locked_asset_address = context.get_contracts(config.LOCKED_ASSETS)[0].address
-    locked_asset_contract = retrieve_locked_asset_factory_by_address(locked_asset_address)
 
     if compare_states:
         print(f"Fetching contract state before upgrade...")

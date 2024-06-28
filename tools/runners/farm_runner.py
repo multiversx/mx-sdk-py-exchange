@@ -46,13 +46,13 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
     command_parser.set_defaults(func=resume_farm_contracts)
 
-    command_parser = contract_group.add_parser('resume-v2-ownership', help='overwrite ownership address for all contracts command')
+    command_parser = contract_group.add_parser('replace-v2-ownership', help='overwrite ownership address for all contracts command')
     command_parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after change')
     command_parser.add_argument('--old-owner', type=str, help='old owner address to replace')
     command_parser.set_defaults(func=replace_v2_ownership)
 
-    command_parser = contract_group.add_parser('update-boosted-factors', help='update boosted factors for all contracts command')
+    command_parser = contract_group.add_parser('update-boosted-factors-all', help='update boosted factors for all contracts command')
     command_parser.set_defaults(func=update_boosted_factors)
     
 
