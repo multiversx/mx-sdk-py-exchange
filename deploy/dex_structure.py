@@ -31,6 +31,7 @@ from contracts.metastaking_contract import MetaStakingContract
 from contracts.staking_contract import StakingContract
 from contracts.dex_proxy_contract import DexProxyContract
 from contracts.governance_contract import GovernanceContract
+from contracts.composable_tasks_contract import ComposableTasksContract
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import hex_to_string
 from utils.utils_chain import Account, WrapperAddress as Address
@@ -108,7 +109,7 @@ class ContractStructure:
 
 class DeployStructureArguments:
     @classmethod
-    def add_parsed_arguments(cls, parser: ArgumentParser):
+    def add_clean_contract_deploy_arguments(cls, parser: ArgumentParser):
         parser.add_argument("--egld-wraps", action="store_true", help="Deploy clean EGLD wraps")
         parser.add_argument("--locked-assets", action="store_true", help="Deploy clean locked assets")
         parser.add_argument("--proxies", action="store_true", help="Deploy clean proxies")
@@ -121,11 +122,12 @@ class DeployStructureArguments:
         parser.add_argument("--router-v2", action="store_true", help="Deploy clean router v2")
         parser.add_argument("--pairs", action="store_true", help="Deploy clean pairs")
         parser.add_argument("--pairs-v2", action="store_true", help="Deploy clean pairs v2")
+        parser.add_argument("--pairs-view", action="store_true", help="Deploy clean pairs v2")
         parser.add_argument("--farms-community", action="store_true", help="Deploy clean farms community")
         parser.add_argument("--farms-unlocked", action="store_true", help="Deploy clean farms unlocked")
         parser.add_argument("--farms-locked", action="store_true", help="Deploy clean farms locked")
         parser.add_argument("--proxy-deployers", action="store_true", help="Deploy clean proxy deployers")
-        parser.add_argument("--farms-v2", action="store_true", help="Deploy clean farms v2")
+        parser.add_argument("--farms-boosted", action="store_true", help="Deploy clean farms v2")
         parser.add_argument("--price-discoveries", action="store_true", help="Deploy clean price discoveries")
         parser.add_argument("--stakings", action="store_true", help="Deploy clean stakings")
         parser.add_argument("--stakings-v2", action="store_true", help="Deploy clean stakings v2")
@@ -133,6 +135,12 @@ class DeployStructureArguments:
         parser.add_argument("--metastakings", action="store_true", help="Deploy clean metastakings")
         parser.add_argument("--metastakings-v2", action="store_true", help="Deploy clean metastakings v2")
         parser.add_argument("--metastakings-boosted", action="store_true", help="Deploy clean metastakings boosted")
+        parser.add_argument("--governances", action="store_true", help="Deploy clean governances")
+        parser.add_argument("--position-creator", action="store_true", help="Deploy clean position_ reators")
+        parser.add_argument("--locked-token-position-creator", action="store_true", help="Deploy clean locked token position creator")
+        parser.add_argument("--escrows", action="store_true", help="Deploy clean escrows")
+        parser.add_argument("--lk-wraps", action="store_true", help="Deploy clean lk token wrappers")
+        parser.add_argument("--composable-tasks", action="store_true", help="Deploy clean composable tasks")
 
 
 class DeployStructure:
@@ -233,6 +241,9 @@ class DeployStructure:
             config.GOVERNANCES:
                 ContractStructure(config.GOVERNANCES, GovernanceContract, config.GOVERNANCE_BYTECODE_PATH,
                                   self.governance_deploy, False),
+            config.COMPOSABLE_TASKS:
+                ContractStructure(config.COMPOSABLE_TASKS, ComposableTasksContract, config.COMPOSABLE_TASKS_BYTECODE_PATH,
+                                  self.composable_tasks_deploy, False),
         }
 
     # main entry method to deploy tokens (either deploy fresh ones or reuse existing ones)
@@ -315,10 +326,10 @@ class DeployStructure:
 
     # main entry method to deploy the DEX contract structure (either fresh deploy or loading existing ones)
     def deploy_structure(self, deployer_account: Account, network_provider: NetworkProviders,
-                         clean_deploy_override: bool):
+                         clean_deploy_override: bool, clean_deploy_list: List[str] = None):
         deployer_account.sync_nonce(network_provider.proxy)
         for contract_label, contracts in self.contracts.items():
-            if not clean_deploy_override and not contracts.deploy_clean:
+            if not clean_deploy_override and not contracts.deploy_clean and contract_label not in clean_deploy_list:
                 contracts.load_deployed_contracts()
             else:
                 log_step_pass(f"Starting setup process for {contract_label}:")
@@ -2165,6 +2176,38 @@ class DeployStructure:
             # setup whitelist in fees collector
             tx_hash = fees_collector.add_known_contracts(deployer_account, network_providers.proxy, contract_address)
             network_providers.check_simple_tx_status(tx_hash, "whitelist in fees collector")
+            
+            deployed_contracts.append(contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def composable_tasks_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for contract_config in contract_structure.deploy_structure_list:
+            egld_wrapper_contract_address = self.contracts[config.EGLD_WRAPS].get_deployed_contract_by_index(contract_config['egld_wrap']).address
+            router_contract_address = self.contracts[config.ROUTER_V2].get_deployed_contract_by_index(contract_config['router_v2']).address
+
+            contract = ComposableTasksContract()
+            tx_hash, contract_address = contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                []
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "composable tasks contract"):
+                return
+            log_step_pass(f"Composable tasks contract address: {contract_address}")
+            contract.address = contract_address
+            
+            # setup contract
+            tx_hash = contract.set_wrap_egld_address(deployer_account, network_providers.proxy, [egld_wrapper_contract_address])
+            if not network_providers.check_simple_tx_status(tx_hash, "set wrap egld address"):
+                return
+
+            tx_hash = contract.set_router_address(deployer_account, network_providers.proxy, [router_contract_address])
+            if not network_providers.check_simple_tx_status(tx_hash, "set router address"):
+                return
             
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
