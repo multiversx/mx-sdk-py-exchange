@@ -2174,7 +2174,7 @@ class DeployStructure:
             contract.address = contract_address
             
             # setup whitelist in fees collector
-            tx_hash = fees_collector.add_known_contracts(deployer_account, network_providers.proxy, contract_address)
+            tx_hash = fees_collector.add_known_contracts(deployer_account, network_providers.proxy, [contract_address])
             network_providers.check_simple_tx_status(tx_hash, "whitelist in fees collector")
             
             deployed_contracts.append(contract)
