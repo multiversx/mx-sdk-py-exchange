@@ -7,6 +7,8 @@ import config
 from tools.runners.common_runner import add_upgrade_command
 from utils.utils_tx import NetworkProviders
 
+from utils.utils_chain import get_bytecode_codehash
+
 
 LOCKED_ASSET_LABEL = "locked_asset"
 
@@ -24,7 +26,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def upgrade_locked_asset_contracts():
+def upgrade_locked_asset_contracts(_):
     """Upgrade locked asset contracts"""
 
     print("Upgrade locked asset factory contract")
@@ -37,8 +39,14 @@ def upgrade_locked_asset_contracts():
     print(f"Processing contract {locked_asset_factory_address}")
     locked_asset_contract = LockedAssetContract("", "", locked_asset_factory_address)
 
+    bytecode_path = config.LOCKED_ASSET_FACTORY_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     tx_hash = locked_asset_contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                                     config.LOCKED_ASSET_FACTORY_BYTECODE_PATH, [],
+                                                     bytecode_path, [],
                                                      no_init=True)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade locked asset factory contract: "

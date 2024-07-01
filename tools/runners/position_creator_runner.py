@@ -9,7 +9,7 @@ from contracts.position_creator_contract import PositionCreatorContract
 from contracts.farm_contract import FarmContract, FarmContractVersion
 from contracts.staking_contract import StakingContract, StakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract, MetaStakingContractVersion
-from utils.utils_chain import WrapperAddress as Address
+from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
 from utils.contract_retrievers import retrieve_position_creator_by_address
 from utils.utils_tx import NetworkProviders
 from runners.farm_runner import get_farm_addresses_from_chain
@@ -56,6 +56,12 @@ def upgrade_position_creator_contract(args: Any):
     position_creator_contract.egld_wrapper_address = deploy_structure_list[0]["egld_wrapped_address"]
     position_creator_contract.router_address = deploy_structure_list[0]["router_address"]
 
+    bytecode_path = config.POSITION_CREATOR_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print("Fetching contract state before upgrade...")
         fetch_contracts_states("pre", network_providers, [position_creator_address], POSITION_CREATOR_LABEL)
@@ -63,7 +69,7 @@ def upgrade_position_creator_contract(args: Any):
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
-    tx_hash = position_creator_contract.contract_upgrade(dex_owner, network_providers.proxy, config.POSITION_CREATOR_BYTECODE_PATH)
+    tx_hash = position_creator_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path)
 
     if not network_providers.check_simple_tx_status(tx_hash, f"upgrade position creator contract: {position_creator_address}"):
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -76,7 +82,7 @@ def upgrade_position_creator_contract(args: Any):
         return
 
 
-def deploy_position_creator_contract():
+def deploy_position_creator_contract(_):
     """Deploy position creator contract"""
 
     print("Deploying position creator contract")
@@ -98,7 +104,7 @@ def deploy_position_creator_contract():
     print(f"Deployed position creator contract at address: {address}")
     
 
-def setup_whitelist():
+def setup_whitelist(_):
     """Setup whitelist for position creator contract"""
 
     print("Setting up whitelist for position creator contract")

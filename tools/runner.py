@@ -1,5 +1,6 @@
 import json
 import sys
+import config
 from typing import Any, List
 from argparse import ArgumentParser
 from multiversx_sdk import Address
@@ -30,12 +31,6 @@ def main(cli_args: List[str]):
 def setup_parser():
     parser = ArgumentParser()
 
-    parser.add_argument('--fetch-pause-state', action='store_true', help='fetch pause state')
-    parser.set_defaults(func=fetch_and_save_pause_state)
-    parser.add_argument('--fetch-all-states', type=ascii, default='pre',
-                        help='fetch all contracts states; specify prefix; default is pre')
-    parser.set_defaults(func=fetch_all_contracts_states)
-
     subparsers = parser.add_subparsers()
     commands: List[Any] = []
 
@@ -52,10 +47,22 @@ def setup_parser():
     commands.append(locked_token_position_creator_runner.setup_parser(subparsers))
     commands.append(simple_lock_runner.setup_parser(subparsers))
 
+    all_subparser = subparsers.add_parser('all', help='general group commands')
+    all_subgroup_parser = all_subparser.add_subparsers()
+
+    command_parser = all_subgroup_parser.add_parser("fetch-pause-state", help='fetch pause state')
+    command_parser.set_defaults(func=fetch_and_save_pause_state)
+    commands.append(command_parser)
+
+    command_parser = all_subgroup_parser.add_parser("fetch-all-states", help='fetch all contracts states')
+    command_parser.add_argument('--prefix', type=ascii, default='pre', help='specify prefix; default is pre')
+    command_parser.set_defaults(func=fetch_all_contracts_states)
+    commands.append(command_parser)
+
     return parser
 
 
-def fetch_and_save_pause_state():
+def fetch_and_save_pause_state(_):
     """Fetch and save pause state of all contracts"""
 
     pair_addresses = pair_runner.get_all_pair_addresses()
@@ -85,9 +92,10 @@ def fetch_and_save_pause_state():
         print(f"Dumped contract pause states in {output_pause_states}")
 
 
-def fetch_all_contracts_states(prefix: str):
+def fetch_all_contracts_states(args: Any):
     """Fetch all contracts states"""
 
+    prefix = args.prefix
     network_providers = NetworkProviders(API, PROXY)
     context = Context()
     locked_asset_address = context.get_contracts("locked_assets")[0].address
@@ -108,7 +116,7 @@ def fetch_all_contracts_states(prefix: str):
 
     # get router state
     if router_address:
-        filename = get_contract_save_name(router_runner.ROUTER_LABEL, router_address, prefix)
+        filename = get_contract_save_name(config.ROUTER_V2, router_address, prefix)
         get_account_keys_online(router_address, network_providers.proxy.url,
                                 with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
     else:
@@ -116,7 +124,7 @@ def fetch_all_contracts_states(prefix: str):
 
     # get template state
     router_data_fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), network_providers.proxy.url)
-    template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").bech32()
+    template_pair_address = Address.new_from_bech32(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
     filename = get_contract_save_name(router_runner.TEMPLATE_PAIR_LABEL, template_pair_address, prefix)
     get_account_keys_online(template_pair_address, network_providers.proxy.url,
                             with_save_in=str(OUTPUT_FOLDER / f"{filename}.json"))
@@ -130,8 +138,11 @@ def fetch_all_contracts_states(prefix: str):
     fetch_contracts_states(prefix, network_providers, staking_addresses, staking_runner.STAKINGS_LABEL)
 
     # get metastaking states
-    metastaking_addresses = metastaking_runner.get_all_metastaking_addresses()
-    fetch_contracts_states(prefix, network_providers, metastaking_addresses, metastaking_runner.METASTAKINGS_LABEL)
+    metastaking_addresses = metastaking_runner.get_metastaking_v1_addresses()
+    fetch_contracts_states(prefix, network_providers, metastaking_addresses, metastaking_runner.METASTAKINGS_V1_LABEL)
+
+    metastaking_addresses = metastaking_runner.get_metastaking_v2_addresses()
+    fetch_contracts_states(prefix, network_providers, metastaking_addresses, metastaking_runner.METASTAKINGS_V2_LABEL)
 
     # get farm v12 states
     farm_v12_addresses = farm_runner.get_all_farm_v12_addresses()
@@ -140,6 +151,10 @@ def fetch_all_contracts_states(prefix: str):
     # get farm v13 states
     farm_v13_addresses = farm_runner.get_all_farm_v13_addresses()
     fetch_contracts_states(prefix, network_providers, farm_v13_addresses, farm_runner.FARMSV13_LABEL)
+
+    # get farm v2 states
+    farm_v2_addresses = farm_runner.get_all_farm_v2_addresses()
+    fetch_contracts_states(prefix, network_providers, farm_v2_addresses, farm_runner.FARMSV2_LABEL)
 
 
 if __name__ == '__main__':

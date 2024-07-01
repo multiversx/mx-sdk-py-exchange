@@ -11,7 +11,7 @@ from tools.runners.common_runner import add_generate_transaction_command, \
     get_acounts_with_token, read_accounts_from_json
 from tools.runners.farm_runner import get_farm_addresses_from_chain
 from utils.contract_retrievers import retrieve_proxy_staking_by_address
-from utils.utils_chain import Account, WrapperAddress
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash
 from utils.utils_tx import ESDTToken, NetworkProviders
 
 import config
@@ -52,7 +52,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after upgrade')
     command_parser.add_argument('--codehash', type=str, help='contract codehash')
-    command_parser.set_defaults(func=upgrade_metastaking_contract)
+    command_parser.set_defaults(func=upgrade_metastaking_contracts_by_codehash)
 
     add_upgrade_command(contract_group, upgrade_metastaking_contract)
 
@@ -66,15 +66,13 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     add_generate_transaction_command(transactions_group, generate_stake_farm_tokens_transaction, 'stakeFarmTokens', 'stake farm tokens command')
 
 
-def fetch_and_save_metastakings_from_chain():
+def fetch_and_save_metastakings_from_chain(_):
     """Fetch metastaking contracts from chain.
     Will separate metastaking contracts by version.
     v2 determined based on contracts linked to boosted farms. The rest are v1.
     """
 
     print("Fetch metastaking contracts from chain")
-
-    network_providers = NetworkProviders(API, PROXY)
 
     boosted_farm_addresses = get_farm_addresses_from_chain("v2")
     print(f"Retrieved {len(boosted_farm_addresses)} boosted farms.")
@@ -87,8 +85,8 @@ def fetch_and_save_metastakings_from_chain():
     print(f"Retrieved {len(metastakings_v1)} metastaking v1 contracts.")
     print(f"Retrieved {len(metastakings_v2)} metastaking v2 contracts.")
 
-    fetch_and_save_contracts(metastakings_v1, METASTAKINGS_V1_LABEL, OUTPUT_METASTAKING_V1_CONTRACTS_FILE, network_providers.proxy)
-    fetch_and_save_contracts(metastakings_v2, METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE, network_providers.proxy)
+    fetch_and_save_contracts(metastakings_v1, METASTAKINGS_V1_LABEL, OUTPUT_METASTAKING_V1_CONTRACTS_FILE)
+    fetch_and_save_contracts(metastakings_v2, METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE)
 
 
 def upgrade_metastaking_contracts(label: str, file: str, compare_states: bool = False, codehash: str = ''):
@@ -103,35 +101,40 @@ def upgrade_metastaking_contracts(label: str, file: str, compare_states: bool = 
     if not metastaking_addresses:
         print("No metastaking contracts available!")
         return
+    
+    version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
+    bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V1 else config.STAKING_PROXY_V2_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     if compare_states:
         print("Fetching contracts states before upgrade...")
         fetch_contracts_states("pre", network_providers, metastaking_addresses, label)
 
-        if not get_user_continue():
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
     count = 1
     for metastaking_address in metastaking_addresses:
         print(f"Processing contract {count} / {len(metastaking_addresses)}: {metastaking_address}")
-        if not get_user_continue():
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
-        version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
-        bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V1 else config.STAKING_PROXY_V2_BYTECODE_PATH
         metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, version)
 
         tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode, [])
 
         if not network_providers.check_complex_tx_status(tx_hash,
                                                          f"upgrade metastaking contract: {metastaking_address}"):
-            if not get_user_continue():
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
 
         if compare_states:
             fetch_new_and_compare_contract_states(label, metastaking_address, network_providers)
 
-        if not get_user_continue():
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
         count += 1
@@ -199,7 +202,7 @@ def upgrade_metastaking_contract(args: Any):
         return
 
 
-def set_energy_factory():
+def set_energy_factory(_):
     """Set energy factory for v2 metastaking contracts"""
 
     network_providers = NetworkProviders(API, PROXY)
@@ -312,7 +315,7 @@ def generate_stake_farm_tokens_transaction(args: Any):
             )
 
 
-def get_metastaking_addresses_from_chain() -> list:
+def get_metastaking_addresses_from_chain() -> list[str]:
     """Get metastaking addresses from chain"""
 
     query = """
@@ -328,7 +331,7 @@ def get_metastaking_addresses_from_chain() -> list:
     return address_list
 
 
-def get_metastaking_addresses_from_chain_by_farms(farm_addresses: list) -> list:
+def get_metastaking_addresses_from_chain_by_farms(farm_addresses: list) -> list[str]:
     """Get metastaking addresses from chain by farms"""
 
     query = """
@@ -345,7 +348,25 @@ def get_metastaking_addresses_from_chain_by_farms(farm_addresses: list) -> list:
     return address_list
 
 
-def get_metastaking_addresses(label: str, file: str, searched_bytecode_hash: str = '') -> list:
-    """Get all metastaking addresses"""
+def get_all_metastaking_addresses() -> list[str]:
+    """Get all saved metastaking addresses"""
 
+    metastaking_addresses = get_metastaking_addresses(METASTAKINGS_V1_LABEL, OUTPUT_METASTAKING_V1_CONTRACTS_FILE)
+    metastaking_addresses.extend(get_metastaking_addresses(METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE))
+
+    return metastaking_addresses
+
+
+def get_metastaking_v1_addresses() -> list[str]:
+    """Get all saved metastaking v1 addresses"""
+    return get_metastaking_addresses(METASTAKINGS_V1_LABEL, OUTPUT_METASTAKING_V1_CONTRACTS_FILE)
+
+
+def get_metastaking_v2_addresses() -> list[str]:
+    """Get all saved metastaking v2 addresses"""
+    return get_metastaking_addresses(METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE)
+
+
+def get_metastaking_addresses(label: str, file: str, searched_bytecode_hash: str = '') -> list[str]:
+    """Get saved metastaking addresses"""
     return get_saved_contract_addresses(label, file, searched_bytecode_hash)

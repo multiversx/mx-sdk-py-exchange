@@ -329,7 +329,8 @@ class DeployStructure:
                          clean_deploy_override: bool, clean_deploy_list: List[str] = None):
         deployer_account.sync_nonce(network_provider.proxy)
         for contract_label, contracts in self.contracts.items():
-            if not clean_deploy_override and not contracts.deploy_clean and contract_label not in clean_deploy_list:
+            if not clean_deploy_override and not contracts.deploy_clean and \
+                (not clean_deploy_list or contract_label not in clean_deploy_list):
                 contracts.load_deployed_contracts()
             else:
                 log_step_pass(f"Starting setup process for {contract_label}:")

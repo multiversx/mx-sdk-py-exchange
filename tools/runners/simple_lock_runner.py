@@ -4,7 +4,7 @@ from contracts.simple_lock_contract import SimpleLockContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
 from tools.runners.common_runner import add_upgrade_command
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import WrapperAddress as Address
+from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
 import config
 
 from utils.contract_data_fetchers import ProxyContractDataFetcher
@@ -35,6 +35,14 @@ def upgrade_simple_lock_contract(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
+    print(f"Processing contract {address}")
+
+    bytecode_path = config.SIMPLE_LOCK_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print(f"Fetching contract state before upgrade...")
         fetch_contracts_states("pre", network_providers, [address], "simple_lock")
@@ -42,11 +50,9 @@ def upgrade_simple_lock_contract(args: Any):
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
-    print(f"Processing contract {address}")
-
     contract = SimpleLockContract("", "", "", address)
     tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy, 
-                                        config.SIMPLE_LOCK_BYTECODE_PATH, 
+                                        bytecode_path, 
                                         [])
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade simple lock contract: "

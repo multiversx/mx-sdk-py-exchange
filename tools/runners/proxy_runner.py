@@ -6,7 +6,7 @@ from contracts.dex_proxy_contract import DexProxyContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
 from tools.runners.common_runner import add_upgrade_command
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import WrapperAddress as Address
+from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
 import config
 
 from utils.contract_data_fetchers import ProxyContractDataFetcher
@@ -39,6 +39,12 @@ def upgrade_proxy_dex_contracts(args: Any):
     proxy_dex_contract: DexProxyContract
     proxy_dex_contract = context.get_contracts(config.PROXIES_V2)[0]
 
+    bytecode_path = config.PROXY_V2_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print(f"Fetching contract state before upgrade...")
         fetch_contracts_states("pre", context.network_provider, [proxy_dex_contract.address], "proxy_dex")
@@ -54,7 +60,7 @@ def upgrade_proxy_dex_contracts(args: Any):
     old_factory_address = context.get_contracts(config.LOCKED_ASSETS)[0].address
 
     tx_hash = proxy_dex_contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                                  config.PROXY_V2_BYTECODE_PATH, 
+                                                  bytecode_path, 
                                                   [old_locked_token, old_factory_address])
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade proxy-dex contract: "

@@ -32,7 +32,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def deploy_position_creator_contract():
+def deploy_position_creator_contract(_):
     """Deploy locked token position creator contract"""
 
     print("Deploying locked token position creator contract")
@@ -64,7 +64,7 @@ def deploy_position_creator_contract():
     print(f"Deployed locked token position creator contract at address: {address}")
     
 
-def setup_whitelist():
+def setup_whitelist(_):
     """Setup whitelist for locked token position creator contract"""
 
     print("Setting up whitelist for locked token position creator contract")

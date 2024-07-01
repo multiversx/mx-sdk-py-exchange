@@ -34,8 +34,8 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
         try:
             response = proxy.do_get_generic(resource_url)
             break
-        except requests.exceptions.Timeout:
-            log_step_fail("Timeout exception occurred while retrieving keys.")
+        except requests.exceptions.RequestException as e:
+            log_step_fail(f"Exception occurred while retrieving keys: {e}")
             if input("Do you want to retry? (y/n): ").lower() != "y":
                 break
 

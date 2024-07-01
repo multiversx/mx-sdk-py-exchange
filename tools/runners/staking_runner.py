@@ -21,7 +21,7 @@ from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 
 from context import Context
 
-from utils.utils_chain import log_explorer_transaction
+from utils.utils_chain import get_bytecode_codehash, log_explorer_transaction
 
 
 STAKINGS_LABEL = "stakings"
@@ -70,15 +70,13 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def fetch_and_save_stakings_from_chain():
+def fetch_and_save_stakings_from_chain(_):
     """Fetch staking contracts from chain"""
 
     print("Fetch staking contracts from chain")
 
-    network_providers = NetworkProviders(API, PROXY)
-
     stakings = get_staking_addresses_from_chain()
-    fetch_and_save_contracts(stakings, STAKINGS_LABEL, OUTPUT_STAKING_CONTRACTS_FILE, network_providers.proxy)
+    fetch_and_save_contracts(stakings, STAKINGS_LABEL, OUTPUT_STAKING_CONTRACTS_FILE)
 
 
 def pause_staking_contracts(staking_addresses: list[str]):
@@ -93,7 +91,7 @@ def pause_staking_contracts(staking_addresses: list[str]):
     count = 1
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        data_fetcher = StakingContractDataFetcher(Address(staking_address, "erd"), network_providers.proxy.url)
+        data_fetcher = StakingContractDataFetcher(Address.new_from_bech32(staking_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
         if contract_state != 0:
@@ -107,7 +105,7 @@ def pause_staking_contracts(staking_addresses: list[str]):
         count += 1
 
 
-def pause_all_staking_contracts():
+def pause_all_staking_contracts(_):
     staking_addresses = get_all_staking_addresses()
     pause_staking_contracts(staking_addresses)
 
@@ -153,7 +151,7 @@ def resume_staking_contracts(staking_addresses: list[str]):
         count += 1
 
 
-def resume_all_staking_contracts():
+def resume_all_staking_contracts(_):
     staking_addresses = get_all_staking_addresses()
     resume_staking_contracts(staking_addresses)
 
@@ -177,6 +175,12 @@ def upgrade_staking_contracts(args: Any):
     if not staking_addresses:
         print("No staking contracts available!")
         return
+    
+    bytecode_path = config.STAKING_V3_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     if compare_states:
         print("Fetching contracts states before upgrade...")
@@ -194,7 +198,7 @@ def upgrade_staking_contracts(args: Any):
         staking_contract = retrieve_staking_by_address(staking_address, StakingContractVersion.V2)
 
         staking_contract.version = StakingContractVersion.V3Boosted
-        tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, config.STAKING_V3_BYTECODE_PATH, 
+        tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, 
                                                     [], True)
 
         if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
@@ -225,17 +229,23 @@ def upgrade_staking_contract(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
+    bytecode_path = config.STAKING_V3_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print("Fetching contracts states before upgrade...")
         fetch_contracts_states("pre", network_providers, [staking_address], STAKINGS_LABEL)
 
-    if not get_user_continue():
-        return
+        if not get_user_continue():
+            return
 
     staking_contract = retrieve_staking_by_address(staking_address, StakingContractVersion.V2)
 
     staking_contract.version = StakingContractVersion.V3Boosted
-    tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, config.STAKING_V3_BYTECODE_PATH,
+    tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path,
                                                 [], True)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):

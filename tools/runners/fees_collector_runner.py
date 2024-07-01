@@ -10,6 +10,8 @@ from typing import Any
 
 from utils.utils_tx import NetworkProviders
 
+from utils.utils_chain import get_bytecode_codehash
+
 
 FEES_COLLECTOR_LABEL = 'fees_collector'
 
@@ -30,7 +32,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def set_pairs_in_fees_collector():
+def set_pairs_in_fees_collector(_):
     """Set pairs in fees collector"""
 
     network_providers = NetworkProviders(API, PROXY)
@@ -68,8 +70,10 @@ def upgrade_fees_collector_contract(args: Any):
     context = Context()
     fees_collector_contract: FeesCollectorContract
     fees_collector_contract = context.get_contracts(FEES_COLLECTOR_LABEL)[0]
+    bytecode_path = config.FEES_COLLECTOR_BYTECODE_PATH
 
     print(f"Upgrading fees collector contract...")
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
 
@@ -81,7 +85,7 @@ def upgrade_fees_collector_contract(args: Any):
             return
 
     tx_hash = fees_collector_contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                        config.FEES_COLLECTOR_BYTECODE_PATH,
+                                        bytecode_path,
                                         [], True)
 
     if not network_providers.check_simple_tx_status(tx_hash, f"upgrade fees collector: {fees_collector_contract.address}"):

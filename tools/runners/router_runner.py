@@ -13,6 +13,8 @@ from utils.contract_retrievers import retrieve_pair_by_address, retrieve_router_
 
 from utils.utils_tx import NetworkProviders
 
+from utils.utils_chain import get_bytecode_codehash
+
 
 TEMPLATE_PAIR_LABEL = "template_pair"
 
@@ -49,6 +51,12 @@ def upgrade_router_contract(router_address: str, compare_states: bool = False):
 
     router_contract = retrieve_router_by_address(router_address)
 
+    bytecode_path = config.ROUTER_V2_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print(f"Fetching contract state before upgrade...")
         fetch_contracts_states("pre", network_providers, [router_address], config.ROUTER_V2)
@@ -58,7 +66,7 @@ def upgrade_router_contract(router_address: str, compare_states: bool = False):
 
     # change router version & upgrade router contract
     router_contract.version = RouterContractVersion.V2
-    tx_hash = router_contract.contract_upgrade(dex_owner, network_providers.proxy, config.ROUTER_V2_BYTECODE_PATH)
+    tx_hash = router_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade router contract {router_address}"):
         return
@@ -81,6 +89,12 @@ def upgrade_template_pair_contract(compare_states: bool = False):
     template_pair_address = Address.new_from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").to_bech32()
     template_pair = retrieve_pair_by_address(template_pair_address)
 
+    bytecode_path = config.PAIR_V2_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print("Fetching contract states before upgrade...")
         fetch_contracts_states("pre", network_providers, [template_pair_address], TEMPLATE_PAIR_LABEL)
@@ -91,7 +105,7 @@ def upgrade_template_pair_contract(compare_states: bool = False):
     template_pair.version = PairContractVersion.V2
     args = [config.ZERO_CONTRACT_ADDRESS, config.ZERO_CONTRACT_ADDRESS,
             config.ZERO_CONTRACT_ADDRESS, 0, 0, config.ZERO_CONTRACT_ADDRESS]
-    tx_hash = template_pair.contract_upgrade(dex_owner, network_providers.proxy, config.PAIR_V2_BYTECODE_PATH, args)
+    tx_hash = template_pair.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, args)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade template pair contract: {template_pair_address}"):
         if not get_user_continue():

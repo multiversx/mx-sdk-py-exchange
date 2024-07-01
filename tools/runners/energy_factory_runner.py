@@ -10,6 +10,8 @@ from utils.contract_retrievers import retrieve_simple_lock_energy_by_address, re
 
 from utils.utils_tx import NetworkProviders
 
+from utils.utils_chain import get_bytecode_codehash
+
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for energy factory commands"""
@@ -29,7 +31,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def pause_energy_factory():
+def pause_energy_factory(_):
     context = Context()
     energy_contract: SimpleLockEnergyContract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
 
@@ -37,7 +39,7 @@ def pause_energy_factory():
     context.network_provider.check_simple_tx_status(tx_hash, f"pause energy contract: {energy_contract}")
 
 
-def resume_energy_factory():
+def resume_energy_factory(_):
     context = Context()
     energy_contract: SimpleLockEnergyContract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
 
@@ -51,6 +53,11 @@ def upgrade_energy_factory(args: Any):
     energy_factory_address = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0].address
     energy_contract = retrieve_simple_lock_energy_by_address(energy_factory_address)
 
+    bytecode_path = config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print(f"Fetching contract state before upgrade...")
         fetch_contracts_states("pre", context.network_provider, [energy_contract.address], "energy")
@@ -59,7 +66,7 @@ def upgrade_energy_factory(args: Any):
             return
 
     tx_hash = energy_contract.contract_upgrade(context.deployer_account, context.network_provider.proxy,
-                                               config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH,
+                                               bytecode_path,
                                                [], True)
 
     if not context.network_provider.check_complex_tx_status(tx_hash, f"upgrade energy contract: {energy_contract}"):
