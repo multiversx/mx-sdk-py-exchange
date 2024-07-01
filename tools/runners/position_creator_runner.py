@@ -119,7 +119,7 @@ def setup_whitelist(_):
     staking_addresses = get_staking_addresses_from_chain()
     staking_proxy_addresses = get_metastaking_addresses_from_chain_by_farms(farm_addresses)
 
-    print("Whitelisting position creator in farms...")
+    print(f"Whitelisting position creator in {len(farm_addresses)} farms...")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
 
@@ -130,25 +130,25 @@ def setup_whitelist(_):
             continue
         farm_contract.add_contract_to_whitelist(dex_owner, network_providers.proxy, position_creator_contract.address)
 
-    print("Whitelisting position creator in staking contracts...")
+    print(f"Whitelisting position creator in {len(staking_addresses)} staking contracts...")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
     
     for address in staking_addresses:
+        staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", address)
         if staking_contract.is_contract_whitelisted(position_creator_contract.address, network_providers.proxy):
             print(f"Position creator already whitelisted in staking contract: {address}")
             continue
-        staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", address)
         staking_contract.whitelist_contract(dex_owner, network_providers.proxy, position_creator_contract.address)
 
-    print("Whitelisting position creator in metastaking contracts...")
+    print(f"Whitelisting position creator in {len(staking_proxy_addresses)} metastaking contracts...")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
     
     for address in staking_proxy_addresses:
+        metastaking_contract = MetaStakingContract("", "", "", "", "", "", "", MetaStakingContractVersion.V3Boosted, "", address)
         if metastaking_contract.is_contract_whitelisted(position_creator_contract.address, network_providers.proxy):
             print(f"Position creator already whitelisted in metastaking contract: {address}")
             continue
-        metastaking_contract = MetaStakingContract("", "", "", "", "", "", "", MetaStakingContractVersion.V3Boosted, "", address)
         metastaking_contract.whitelist_contract(dex_owner, network_providers.proxy, position_creator_contract.address)
     
