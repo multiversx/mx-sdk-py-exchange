@@ -319,8 +319,11 @@ def setup_boosted_parameters_for_all_stakings(args: Any):
     energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
     staking_addresses = get_all_staking_addresses()
 
+    count = 1
     for staking_address in staking_addresses:
+        print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
         setup_boosted_parameters_with_energy_address(staking_address, energy_contract.address, compare_states)
+        count += 1
 
 
 def get_staking_addresses_from_chain() -> list:
