@@ -3,6 +3,7 @@ import os
 from argparse import ArgumentParser
 from typing import Dict, Any, Tuple
 from multiversx_sdk import ProxyNetworkProvider
+from multiversx_sdk.network_providers import errors
 import requests
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning, get_continue_confirmation
 from utils.logger import get_logger
@@ -34,7 +35,7 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
         try:
             response = proxy.do_get_generic(resource_url)
             break
-        except requests.exceptions.RequestException as e:
+        except (requests.exceptions.RequestException, errors.GenericError) as e:
             log_step_fail(f"Exception occurred while retrieving keys: {e}")
             if input("Do you want to retry? (y/n): ").lower() != "y":
                 break

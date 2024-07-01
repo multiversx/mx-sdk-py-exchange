@@ -92,7 +92,7 @@ def fetch_and_save_metastakings_from_chain(_):
 def upgrade_metastaking_contracts(label: str, file: str, compare_states: bool = False, codehash: str = ''):
     """Upgrade metastaking contracts"""
 
-    print("Upgrade {label} contracts")
+    print(f"Upgrade {label} contracts")
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -101,6 +101,7 @@ def upgrade_metastaking_contracts(label: str, file: str, compare_states: bool = 
     if not metastaking_addresses:
         print("No metastaking contracts available!")
         return
+    print(f"Processing {len(metastaking_addresses)} metastaking contracts.")
     
     version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
     bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V2 else config.STAKING_PROXY_V2_BYTECODE_PATH
@@ -209,7 +210,7 @@ def set_energy_factory(_):
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
 
-    energy_factory_address = context.get_contracts[config.SIMPLE_LOCKS_ENERGY][0].address
+    energy_factory_address = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0].address
     metastaking_addresses = get_metastaking_addresses(METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE)
     if not metastaking_addresses:
         print("No metastaking contracts available!")
@@ -218,7 +219,7 @@ def set_energy_factory(_):
     settable_addresses = []
     for metastaking_address in metastaking_addresses:
         metastaking_contract = MetaStakingContract("", "", "", "", "", "", "", MetaStakingContractVersion.V2, "", metastaking_address)
-        if metastaking_contract.get_energy_factory_address() == energy_factory_address:
+        if metastaking_contract.get_energy_factory_address(network_providers.proxy) != energy_factory_address:
             settable_addresses.append(metastaking_address)
     
     print(f"Set energy factory for {len(settable_addresses)} metastaking v2 contracts.")

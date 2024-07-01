@@ -166,8 +166,6 @@ def upgrade_staking_contracts(args: Any):
 
     compare_states = args.compare_states
 
-    print("Upgrade staking contracts")
-
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
@@ -175,6 +173,8 @@ def upgrade_staking_contracts(args: Any):
     if not staking_addresses:
         print("No staking contracts available!")
         return
+    
+    print(f"Processing {len(staking_addresses)} staking contracts.")
     
     bytecode_path = config.STAKING_V3_BYTECODE_PATH
 
