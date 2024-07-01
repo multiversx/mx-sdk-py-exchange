@@ -127,7 +127,7 @@ def resume_staking_contracts(staking_addresses: list[str]):
         print("Contract initial states not found!"
               "Cannot proceed safely without altering initial state.")
 
-    with open(OUTPUT_PAUSE_STATES, encoding="URF-8") as reader:
+    with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
         contract_states = json.load(reader)
 
     # pause all the staking contracts
