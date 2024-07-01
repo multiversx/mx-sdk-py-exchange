@@ -320,6 +320,9 @@ def produce_staking_rewards(args: Any):
 def generate_unstake_tokens_transactions(args: Any):
     """Generate unstake tokens transactions"""
 
+    if not hasattr(args, 'unbond_tokens'):
+        args.unbond_tokens = False
+
     staking_address = args.address
     exported_accounts_path = args.accounts_export
     function_name = "unstakeFarm" if not args.unbond_tokens else "unbondFarm"
