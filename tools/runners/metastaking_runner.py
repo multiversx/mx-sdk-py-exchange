@@ -103,7 +103,7 @@ def upgrade_metastaking_contracts(label: str, file: str, compare_states: bool = 
         return
     
     version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
-    bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V1 else config.STAKING_PROXY_V2_BYTECODE_PATH
+    bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V2 else config.STAKING_PROXY_V2_BYTECODE_PATH
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
