@@ -28,14 +28,12 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 def upgrade_simple_lock_contract(args: Any):
     """Upgrade simple lock contracts"""
 
-    print("Upgrade simple lock contract")
-
     address = args.address
     compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    print(f"Processing contract {address}")
+    print(f"Upgrading simple lock contract: {address}")
 
     bytecode_path = config.SIMPLE_LOCK_BYTECODE_PATH
 

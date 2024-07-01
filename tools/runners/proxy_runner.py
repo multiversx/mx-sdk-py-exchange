@@ -30,14 +30,13 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 def upgrade_proxy_dex_contracts(args: Any):
     """Upgrade proxy dex contracts"""
 
-    print("Upgrade proxy dex contract")
-
     compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
     proxy_dex_contract: DexProxyContract
     proxy_dex_contract = context.get_contracts(config.PROXIES_V2)[0]
+    print(f"Upgrade proxy dex contract: {proxy_dex_contract.address}")
 
     bytecode_path = config.PROXY_V2_BYTECODE_PATH
 

@@ -52,6 +52,7 @@ def upgrade_energy_factory(args: Any):
     context = Context()
     energy_factory_address = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0].address
     energy_contract = retrieve_simple_lock_energy_by_address(energy_factory_address)
+    print(f"Upgrade energy factory contract: {energy_factory_address}")
 
     bytecode_path = config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")

@@ -42,12 +42,10 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 def upgrade_router_contract(router_address: str, compare_states: bool = False):
     """Upgrade router contract"""
 
-    print("Upgrade router contract")
-
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    print(f"Router address: {router_address}")
+    print(f"Upgrade router contract: {router_address}")
 
     router_contract = retrieve_router_by_address(router_address)
 
@@ -77,8 +75,6 @@ def upgrade_router_contract(router_address: str, compare_states: bool = False):
 
 def upgrade_template_pair_contract(compare_states: bool = False):
     """Upgrade template pair contract"""
-
-    print("Upgrade template pair contract")
     
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -88,6 +84,7 @@ def upgrade_template_pair_contract(compare_states: bool = False):
     router_data_fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), network_providers.proxy.url)
     template_pair_address = Address.new_from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").to_bech32()
     template_pair = retrieve_pair_by_address(template_pair_address)
+    print(f"Upgrade template pair contract: {template_pair_address}")
 
     bytecode_path = config.PAIR_V2_BYTECODE_PATH
 
