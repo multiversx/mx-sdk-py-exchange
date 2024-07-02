@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from typing import Any
 
 import config
 from context import Context
@@ -8,6 +9,8 @@ from tools.runners.common_runner import add_upgrade_command
 from utils.contract_retrievers import retrieve_simple_lock_energy_by_address, retrieve_locked_asset_factory_by_address
 
 from utils.utils_tx import NetworkProviders
+
+from utils.utils_chain import get_bytecode_codehash
 
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
@@ -28,7 +31,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def pause_energy_factory():
+def pause_energy_factory(_):
     context = Context()
     energy_contract: SimpleLockEnergyContract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
 
@@ -36,7 +39,7 @@ def pause_energy_factory():
     context.network_provider.check_simple_tx_status(tx_hash, f"pause energy contract: {energy_contract}")
 
 
-def resume_energy_factory():
+def resume_energy_factory(_):
     context = Context()
     energy_contract: SimpleLockEnergyContract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
 
@@ -44,13 +47,17 @@ def resume_energy_factory():
     context.network_provider.check_simple_tx_status(tx_hash, f"resume energy contract: {energy_contract}")
 
 
-def upgrade_energy_factory(compare_states: bool = False):
+def upgrade_energy_factory(args: Any):
+    compare_states = args.compare_states
     context = Context()
     energy_factory_address = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0].address
     energy_contract = retrieve_simple_lock_energy_by_address(energy_factory_address)
+    print(f"Upgrade energy factory contract: {energy_factory_address}")
 
-    locked_asset_address = context.get_contracts(config.LOCKED_ASSETS)[0].address
-    locked_asset_contract = retrieve_locked_asset_factory_by_address(locked_asset_address)
+    bytecode_path = config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     if compare_states:
         print(f"Fetching contract state before upgrade...")
@@ -60,9 +67,8 @@ def upgrade_energy_factory(compare_states: bool = False):
             return
 
     tx_hash = energy_contract.contract_upgrade(context.deployer_account, context.network_provider.proxy,
-                                               config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH,
-                                               [locked_asset_contract.locked_asset, locked_asset_contract.address,
-                                                0, [], []])
+                                               bytecode_path,
+                                               [], True)
 
     if not context.network_provider.check_complex_tx_status(tx_hash, f"upgrade energy contract: {energy_contract}"):
         return

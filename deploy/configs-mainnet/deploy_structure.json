@@ -5,6 +5,18 @@
             "number_of_tokens": 10
         },
 
+    "egld_wraps": [
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        }
+    ],
+
     "locked_assets": [
         {
             "unlocked_asset": 0,

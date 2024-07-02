@@ -54,7 +54,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def fetch_and_save_pairs_from_chain():
+def fetch_and_save_pairs_from_chain(_):
     """Fetch and save pairs from chain"""
 
     print('fetch_and_save_pairs_from_chain')
@@ -67,7 +67,7 @@ def fetch_and_save_pairs_from_chain():
     fetch_and_save_contracts(registered_pairs, PAIRS_LABEL, OUTPUT_PAIR_CONTRACTS_FILE)
 
 
-def pause_pair_contracts():
+def pause_pair_contracts(_):
     """Pause pair contracts"""
 
     print("Pausing pair contracts")
@@ -97,7 +97,7 @@ def pause_pair_contracts():
         count += 1
 
 
-def resume_pair_contracts():
+def resume_pair_contracts(_):
     """Resume pair contracts"""
 
     print("Resuming pair contracts")
@@ -198,7 +198,7 @@ def upgrade_pair_contracts(args: Any):
         count += 1
 
 
-def set_fees_collector_in_pairs():
+def set_fees_collector_in_pairs(_):
     """Set fees collector in pairs"""
 
     print("Setting fees collector in all pairs")
@@ -233,7 +233,7 @@ def set_fees_collector_in_pairs():
         count += 1
 
 
-def remove_pairs_from_fees_collector():
+def remove_pairs_from_fees_collector(_):
     """Remove pairs from fees collector"""
 
     print("Removing pairs from fees collector")
@@ -302,7 +302,7 @@ def remove_pairs_from_fees_collector():
         return
 
 
-def update_fees_percentage():
+def update_fees_percentage(_):
     """Update fees percentage"""
 
     print("Updating fees percentage")

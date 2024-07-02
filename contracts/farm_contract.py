@@ -1,6 +1,6 @@
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
-from contracts.base_contracts import BaseFarmContract, BaseBoostedContract
+from contracts.base_contracts import BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract
 from utils import decoding_structures
 from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
@@ -16,7 +16,7 @@ from typing import Dict, Any
 logger = get_logger(__name__)
 
 
-class FarmContract(BaseFarmContract, BaseBoostedContract):
+class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract):
     def __init__(self, farming_token, farm_token, farmed_token, address, version: FarmContractVersion,
                  proxy_contract=None):
         self.farmingToken = farming_token
@@ -373,17 +373,6 @@ class FarmContract(BaseFarmContract, BaseBoostedContract):
         sc_args = [lock_epochs]
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockEpochs", sc_args)
-
-    def add_contract_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
-        """Only V2Boosted.
-        """
-        function_purpose = "Add contract to farm whitelist"
-        logger.info(function_purpose)
-        
-        gas_limit = 70000000
-        sc_args = [whitelisted_sc_address]
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
     
     def update_owner_or_admin(self, deployer: Account, proxy: ProxyNetworkProvider, old_address: str):
         """Only V2Boosted.
