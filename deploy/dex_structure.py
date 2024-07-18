@@ -353,10 +353,11 @@ class DeployStructure:
 
     # should be run for fresh deployed contracts
     def start_deployed_contracts(self, deployer_account: Account, network_provider: NetworkProviders,
-                                 clean_deploy_override: bool):
+                                 clean_deploy_override: bool, clean_deploy_list: List[str] = None):
         deployer_account.sync_nonce(network_provider.proxy)
         for contracts in self.contracts.values():
-            if contracts.deploy_clean or clean_deploy_override:
+            if contracts.deploy_clean or clean_deploy_override or \
+                (clean_deploy_list and contracts.label in clean_deploy_list):
                 for contract in contracts.deployed_contracts:
                     contract.contract_start(deployer_account, network_provider.proxy)
 
@@ -372,7 +373,8 @@ class DeployStructure:
         energy_factory: Optional[SimpleLockEnergyContract] = None
         energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
         whitelist = [config.PROXIES_V2, config.FEES_COLLECTORS,
-                     config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED]
+                     config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED, 
+                     config.GOVERNANCES, config.LOCKED_TOKEN_POSITION_CREATOR]
 
         # gather contract addresses to whitelist
         addresses = []
@@ -1496,7 +1498,8 @@ class DeployStructure:
             # Whitelist farm in pool if it's linked to pool
             if lp_contract is not None:
                 tx_hash = lp_contract.whitelist_contract(deployer_account, network_providers.proxy, contract_address)
-                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in pool"): return
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in pool"): 
+                    if not get_continue_confirmation(): return
 
             # Set energy contract
             if locking_contract is not None:
@@ -1516,10 +1519,11 @@ class DeployStructure:
                 # Whitelist farm in locking contract
                 tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
                                                                deployed_contract.address)
-                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in locking contract"): return
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in locking contract"):
+                    if not get_continue_confirmation(): return
             else:
                 log_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
-                return
+                if not get_continue_confirmation(): return
 
             # Set lock epochs
             if 'lock_epochs' not in contract_config:
@@ -1954,7 +1958,7 @@ class DeployStructure:
             tx_hash = lp.whitelist_contract(deployer_account, network_providers.proxy, contract_address)
             if not network_providers.check_simple_tx_status(tx_hash,
                                                             "whitelist metastaking contract in pair contract"):
-                return
+                if not get_continue_confirmation(): return
 
             # whitelist in farm contract
             tx_hash = farm.add_contract_to_whitelist(deployer_account, network_providers.proxy, contract_address)
@@ -1966,7 +1970,7 @@ class DeployStructure:
             tx_hash = staking.whitelist_contract(deployer_account, network_providers.proxy, contract_address)
             if not network_providers.check_simple_tx_status(tx_hash,
                                                             "whitelist metastaking contract in staking contract"):
-                return
+                if not get_continue_confirmation(): return
 
             if version == MetaStakingContractVersion.V3Boosted:
                 # set burn role from staking contract
