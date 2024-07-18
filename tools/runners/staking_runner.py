@@ -6,8 +6,10 @@ from typing import Any
 from multiversx_sdk import Address
 import config
 from config import GRAPHQL
+from context import Context
 from contracts.contract_identities import StakingContractVersion
 from contracts.staking_contract import StakingContract
+from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
@@ -16,13 +18,9 @@ from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_com
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.contract_retrievers import retrieve_staking_by_address
 from utils.utils_tx import NetworkProviders
-
-from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
-
-from context import Context
-
 from utils.utils_chain import get_bytecode_codehash, log_explorer_transaction
 from utils.utils_generic import get_file_from_url_or_path
+from tools.runners.common_config import STAKING_BOOSTED_REWARDS_PERCENTAGE, STAKING_BOOSTED_YIELD_FACTORS
 
 
 STAKINGS_LABEL = "stakings"
@@ -253,10 +251,7 @@ def upgrade_staking_contract(args: Any):
 
     staking_contract.version = StakingContractVersion.V3Boosted
     tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path,
-                                                [], True)
-
-    if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
-        if not get_user_continue():
+                                                [], True)setup-whitelist
             return
 
     if compare_states:
@@ -284,9 +279,9 @@ def setup_boosted_parameters_with_energy_address(staking_address: str, energy_ad
     staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", staking_address)
 
     hashes = []
-    hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, 4000))
+    hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, STAKING_BOOSTED_REWARDS_PERCENTAGE))
     hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, 
-                                                  [2, 1, 0, 1, 1000]))
+                                                  STAKING_BOOSTED_YIELD_FACTORS))
     hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
     hashes.append(energy_contract.add_sc_to_whitelist(dex_owner, network_providers.proxy, staking_address))
 
