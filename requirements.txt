@@ -1,4 +1,5 @@
 ipykernel
 toml
 debugpy
+wget
 multiversx-sdk==0.9.0

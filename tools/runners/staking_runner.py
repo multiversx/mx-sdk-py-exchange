@@ -22,6 +22,7 @@ from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from context import Context
 
 from utils.utils_chain import get_bytecode_codehash, log_explorer_transaction
+from utils.utils_generic import get_file_from_url_or_path
 
 
 STAKINGS_LABEL = "stakings"
@@ -176,7 +177,10 @@ def upgrade_staking_contracts(args: Any):
     
     print(f"Processing {len(staking_addresses)} staking contracts.")
     
-    bytecode_path = config.STAKING_V3_BYTECODE_PATH
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.STAKING_V3_BYTECODE_PATH
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -229,7 +233,10 @@ def upgrade_staking_contract(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    bytecode_path = config.STAKING_V3_BYTECODE_PATH
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.STAKING_V3_BYTECODE_PATH
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):

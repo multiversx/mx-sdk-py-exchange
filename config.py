@@ -52,10 +52,12 @@ PAIR_VIEW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "safe-price-vi
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
 FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "farm-with-locked-rewards" / "farm-with-locked-rewards.wasm"
 FARM_V3_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "farm-with-locked-rewards.wasm"
-GOVERNANCE_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "energy-integration" / "governance-v2" / "output" / "governance-v2.wasm"
-POSITION_CREATOR_BYTECODE_PATH = Path().home() / "MultiversX/mx-exchange-tools-sc/auto-pos-creator/output" / "auto-pos-creator.wasm"
+GOVERNANCE_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "governance-v2.wasm"
+POSITION_CREATOR_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "auto-pos-creator.wasm"
+LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-pos-creator.wasm"
 ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "lkmex-transfer.wasm"
 LK_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-wrapper.wasm"
+COMPOSABLE_TASKS_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "composable-tasks.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
@@ -75,6 +77,7 @@ DEFAULT_MINT_VALUE = 1  # EGLD      # TODO: don't go sub-unitary cause headaches
 CROSS_SHARD_DELAY = 60
 INTRA_SHARD_DELAY = 10
 
+# TODO: add new entries into DeployStructureArguments as well. For future, need to clean this up and make it seamless
 EGLD_WRAPS = "egld_wraps"
 LOCKED_ASSETS = "locked_assets"
 PROXIES = "proxies"
@@ -102,8 +105,10 @@ METASTAKINGS_BOOSTED = "metastakings_boosted"
 FEES_COLLECTORS = "fees_collectors"
 GOVERNANCES = "governances"
 POSITION_CREATOR = "position_creator"
+LOCKED_TOKEN_POSITION_CREATOR = "locked_token_position_creator"
 ESCROWS = "escrows"
 LK_WRAPS = "lk_wraps"
+COMPOSABLE_TASKS = "composable_tasks"
 
 
 def get_default_tokens_file():
