@@ -12,6 +12,7 @@ from contracts.metastaking_contract import MetaStakingContract, MetaStakingContr
 from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
 from utils.contract_retrievers import retrieve_position_creator_by_address
 from utils.utils_tx import NetworkProviders
+from utils.utils_generic import get_file_from_url_or_path
 from runners.farm_runner import get_farm_addresses_from_chain
 from runners.staking_runner import get_staking_addresses_from_chain
 from runners.metastaking_runner import get_metastaking_addresses_from_chain_by_farms
@@ -56,7 +57,10 @@ def upgrade_position_creator_contract(args: Any):
     position_creator_contract.egld_wrapper_address = deploy_structure_list[0]["egld_wrapped_address"]
     position_creator_contract.router_address = deploy_structure_list[0]["router_address"]
 
-    bytecode_path = config.POSITION_CREATOR_BYTECODE_PATH
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.POSITION_CREATOR_BYTECODE_PATH
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):

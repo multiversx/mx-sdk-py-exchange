@@ -9,7 +9,7 @@ from tools.runners.common_runner import add_upgrade_command
 from utils.contract_retrievers import retrieve_simple_lock_energy_by_address, retrieve_locked_asset_factory_by_address
 
 from utils.utils_tx import NetworkProviders
-
+from utils.utils_generic import get_file_from_url_or_path
 from utils.utils_chain import get_bytecode_codehash
 
 
@@ -54,7 +54,10 @@ def upgrade_energy_factory(args: Any):
     energy_contract = retrieve_simple_lock_energy_by_address(energy_factory_address)
     print(f"Upgrade energy factory contract: {energy_factory_address}")
 
-    bytecode_path = config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return

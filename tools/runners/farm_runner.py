@@ -15,6 +15,8 @@ from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.contract_retrievers import retrieve_farm_by_address
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import get_bytecode_codehash
+from utils.utils_generic import get_file_from_url_or_path
+from tools.runners.common_config import FARM_BOOSTED_YIELD_FACTORS
 import config
 
 
@@ -285,7 +287,11 @@ def upgrade_farmv2_contracts(args: Any):
     dex_owner = get_owner(network_providers.proxy)
 
     all_addresses = get_all_farm_v2_addresses()
-    bytecode_path = config.FARM_V3_BYTECODE_PATH
+
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.FARM_V3_BYTECODE_PATH
 
     print(f"Upgrading {len(all_addresses)} boosted farm contracts...")
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
@@ -342,6 +348,15 @@ def upgrade_farmv2_contract(args: Any):
 
     contract = retrieve_farm_by_address(farm_address)
 
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.FARM_V3_BYTECODE_PATH
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     if compare_states:
         print("Fetching contract state before upgrade...")
         fetch_contracts_states("pre", network_providers, [farm_address], FARMSV2_LABEL)
@@ -350,7 +365,7 @@ def upgrade_farmv2_contract(args: Any):
             return
 
     tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                        config.FARM_V3_BYTECODE_PATH,
+                                        bytecode_path,
                                         [], True)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
@@ -450,7 +465,7 @@ def update_boosted_factors(_):
         print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
         contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
         tx_hash = contract.set_boosted_yields_factors(dex_owner, network_providers.proxy,
-                                                      [2, 1, 0, 1, 1000])
+                                                      FARM_BOOSTED_YIELD_FACTORS)
         if not network_providers.check_simple_tx_status(tx_hash, f"set boosted yields for farm contract: {farm_address}"):
             if not get_user_continue():
                 return

@@ -130,6 +130,7 @@ def add_upgrade_command(subparsers, func: Any) -> None:
     command_parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after upgrade')
     command_parser.add_argument('--address', type=str, help='contract address')
+    command_parser.add_argument('--bytecode', type=str, help='optional: contract bytecode path/url; defaults to config path')
     command_parser.set_defaults(func=func)
 
 
@@ -139,6 +140,7 @@ def add_upgrade_all_command(subparsers, func: Any) -> None:
     command_parser = subparsers.add_parser('upgrade-all', help='upgrade all contracts command')
     command_parser.add_argument('--compare-states', action='store_true',
                         help='compare states before and after upgrade')
+    command_parser.add_argument('--bytecode', type=str, help='optional: contract bytecode path/url; defaults to config path')
     command_parser.set_defaults(func=func)
 
 

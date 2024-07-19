@@ -20,7 +20,7 @@ from tools.runners.common_runner import add_generate_transaction_command, \
     sync_account_nonce
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.utils_chain import Account, WrapperAddress
-from utils.utils_generic import split_to_chunks
+from utils.utils_generic import split_to_chunks, get_file_from_url_or_path
 from utils.utils_tx import ESDTToken, NetworkProviders
 import config
 
@@ -29,6 +29,7 @@ from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from context import Context
 
 from utils.utils_chain import get_bytecode_codehash, log_explorer_transaction
+from tools.runners.common_config import STAKING_BOOSTED_REWARDS_PERCENTAGE, STAKING_BOOSTED_YIELD_FACTORS
 
 
 STAKINGS_LABEL = "stakings"
@@ -194,7 +195,10 @@ def upgrade_staking_contracts(args: Any):
     
     print(f"Processing {len(staking_addresses)} staking contracts.")
     
-    bytecode_path = config.STAKING_V3_BYTECODE_PATH
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.STAKING_V3_BYTECODE_PATH
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -247,7 +251,10 @@ def upgrade_staking_contract(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    bytecode_path = config.STAKING_V3_BYTECODE_PATH
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.STAKING_V3_BYTECODE_PATH
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -295,9 +302,8 @@ def setup_boosted_parameters_with_energy_address(staking_address: str, energy_ad
     staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", staking_address)
 
     hashes = []
-    hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, 4000))
-    hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, 
-                                                  [2, 1, 0, 1, 1000]))
+    hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, STAKING_BOOSTED_REWARDS_PERCENTAGE))
+    hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, STAKING_BOOSTED_YIELD_FACTORS))
     hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
     hashes.append(energy_contract.add_sc_to_whitelist(dex_owner, network_providers.proxy, staking_address))
 

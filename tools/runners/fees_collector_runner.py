@@ -9,7 +9,7 @@ from utils.contract_retrievers import retrieve_pair_by_address
 from typing import Any
 
 from utils.utils_tx import NetworkProviders
-
+from utils.utils_generic import get_file_from_url_or_path
 from utils.utils_chain import get_bytecode_codehash
 
 
@@ -70,9 +70,14 @@ def upgrade_fees_collector_contract(args: Any):
     context = Context()
     fees_collector_contract: FeesCollectorContract
     fees_collector_contract = context.get_contracts(config.FEES_COLLECTORS)[0]
-    bytecode_path = config.FEES_COLLECTOR_BYTECODE_PATH
 
     print(f"Upgrading fees collector contract: {fees_collector_contract.address}")
+
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.FEES_COLLECTOR_BYTECODE_PATH
+        
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return

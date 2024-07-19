@@ -7,6 +7,7 @@ from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compa
 from tools.runners.common_runner import add_upgrade_command
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
+from utils.utils_generic import get_file_from_url_or_path
 import config
 
 from utils.contract_data_fetchers import ProxyContractDataFetcher
@@ -38,7 +39,10 @@ def upgrade_proxy_dex_contracts(args: Any):
     proxy_dex_contract = context.get_contracts(config.PROXIES_V2)[0]
     print(f"Upgrade proxy dex contract: {proxy_dex_contract.address}")
 
-    bytecode_path = config.PROXY_V2_BYTECODE_PATH
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = config.PROXY_V2_BYTECODE_PATH
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
