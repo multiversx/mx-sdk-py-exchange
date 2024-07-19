@@ -128,8 +128,10 @@ def add_upgrade_command(subparsers, func: Any) -> None:
 
     command_parser = subparsers.add_parser('upgrade', help='upgrade contarct command')
     command_parser.add_argument('--compare-states', action='store_true',
-                        help='compare states before and after upgrade')
-    command_parser.add_argument('--address', type=str, help='contract address')
+                                help='compare states before and after upgrade')
+    group = command_parser.add_mutually_exclusive_group()
+    group.add_argument('--address', type=str, help='contract address')
+    group.add_argument('--all', action='store_true', help='run command for all contracts')
     command_parser.set_defaults(func=func)
 
 
