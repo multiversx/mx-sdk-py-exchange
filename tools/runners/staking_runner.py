@@ -15,9 +15,10 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
 from tools.runners.common_runner import add_generate_transaction_command, \
-    add_upgrade_all_command, add_upgrade_command, fund_shadowfork_accounts, \
+    add_upgrade_command, fund_shadowfork_accounts, \
     get_acounts_with_token, get_default_signature, read_accounts_from_json, \
     sync_account_nonce
+from tools.runners.metastaking_runner import get_metastaking_addresses_from_chain
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.utils_chain import Account, WrapperAddress
 from utils.utils_generic import split_to_chunks
@@ -37,8 +38,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_parser = subgroup_parser.add_parser('contract', help='stakings contract commands')
 
     contract_group = contract_parser.add_subparsers()
-    add_upgrade_command(contract_group, upgrade_staking_contract)
-    add_upgrade_all_command(contract_group, upgrade_staking_contracts)
+    add_upgrade_command(contract_group, upgrade_staking_contracts)
 
     command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
     command_parser.set_defaults(func=fetch_and_save_stakings_from_chain)
@@ -218,13 +218,12 @@ def upgrade_staking_contracts(args: Any):
 
     print("Upgrade staking contracts")
 
+    staking_addresses = get_staking_addresses_from_chain()
+    if not args.all:
+        staking_addresses = [args.address]
+
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
-
-    staking_addresses = get_staking_addresses_from_chain()
-    if not staking_addresses:
-        print("No staking contracts available!")
-        return
 
     if compare_states:
         print("Fetching contracts states before upgrade...")
@@ -255,44 +254,6 @@ def upgrade_staking_contracts(args: Any):
             return
 
         count += 1
-
-
-def upgrade_staking_contract(args: Any):
-    """Upgrade staking contract"""
-
-    staking_address = args.address
-    compare_states = args.compare_states
-
-    if not staking_address:
-        print("Staking address is required!")
-        return
-
-    print("Upgrade staking contract")
-
-    network_providers = NetworkProviders(API, PROXY)
-    dex_owner = get_owner(network_providers.proxy)
-
-    if compare_states:
-        print("Fetching contracts states before upgrade...")
-        fetch_contracts_states("pre", network_providers, [staking_address], STAKINGS_LABEL)
-
-    if not get_user_continue():
-        return
-
-    staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
-
-    tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, config.STAKING_V3_BYTECODE_PATH,
-                                                [], True)
-
-    if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
-        if not get_user_continue():
-            return
-
-    if compare_states:
-        fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
-
-    if not get_user_continue():
-        return
 
 
 def produce_staking_rewards(args: Any):
