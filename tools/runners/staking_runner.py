@@ -1,10 +1,12 @@
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
-import time
+from time import sleep
 from typing import Any
 from multiversx_sdk import Address
-import config
+from multiversx_sdk.core.transaction_builders import ContractCallBuilder, \
+    DefaultTransactionBuildersConfiguration
 from config import GRAPHQL
 from context import Context
 from contracts.contract_identities import StakingContractVersion
@@ -14,14 +16,17 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
-from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command
+from tools.runners.common_runner import add_generate_transaction_command, \
+    add_upgrade_all_command, add_upgrade_command, fund_shadowfork_accounts, \
+    get_acounts_with_token, get_default_signature, read_accounts_from_json, \
+    sync_account_nonce
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.contract_retrievers import retrieve_staking_by_address
-from utils.utils_tx import NetworkProviders
-from utils.utils_chain import get_bytecode_codehash, log_explorer_transaction
-from utils.utils_generic import get_file_from_url_or_path
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, log_explorer_transaction
+from utils.utils_generic import split_to_chunks, get_file_from_url_or_path
+from utils.utils_tx import ESDTToken, NetworkProviders
 from tools.runners.common_config import STAKING_BOOSTED_REWARDS_PERCENTAGE, STAKING_BOOSTED_YIELD_FACTORS
-
+import config
 
 STAKINGS_LABEL = "stakings"
 OUTPUT_STAKING_CONTRACTS_FILE = OUTPUT_FOLDER / "staking_data.json"
@@ -65,6 +70,17 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
                         help='compare states before and after the setup')
     command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.set_defaults(func=setup_boosted_parameters_for_staking)
+
+    command_parser = contract_group.add_parser('produce-rewards', help='toggle rewards distribution command')
+    command_parser.add_argument('--address', type=str, help='contract address')
+    command_parser.add_argument('--state', action='store_true', help='rewards distribution state')
+    command_parser.set_defaults(func=produce_staking_rewards)
+
+    transactions_parser = subgroup_parser.add_parser('generate-transactions', help='metastaking transactions commands')
+
+    transactions_group = transactions_parser.add_subparsers()
+    add_generate_transaction_command(transactions_group, generate_unstake_tokens_transactions, 'unstakeTokens', 'unstake tokens command')
+    add_generate_transaction_command(transactions_group, generate_unbond_tokens_transactions, 'unbondTokens', 'unbond tokens command')
 
     return group_parser
 
@@ -168,7 +184,7 @@ def upgrade_staking_contracts(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    staking_addresses = get_all_staking_addresses()
+    staking_addresses = get_staking_addresses_from_chain()
     if not staking_addresses:
         print("No staking contracts available!")
         return
@@ -197,7 +213,7 @@ def upgrade_staking_contracts(args: Any):
         if not get_user_continue():
             return
 
-        staking_contract = retrieve_staking_by_address(staking_address, StakingContractVersion.V2)
+        staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
 
         staking_contract.version = StakingContractVersion.V3Boosted
         tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, 
@@ -247,7 +263,7 @@ def upgrade_staking_contract(args: Any):
         if not get_user_continue():
             return
 
-    staking_contract = retrieve_staking_by_address(staking_address, StakingContractVersion.V2)
+    staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
 
     staking_contract.version = StakingContractVersion.V3Boosted
     tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path,
@@ -288,7 +304,7 @@ def setup_boosted_parameters_with_energy_address(staking_address: str, energy_ad
     for tx_hash in hashes:
         log_explorer_transaction(tx_hash, network_providers.proxy.url)
         
-    time.sleep(6)
+    sleep(6)
 
     if compare_states:
         fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
@@ -326,6 +342,119 @@ def setup_boosted_parameters_for_all_stakings(args: Any):
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
         setup_boosted_parameters_with_energy_address(staking_address, energy_contract.address, compare_states)
         count += 1
+
+
+def produce_staking_rewards(args: Any):
+    """Resume staking contract"""
+
+    staking_address = args.address
+    state = args.state
+
+    if not staking_address:
+        print("Staking address is required!")
+        return
+
+    print(f"Toggle rewards distribution on staking contract: {staking_address}")
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
+    if state:
+        staking_contract.start_produce_rewards(dex_owner, network_providers.proxy)
+    else:
+        staking_contract.end_produce_rewards(dex_owner, network_providers.proxy)
+
+
+def generate_unstake_tokens_transactions(args: Any):
+    """Generate unstake tokens transactions"""
+
+    if not hasattr(args, 'unbond_tokens'):
+        args.unbond_tokens = False
+
+    staking_address = args.address
+    exported_accounts_path = args.accounts_export
+    function_name = "unstakeFarm" if not args.unbond_tokens else "unbondFarm"
+
+    if not exported_accounts_path:
+        print("Missing required arguments!")
+        return
+
+    if not staking_address and not args.all:
+        print("Missing required arguments!")
+        return
+
+    network_providers = NetworkProviders(API, PROXY)
+    network_providers.network = network_providers.proxy.get_network_config()
+    chain_id = network_providers.proxy.get_network_config().chain_id
+    config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    signature = get_default_signature()
+
+    exported_accounts = read_accounts_from_json(exported_accounts_path)
+
+    fund_shadowfork_accounts(exported_accounts)
+    sleep(60)
+
+    staking_addresses = get_staking_addresses_from_chain()
+    if not args.all:
+        staking_addresses = [staking_address]
+
+    with ThreadPoolExecutor(max_workers=500) as executor:
+        exported_accounts = list(executor.map(sync_account_nonce, exported_accounts))
+
+    for staking_address in staking_addresses:
+        staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
+        accounts_with_token = get_acounts_with_token(exported_accounts, staking_contract.farm_token)
+        print(f"Found {len(accounts_with_token)} accounts with token {staking_contract.farm_token}")
+
+        transactions = []
+        accounts_index = 1
+        for account_with_token in accounts_with_token:
+            print(f"Processing account {accounts_index} / {len(accounts_with_token)}")
+
+            account = Account(account_with_token.address, config.DEFAULT_OWNER)
+            account.address = WrapperAddress.from_bech32(account_with_token.address)
+            account.nonce = account_with_token.nonce
+            tokens = [
+                token for token in account_with_token.account_tokens_supply
+                if token.token_name == staking_contract.farm_token and (
+                    (len(token.attributes) > 13 and not args.unbond_tokens) or (len(token.attributes) < 13 and args.unbond_tokens)
+                )
+            ]
+            for token in tokens:
+                payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
+                builder = ContractCallBuilder(
+                    config=config_tx,
+                    contract=Address.new_from_bech32(staking_address),
+                    function_name=function_name,
+                    caller=account.address,
+                    call_arguments=[],
+                    value=0,
+                    gas_limit=13000000,
+                    nonce=account.nonce,
+                    esdt_transfers=payment_tokens
+                )
+                tx = builder.build()
+                tx.signature = signature
+
+                transactions.append(tx)
+                account_with_token.nonce += 1
+
+            index = exported_accounts.index(account_with_token)
+            exported_accounts[index].nonce = account_with_token.nonce
+            accounts_index += 1
+
+        transactions_chunks = split_to_chunks(transactions, 100)
+        for chunk in transactions_chunks:
+            network_providers.proxy.send_transactions(chunk)
+
+
+def generate_unbond_tokens_transactions(args: Any):
+    """Generate unbond tokens transactions"""
+
+    args.unbond_tokens = True
+
+    generate_unstake_tokens_transactions(args)
 
 
 def get_staking_addresses_from_chain() -> list:
