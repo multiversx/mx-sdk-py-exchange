@@ -331,11 +331,15 @@ def generate_unstake_tokens_transactions(args: Any):
     chain_id = network_providers.proxy.get_network_config().chain_id
     config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
     signature = get_default_signature()
+    default_account = Account(None, config.DEFAULT_OWNER)
+    default_account.sync_nonce(network_providers.proxy)
 
     exported_accounts = read_accounts_from_json(exported_accounts_path)
 
     fund_shadowfork_accounts(exported_accounts)
-    sleep(60)
+    sleep(30)
+
+    metastaking_addresses = get_metastaking_addresses_from_chain()
 
     staking_addresses = get_staking_addresses_from_chain()
     if not args.all:
@@ -347,6 +351,7 @@ def generate_unstake_tokens_transactions(args: Any):
     for staking_address in staking_addresses:
         staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
         accounts_with_token = get_acounts_with_token(exported_accounts, staking_contract.farm_token)
+
         print(f"Found {len(accounts_with_token)} accounts with token {staking_contract.farm_token}")
 
         transactions = []
@@ -357,33 +362,60 @@ def generate_unstake_tokens_transactions(args: Any):
             account = Account(account_with_token.address, config.DEFAULT_OWNER)
             account.address = WrapperAddress.from_bech32(account_with_token.address)
             account.nonce = account_with_token.nonce
+
             tokens = [
                 token for token in account_with_token.account_tokens_supply
                 if token.token_name == staking_contract.farm_token and (
                     (len(token.attributes) > 13 and not args.unbond_tokens) or (len(token.attributes) < 13 and args.unbond_tokens)
                 )
             ]
+
+            print(f"Found {len(tokens)} tokens to unstake for account {account_with_token.address}")
+
             for token in tokens:
                 payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
-                builder = ContractCallBuilder(
-                    config=config_tx,
-                    contract=Address.new_from_bech32(staking_address),
-                    function_name=function_name,
-                    caller=account.address,
-                    call_arguments=[],
-                    value=0,
-                    gas_limit=13000000,
-                    nonce=account.nonce,
-                    esdt_transfers=payment_tokens
-                )
-                tx = builder.build()
-                tx.signature = signature
+                if not account.address.is_smart_contract():
+                    builder = ContractCallBuilder(
+                        config=config_tx,
+                        contract=Address.new_from_bech32(staking_address),
+                        function_name=function_name,
+                        caller=account.address,
+                        call_arguments=[],
+                        value=0,
+                        gas_limit=13000000,
+                        nonce=account.nonce,
+                        esdt_transfers=payment_tokens
+                    )
 
-                transactions.append(tx)
-                account_with_token.nonce += 1
+                    tx = builder.build()
+                    tx.signature = signature
+
+                    transactions.append(tx)
+                    account.nonce += 1
+                elif account.address.to_bech32() not in metastaking_addresses:
+                    builder = ContractCallBuilder(
+                        config=config_tx,
+                        contract=account.address,
+                        function_name="callInternalTransferEndpoint",
+                        caller=default_account.address,
+                        call_arguments=[
+                            token.token_name,
+                            int(token.token_nonce_hex, 16),
+                            int(token.supply),
+                            Address.new_from_bech32(staking_address),
+                            function_name,
+                        ],
+                        value=0,
+                        gas_limit=50000000,
+                        nonce=default_account.nonce
+                    )
+                    default_account.nonce += 1
+                    tx = builder.build()
+                    tx.signature = signature
+                    transactions.append(tx)
 
             index = exported_accounts.index(account_with_token)
-            exported_accounts[index].nonce = account_with_token.nonce
+            exported_accounts[index].nonce = account.nonce
             accounts_index += 1
 
         transactions_chunks = split_to_chunks(transactions, 100)
