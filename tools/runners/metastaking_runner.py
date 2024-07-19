@@ -2,17 +2,17 @@ from argparse import ArgumentParser
 from typing import Any
 from contracts.contract_identities import MetaStakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract
+from events.event_generators import get_lp_from_metastake_token_attributes
 from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
 from tools.runners.common_runner import add_generate_transaction_command, \
-    add_upgrade_all_command, \
-    add_upgrade_command, \
-    get_acounts_with_token, \
-    read_accounts_from_json
-from utils.contract_retrievers import retrieve_proxy_staking_by_address
-from utils.utils_chain import Account, WrapperAddress
+    add_upgrade_command, fund_shadowfork_accounts, \
+    get_acounts_with_token, get_default_signature, \
+    read_accounts_from_json, sync_account_nonce
+from utils.utils_chain import Account, WrapperAddress, base64_to_hex
+from utils.utils_generic import split_to_chunks
 from utils.utils_tx import ESDTToken, NetworkProviders
 
 import config
@@ -30,8 +30,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_parser = subgroup_parser.add_parser('contract', help='metastaking contract commands')
 
     contract_group = contract_parser.add_subparsers()
-    add_upgrade_command(contract_group, upgrade_metastaking_contract)
-    add_upgrade_all_command(contract_group, upgrade_metastaking_contracts)
+    add_upgrade_command(contract_group, upgrade_metastaking_contracts)
 
     transactions_parser = subgroup_parser.add_parser('generate-transactions', help='metastaking transactions commands')
 
@@ -61,10 +60,9 @@ def upgrade_metastaking_contracts(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    metastaking_addresses = get_all_metastaking_addresses('56468a6ae726693a71edcf96cf44673466dd980412388e1e4b073a0b4ee592d7')
-    if not metastaking_addresses:
-        print("No metastaking contracts available!")
-        return
+    metastaking_addresses = get_metastaking_addresses_from_chain()
+    if not args.all:
+        metastaking_addresses = [args.address]
 
     if compare_states:
         print("Fetching contracts states before upgrade...")
@@ -82,7 +80,7 @@ def upgrade_metastaking_contracts(args: Any):
         metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V3Boosted)
 
         tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                                        config.STAKING_PROXY_BYTECODE_PATH, [])
+                                                        config.STAKING_PROXY_V3_BYTECODE_PATH, [])
 
         if not network_providers.check_complex_tx_status(tx_hash,
                                                          f"upgrade metastaking contract: {metastaking_address}"):
@@ -96,45 +94,6 @@ def upgrade_metastaking_contracts(args: Any):
             return
 
         count += 1
-
-
-def upgrade_metastaking_contract(args: Any):
-    """Upgrade metastaking contract by address"""
-
-    compare_states = args.compare_states
-    metastaking_address = args.address
-
-    if not metastaking_address:
-        print("Missing required arguments!")
-        return
-
-    print(f"Upgrade metastaking contract {metastaking_address} with compare states: {compare_states}")
-
-    network_providers = NetworkProviders(API, PROXY)
-    dex_owner = get_owner(network_providers.proxy)
-
-    if compare_states:
-        print("Fetching contracts states before upgrade...")
-        fetch_contracts_states("pre", network_providers, [metastaking_address], METASTAKINGS_LABEL)
-
-    if not get_user_continue():
-        return
-
-    metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V3Boosted)
-
-    tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                                    config.STAKING_PROXY_V3_BYTECODE_PATH, [], True)
-
-    if not network_providers.check_complex_tx_status(tx_hash,
-                                                     f"upgrade metastaking contract: {metastaking_address}"):
-        if not get_user_continue():
-            return
-
-    if compare_states:
-        fetch_new_and_compare_contract_states(METASTAKINGS_LABEL, metastaking_address, network_providers)
-
-    if not get_user_continue():
-        return
 
 
 def generate_unstake_farm_tokens_transaction(args: Any):
