@@ -155,3 +155,7 @@ def get_contract_save_name(contract_type: str, address: str, prefix: str):
     """Get contract save name"""
 
     return f"{prefix}_{contract_type}_{address}"
+
+
+def rule_of_three(first_amount, first_equivalent, second_amount):
+    return (second_amount * first_equivalent) // first_amount

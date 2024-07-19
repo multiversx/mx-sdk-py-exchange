@@ -1,12 +1,18 @@
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor
+from time import sleep
 from typing import Any
+
+from multiversx_sdk import Address
+from multiversx_sdk.core.transaction_builders import ContractCallBuilder, \
+    DefaultTransactionBuildersConfiguration
 from contracts.contract_identities import MetaStakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract
 from events.event_generators import get_lp_from_metastake_token_attributes
 from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
-    get_saved_contract_addresses, get_user_continue, run_graphql_query
+    get_saved_contract_addresses, get_user_continue, rule_of_three, run_graphql_query
 from tools.runners.common_runner import add_generate_transaction_command, \
     add_upgrade_command, fund_shadowfork_accounts, \
     get_acounts_with_token, get_default_signature, \
@@ -102,33 +108,111 @@ def generate_unstake_farm_tokens_transaction(args: Any):
     metastaking_address = args.address
     exported_accounts_path = args.accounts_export
 
-    if not metastaking_address or not exported_accounts_path:
+    if not exported_accounts_path:
         print("Missing required arguments!")
         return
 
-    print(f"Generate unstake farm tokens transaction for metastaking contract {metastaking_address}")
+    if not metastaking_address and not args.all:
+        print("Missing required arguments!")
+        return
 
     network_providers = NetworkProviders(API, PROXY)
-    metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V2)
+    network_providers.network = network_providers.proxy.get_network_config()
+    chain_id = network_providers.proxy.get_network_config().chain_id
+    config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    signature = get_default_signature()
+    default_account = Account(None, config.DEFAULT_OWNER)
+    default_account.sync_nonce(network_providers.proxy)
 
     exported_accounts = read_accounts_from_json(exported_accounts_path)
-    accounts_with_token = get_acounts_with_token(exported_accounts, metastaking_contract.metastake_token)
 
-    for account_with_token in accounts_with_token:
-        account = Account(account_with_token.address, config.DEFAULT_OWNER)
-        account.address = WrapperAddress.from_bech32(account_with_token.address)
-        account.sync_nonce(network_providers.proxy)
-        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == metastaking_contract.metastake_token]
-        for token in tokens:
-            metastaking_contract.exit_metastake(
-                network_providers.proxy,
-                account,
-                [
-                    [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply))],
-                    1,
-                    1
-                ],
-            )
+    fund_shadowfork_accounts(exported_accounts)
+    sleep(30)
+
+    with ThreadPoolExecutor(max_workers=500) as executor:
+        exported_accounts = list(executor.map(sync_account_nonce, exported_accounts))
+
+    metastaking_addresses = get_metastaking_addresses_from_chain()
+    if not args.all:
+        metastaking_addresses = [metastaking_address]
+
+    for metastaking_address in metastaking_addresses:
+        metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, MetaStakingContractVersion.V3Boosted)
+        accounts_with_token = get_acounts_with_token(exported_accounts, metastaking_contract.metastake_token)
+        print(f"Found {len(accounts_with_token)} accounts with token {metastaking_contract.metastake_token}")
+
+        with ThreadPoolExecutor(max_workers=500) as executor:
+            accounts_with_token = list(executor.map(sync_account_nonce, accounts_with_token))
+
+        transactions = []
+        accounts_index = 1
+        for account_with_token in accounts_with_token:
+            print(f"Processing account {accounts_index} / {len(accounts_with_token)}")
+
+            account = Account(account_with_token.address, config.DEFAULT_OWNER)
+            account.address = WrapperAddress.from_bech32(account_with_token.address)
+            account.nonce = account_with_token.nonce
+            tokens = [
+                token for token in account_with_token.account_tokens_supply
+                if token.token_name == metastaking_contract.metastake_token
+            ]
+            for token in tokens:
+                attributes_hex = base64_to_hex(token.attributes)
+                decoded_metastake_tk_attributes = get_lp_from_metastake_token_attributes(attributes_hex)
+                farm_token_amount = rule_of_three(
+                    int(decoded_metastake_tk_attributes['staking_farm_token_amount']),
+                    int(decoded_metastake_tk_attributes['lp_farm_token_amount']),
+                    int(token.supply),
+                )
+
+                payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
+                if not account.address.is_smart_contract():
+                    builder = ContractCallBuilder(
+                        config=config_tx,
+                        contract=Address.new_from_bech32(metastaking_address),
+                        function_name="unstakeFarmTokens",
+                        caller=account.address,
+                        call_arguments=[1, 1, farm_token_amount],
+                        value=0,
+                        gas_limit=75000000,
+                        nonce=account.nonce,
+                        esdt_transfers=payment_tokens
+                    )
+                    tx = builder.build()
+                    tx.signature = signature
+
+                    transactions.append(tx)
+                    account.nonce += 1
+                else:
+                    builder = ContractCallBuilder(
+                        config=config_tx,
+                        contract=account.address,
+                        function_name="callInternalTransferEndpoint",
+                        caller=default_account.address,
+                        call_arguments=[
+                            token.token_name,
+                            int(token.token_nonce_hex, 16),
+                            int(token.supply),
+                            Address.new_from_bech32(metastaking_address),
+                            "unstakeFarmTokens",
+                            1, 1, farm_token_amount
+                        ],
+                        value=0,
+                        gas_limit=50000000,
+                        nonce=default_account.nonce
+                    )
+                    default_account.nonce += 1
+                    tx = builder.build()
+                    tx.signature = signature
+                    transactions.append(tx)
+
+            index = exported_accounts.index(account_with_token)
+            exported_accounts[index].nonce = account.nonce
+            accounts_index += 1
+
+        transactions_chunks = split_to_chunks(transactions, 100)
+        for chunk in transactions_chunks:
+            network_providers.proxy.send_transactions(chunk)
 
 
 def generate_stake_farm_tokens_transaction(args: Any):
