@@ -58,9 +58,18 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser.set_defaults(func=resume_staking_contract)
 
     command_parser = contract_group.add_parser('produce-rewards', help='toggle rewards distribution command')
-    command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.add_argument('--state', action='store_true', help='rewards distribution state')
+    group = command_parser.add_mutually_exclusive_group()
+    group.add_argument('--address', type=str, help='contract address')
+    group.add_argument('--all', action='store_true', help='run command for all contracts')
     command_parser.set_defaults(func=produce_staking_rewards)
+
+    command_parser = contract_group.add_parser('unbond-epochs', help='set minim unbond epoochs command')
+    command_parser.add_argument('--epochs', type=int, help='minim unbond epochs')
+    group = command_parser.add_mutually_exclusive_group()
+    group.add_argument('--address', type=str, help='contract address')
+    group.add_argument('--all', action='store_true', help='run command for all contracts')
+    command_parser.set_defaults(func=set_unbond_epochs)
 
     transactions_parser = subgroup_parser.add_parser('generate-transactions', help='metastaking transactions commands')
 
@@ -257,25 +266,46 @@ def upgrade_staking_contracts(args: Any):
 
 
 def produce_staking_rewards(args: Any):
-    """Resume staking contract"""
+    """Toggle produce rewards on staking contract"""
 
-    staking_address = args.address
     state = args.state
-
-    if not staking_address:
-        print("Staking address is required!")
-        return
-
-    print(f"Toggle rewards distribution on staking contract: {staking_address}")
+    staking_addresses = get_staking_addresses_from_chain()
+    if not args.all:
+        staking_addresses = [args.address]
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
-    if state:
-        staking_contract.start_produce_rewards(dex_owner, network_providers.proxy)
-    else:
-        staking_contract.end_produce_rewards(dex_owner, network_providers.proxy)
+    for staking_address in staking_addresses:
+        print(f"Toggle rewards distribution on staking contract: {staking_address}")
+
+        staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
+        if state:
+            staking_contract.start_produce_rewards(dex_owner, network_providers.proxy)
+        else:
+            staking_contract.end_produce_rewards(dex_owner, network_providers.proxy)
+
+
+def set_unbond_epochs(args: Any):
+    """Set unbond epochs on staking contract"""
+
+    if args.epochs is None:
+        print("Missing required arguments!")
+        return
+
+    epochs = args.epochs
+    staking_addresses = get_staking_addresses_from_chain()
+    if not args.all:
+        staking_addresses = [args.staking_address]
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    for staking_address in staking_addresses:
+        print(f"Toggle rewards distribution on staking contract: {staking_address}")
+
+        staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
+        staking_contract.set_unbond_epochs(dex_owner, network_providers.proxy, epochs)
 
 
 def generate_unstake_tokens_transactions(args: Any):
