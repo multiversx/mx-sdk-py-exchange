@@ -10,7 +10,6 @@ from tools.runners.common_runner import add_generate_transaction_command, \
     add_upgrade_all_command, add_upgrade_command, \
     get_acounts_with_token, read_accounts_from_json
 from tools.runners.farm_runner import get_farm_addresses_from_chain
-from utils.contract_retrievers import retrieve_proxy_staking_by_address
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash
 from utils.utils_tx import ESDTToken, NetworkProviders
 from utils.utils_generic import get_file_from_url_or_path
@@ -132,7 +131,7 @@ def upgrade_metastaking_contracts(label: str, file: str, bytecode_path: str = ''
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
-        metastaking_contract = retrieve_proxy_staking_by_address(metastaking_address, version)
+        metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, version)
 
         tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode, [])
 

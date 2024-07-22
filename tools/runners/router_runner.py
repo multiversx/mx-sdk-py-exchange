@@ -4,12 +4,13 @@ from multiversx_sdk import Address
 import config
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
+from contracts.router_contract import RouterContract
+from contracts.pair_contract import PairContract
 from tools.common import API, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, \
     get_owner, get_user_continue
 from tools.runners.common_runner import add_upgrade_command
 from utils.contract_data_fetchers import RouterContractDataFetcher
-from utils.contract_retrievers import retrieve_pair_by_address, retrieve_router_by_address
 
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import get_file_from_url_or_path
@@ -50,7 +51,7 @@ def upgrade_router_contract(args: Any):
 
     print(f"Upgrade router contract: {router_address}")
 
-    router_contract = retrieve_router_by_address(router_address)
+    router_contract = RouterContract.load_contract_by_address(router_address)
 
     if args.bytecode:
         bytecode_path = get_file_from_url_or_path(args.bytecode)
@@ -90,7 +91,7 @@ def upgrade_template_pair_contract(args: Any):
 
     router_data_fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), network_providers.proxy.url)
     template_pair_address = Address.new_from_hex(router_data_fetcher.get_data("getPairTemplateAddress"), "erd").to_bech32()
-    template_pair = retrieve_pair_by_address(template_pair_address)
+    template_pair = PairContract.load_contract_by_address(template_pair_address)
     print(f"Upgrade template pair contract: {template_pair_address}")
 
     if args.bytecode:
@@ -136,7 +137,7 @@ def enable_pair_creation(args: Any):
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
 
-    router_contract = retrieve_router_by_address(context.get_contracts(config.ROUTER_V2)[0].address)
+    router_contract = RouterContract.load_contract_by_address(context.get_contracts(config.ROUTER_V2)[0].address)
 
     tx_hash = router_contract.set_pair_creation_enabled(dex_owner, network_providers.proxy, [args.state])
 

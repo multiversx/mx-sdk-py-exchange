@@ -2,10 +2,10 @@ import config
 from argparse import ArgumentParser
 from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
+from contracts.pair_contract import PairContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
 from tools.runners.common_runner import add_upgrade_command
 from tools.runners.pair_runner import get_all_pair_addresses
-from utils.contract_retrievers import retrieve_pair_by_address
 from typing import Any
 
 from utils.utils_tx import NetworkProviders
@@ -46,7 +46,7 @@ def set_pairs_in_fees_collector(_):
     count = 1
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
-        pair_contract = retrieve_pair_by_address(pair_address)
+        pair_contract = PairContract.load_contract_by_address(pair_address)
 
         # add pair address in fees collector
         _ = fees_collector.add_known_contracts(dex_owner, network_providers.proxy,

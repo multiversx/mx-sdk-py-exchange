@@ -10,7 +10,6 @@ from contracts.farm_contract import FarmContract, FarmContractVersion
 from contracts.staking_contract import StakingContract, StakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract, MetaStakingContractVersion
 from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
-from utils.contract_retrievers import retrieve_position_creator_by_address
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import get_file_from_url_or_path
 from runners.farm_runner import get_farm_addresses_from_chain
@@ -51,7 +50,7 @@ def upgrade_position_creator_contract(args: Any):
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
     position_creator_address = context.get_contracts(config.POSITION_CREATOR)[0].address
-    position_creator_contract = retrieve_position_creator_by_address(position_creator_address)
+    position_creator_contract = PositionCreatorContract.load_contract_by_address(position_creator_address)
 
     deploy_structure_list = populate_deploy_lists.populate_list(config.DEPLOY_STRUCTURE_JSON, POSITION_CREATOR_LABEL)
     position_creator_contract.egld_wrapper_address = deploy_structure_list[0]["egld_wrapped_address"]
@@ -117,7 +116,7 @@ def setup_whitelist(_):
 
     context = Context()
     position_creator_address = context.get_contracts(config.POSITION_CREATOR)[0].address
-    position_creator_contract = retrieve_position_creator_by_address(position_creator_address)
+    position_creator_contract = PositionCreatorContract.load_contract_by_address(position_creator_address)
 
     farm_addresses = get_farm_addresses_from_chain("v2")
     staking_addresses = get_staking_addresses_from_chain()

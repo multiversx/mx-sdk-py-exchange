@@ -6,7 +6,6 @@ from context import Context
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tools.common import get_user_continue, fetch_contracts_states, fetch_new_and_compare_contract_states
 from tools.runners.common_runner import add_upgrade_command
-from utils.contract_retrievers import retrieve_simple_lock_energy_by_address, retrieve_locked_asset_factory_by_address
 
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import get_file_from_url_or_path
@@ -51,7 +50,7 @@ def upgrade_energy_factory(args: Any):
     compare_states = args.compare_states
     context = Context()
     energy_factory_address = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0].address
-    energy_contract = retrieve_simple_lock_energy_by_address(energy_factory_address)
+    energy_contract = SimpleLockEnergyContract.load_contract_by_address(energy_factory_address)
     print(f"Upgrade energy factory contract: {energy_factory_address}")
 
     if args.bytecode:

@@ -12,7 +12,6 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
 from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command
 from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.contract_retrievers import retrieve_farm_by_address
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import get_bytecode_codehash
 from utils.utils_generic import get_file_from_url_or_path
@@ -302,7 +301,7 @@ def upgrade_farmv2_contracts(args: Any):
     for address in all_addresses:
         print(f"Processing contract {count} / {len(all_addresses)}: {address}")
         contract: FarmContract
-        contract = retrieve_farm_by_address(address)
+        contract = FarmContract.load_contract_by_address(address)
 
         if compare_states:
             print("Fetching contract state before upgrade...")
@@ -346,7 +345,7 @@ def upgrade_farmv2_contract(args: Any):
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
 
-    contract = retrieve_farm_by_address(farm_address)
+    contract = FarmContract.load_contract_by_address(farm_address)
 
     if args.bytecode:
         bytecode_path = get_file_from_url_or_path(args.bytecode)
