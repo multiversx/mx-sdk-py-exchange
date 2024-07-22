@@ -100,17 +100,18 @@ def download_file(url: str, destination_folder: Path = None) -> Path:
     logger.debug(f"Downloading file from [{url}] to [{unique_destination}].")
     try:
         wget.download(url, str(unique_destination))
+        print("")  # wget does not print newline
         return unique_destination
     except Exception as err:
-        logger.error(f"Failed to download file from [{url}].")
-        raise err
+        logger.error(f"Failed to download file from [{url}] with {err}. Closing process.")
+        exit(1)
     
 
 def get_file_from_url_or_path(url_or_path: Any) -> Path:
     if str(url_or_path).startswith("http"):
         return download_file(url_or_path)
     
-    local_path = Path(url_or_path)
+    local_path = Path(url_or_path) if type(url_or_path) != Path else url_or_path
     if not local_path.exists():
         raise FileNotFoundError(f"File [{local_path}] not found!")
     return local_path

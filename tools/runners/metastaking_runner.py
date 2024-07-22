@@ -107,11 +107,13 @@ def upgrade_metastaking_contracts(label: str, file: str, bytecode_path: str = ''
         return
     print(f"Processing {len(metastaking_addresses)} metastaking contracts.")
     
+    version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
+
     if bytecode_path:
         bytecode = get_file_from_url_or_path(bytecode_path)
     else:
-        version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
-        bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V2 else config.STAKING_PROXY_V2_BYTECODE_PATH
+        config_bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V2 else config.STAKING_PROXY_V2_BYTECODE_PATH
+        bytecode = get_file_from_url_or_path(config_bytecode)
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -192,7 +194,7 @@ def upgrade_metastaking_contract(args: Any):
     if args.bytecode:
         bytecode_path = get_file_from_url_or_path(args.bytecode)
     else:
-        bytecode_path = config.STAKING_PROXY_V3_BYTECODE_PATH
+        bytecode_path = get_file_from_url_or_path(config.STAKING_PROXY_V3_BYTECODE_PATH)
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue():

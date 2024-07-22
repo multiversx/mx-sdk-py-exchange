@@ -42,7 +42,7 @@ def upgrade_proxy_dex_contracts(args: Any):
     if args.bytecode:
         bytecode_path = get_file_from_url_or_path(args.bytecode)
     else:
-        bytecode_path = config.PROXY_V2_BYTECODE_PATH
+        bytecode_path = get_file_from_url_or_path(config.PROXY_V2_BYTECODE_PATH)
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):

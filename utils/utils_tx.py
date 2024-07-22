@@ -20,9 +20,9 @@ from multiversx_sdk.network_providers.transaction_status import \
 from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
 
 from utils.logger import get_logger
-from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction
+from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
-                                 log_unexpected_args, split_to_chunks)
+                                 log_unexpected_args, split_to_chunks, get_file_from_url_or_path)
 
 TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
@@ -279,6 +279,7 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Deploy arguments: {args}")
+    logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
     builder = ContractDeploymentBuilder(
         config=config,
         owner=deployer.address,
@@ -301,6 +302,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Upgrade arguments: {args}")
+    logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
     builder = ContractUpgradeBuilder(
         config=config,
         contract=contract_address,
@@ -475,8 +477,9 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
     logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
+    processed_bytecode_path = get_file_from_url_or_path(bytecode_path)
 
-    tx = prepare_deploy_tx(owner, network_config, gas, Path(bytecode_path), metadata, args)
+    tx = prepare_deploy_tx(owner, network_config, gas, processed_bytecode_path, metadata, args)
     tx_hash = send_deploy_tx(tx, proxy)
 
     if tx_hash:
@@ -491,8 +494,9 @@ def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
                  args: list) -> str:
     logger.debug(f"Upgrade {contract_label} contract")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
+    processed_bytecode_path = get_file_from_url_or_path(bytecode_path)
 
-    tx = prepare_upgrade_tx(owner, contract, network_config, gas, Path(bytecode_path), metadata, args)
+    tx = prepare_upgrade_tx(owner, contract, network_config, gas, processed_bytecode_path, metadata, args)
     tx_hash = send_contract_call_tx(tx, proxy)
     owner.nonce += 1 if tx_hash != "" else 0
 

@@ -291,7 +291,7 @@ def upgrade_farmv2_contracts(args: Any):
     if args.bytecode:
         bytecode_path = get_file_from_url_or_path(args.bytecode)
     else:
-        bytecode_path = config.FARM_V3_BYTECODE_PATH
+        bytecode_path = get_file_from_url_or_path(config.FARM_V3_BYTECODE_PATH)
 
     print(f"Upgrading {len(all_addresses)} boosted farm contracts...")
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
@@ -351,7 +351,7 @@ def upgrade_farmv2_contract(args: Any):
     if args.bytecode:
         bytecode_path = get_file_from_url_or_path(args.bytecode)
     else:
-        bytecode_path = config.FARM_V3_BYTECODE_PATH
+        bytecode_path = get_file_from_url_or_path(config.FARM_V3_BYTECODE_PATH)
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):

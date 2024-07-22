@@ -29,6 +29,9 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
     for address in contract_addresses:
         contract_addr = Address.new_from_bech32(address)
         account_data = proxy.get_account(contract_addr)
+        if not account_data.code_hash:
+            print(f"Account data not found for {contract_label} {address}")
+            continue
         code_hash = base64_to_hex(account_data.code_hash)
 
         if code_hash not in pairs_data:

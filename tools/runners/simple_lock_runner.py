@@ -36,7 +36,7 @@ def upgrade_simple_lock_contract(args: Any):
     if args.bytecode:
         bytecode_path = get_file_from_url_or_path(args.bytecode)
     else:
-        bytecode_path = config.SIMPLE_LOCK_BYTECODE_PATH
+        bytecode_path = get_file_from_url_or_path(config.SIMPLE_LOCK_BYTECODE_PATH)
 
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -51,8 +51,7 @@ def upgrade_simple_lock_contract(args: Any):
 
     contract = SimpleLockContract("", "", "", address)
     tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy, 
-                                        bytecode_path, 
-                                        [])
+                                        bytecode_path)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade simple lock contract: "
                                                               f"{address}"):
