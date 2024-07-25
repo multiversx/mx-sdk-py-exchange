@@ -53,12 +53,12 @@ PAIR_VIEW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "safe-price-vi
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
 FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "farm-with-locked-rewards" / "farm-with-locked-rewards.wasm"
 FARM_V3_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "farm-with-locked-rewards.wasm"
-GOVERNANCE_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "governance-v2.wasm"
-POSITION_CREATOR_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "auto-pos-creator.wasm"
-LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-pos-creator.wasm"
+GOVERNANCE_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-sc/releases/download/v3.0.7/governance-v2.wasm"
+POSITION_CREATOR_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/auto-pos-creator.wasm"
+LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/locked-token-pos-creator.wasm"
 ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "lkmex-transfer.wasm"
 LK_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-wrapper.wasm"
-COMPOSABLE_TASKS_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "composable-tasks.wasm"
+COMPOSABLE_TASKS_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/composable-tasks.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
