@@ -38,17 +38,18 @@ def main(cli_args: List[str]):
                                              False if args.deploy_tokens == "config" else True)
 
     # configure contracts and deploy them
+    cli_deployed_contracts_list = [arg for arg, value in vars(args).items() if value is True]
     # DEPLOY CONTRACTS
     dex_infra.deploy_structure.deploy_structure(dex_infra.deployer_account, dex_infra.network_provider,
                                                 False if args.deploy_contracts == "config" else True,
-                                                [arg for arg, value in vars(args).items() if value is True])
+                                                cli_deployed_contracts_list)
 
     # CONTRACTS START
     start_flag = False
     if args.deploy_contracts != "config" or args.force_start:
         start_flag = True
     dex_infra.deploy_structure.start_deployed_contracts(dex_infra.deployer_account, dex_infra.network_provider,
-                                                        start_flag)
+                                                        start_flag, cli_deployed_contracts_list)
 
     # program closing
     # dex_infra.save_deployed_structure()

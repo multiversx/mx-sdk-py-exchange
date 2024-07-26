@@ -48,7 +48,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         base_token = hex_to_string(data_fetcher.get_data("getBaseAssetTokenId"))
         locked_token = hex_to_string(data_fetcher.get_data("getLockedTokenId"))
 
-        return SimpleLockEnergyContract(base_token, locked_token, address)
+        return SimpleLockEnergyContract(base_token, locked_token, "", "", address)
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
