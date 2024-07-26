@@ -288,6 +288,7 @@ class MetaStakingContractDataFetcher(DataFetcher):
             "getPairAddress": self._get_hex_view,
             "getLpFarmAddress": self._get_hex_view,
             "getStakingFarmAddress": self._get_hex_view,
+            "getEnergyFactoryAddress": self._get_hex_view,
         }
 
 
@@ -337,6 +338,14 @@ class BaseBoostedContractDataFetcher(DataFetcher):
             "getTotalRewardsForWeek": self._get_int_view,
             "getRemainingBoostedRewardsToDistribute": self._get_int_view,
             "getUndistributedBoostedRewards": self._get_int_view,
+        }
+
+
+class BaseContractWhitelistDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "isSCAddressWhitelisted": self._get_int_view
         }
 
 

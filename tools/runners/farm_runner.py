@@ -12,8 +12,10 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
 from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command
 from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.contract_retrievers import retrieve_farm_by_address
 from utils.utils_tx import NetworkProviders
+from utils.utils_chain import get_bytecode_codehash
+from utils.utils_generic import get_file_from_url_or_path
+from tools.runners.common_config import FARM_BOOSTED_YIELD_FACTORS
 import config
 
 
@@ -46,27 +48,35 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
     command_parser.set_defaults(func=resume_farm_contracts)
 
+    command_parser = contract_group.add_parser('replace-v2-ownership', help='overwrite ownership address for all contracts command')
+    command_parser.add_argument('--compare-states', action='store_true',
+                        help='compare states before and after change')
+    command_parser.add_argument('--old-owner', type=str, help='old owner address to replace')
+    command_parser.set_defaults(func=replace_v2_ownership)
+
+    command_parser = contract_group.add_parser('update-boosted-factors-all', help='update boosted factors for all contracts command')
+    command_parser.set_defaults(func=update_boosted_factors)
+    
+
     return group_parser
 
 
-def fetch_and_save_farms_from_chain():
+def fetch_and_save_farms_from_chain(_):
     """Fetch and save farms from chain"""
 
     print("Fetching farms from chain...")
-
-    network_providers = NetworkProviders(API, PROXY)
 
     farmsv13 = get_farm_addresses_from_chain("v1.3")
     farmsv13locked = get_farm_addresses_locked_from_chain()
     farmsv12 = get_farm_addresses_from_chain("v1.2")
     farmsv2 = get_farm_addresses_from_chain("v2")
-    fetch_and_save_contracts(farmsv13, FARMSV13_LABEL, OUTPUT_FARMV13_CONTRACTS_FILE, network_providers.proxy)
-    fetch_and_save_contracts(farmsv13locked, FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE, network_providers.proxy)
-    fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE, network_providers.proxy)
-    fetch_and_save_contracts(farmsv2, FARMSV2_LABEL, OUTPUT_FARMV2_CONTRACTS_FILE, network_providers.proxy)
+    fetch_and_save_contracts(farmsv13, FARMSV13_LABEL, OUTPUT_FARMV13_CONTRACTS_FILE)
+    fetch_and_save_contracts(farmsv13locked, FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE)
+    fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE)
+    fetch_and_save_contracts(farmsv2, FARMSV2_LABEL, OUTPUT_FARMV2_CONTRACTS_FILE)
 
 
-def pause_farm_contracts():
+def pause_farm_contracts(_):
     """Pause all farms"""
 
     network_providers = NetworkProviders(API, PROXY)
@@ -82,7 +92,7 @@ def pause_farm_contracts():
     count = 1
     for farm_address in farm_addresses:
         print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
-        data_fetcher = FarmContractDataFetcher(Address(farm_address, "erd"), network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address.from_bech32(farm_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
         if contract_state != 0:
@@ -123,7 +133,7 @@ def pause_farm_contract(args: Any):
         print(f"Contract {farm_address} already inactive. Current state: {contract_state}")
 
 
-def resume_farm_contracts():
+def resume_farm_contracts(_):
     """Resume all farms"""
 
     print("Resuming farms...")
@@ -277,7 +287,13 @@ def upgrade_farmv2_contracts(args: Any):
 
     all_addresses = get_all_farm_v2_addresses()
 
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = get_file_from_url_or_path(config.FARM_V3_BYTECODE_PATH)
+
     print(f"Upgrading {len(all_addresses)} boosted farm contracts...")
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
 
@@ -285,8 +301,7 @@ def upgrade_farmv2_contracts(args: Any):
     for address in all_addresses:
         print(f"Processing contract {count} / {len(all_addresses)}: {address}")
         contract: FarmContract
-        contract = retrieve_farm_by_address(address)
-        lp_address = contract.get_lp_address(network_providers.proxy)
+        contract = FarmContract.load_contract_by_address(address)
 
         if compare_states:
             print("Fetching contract state before upgrade...")
@@ -296,8 +311,8 @@ def upgrade_farmv2_contracts(args: Any):
                 return
 
         tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                            config.FARM_V2_BYTECODE_PATH,
-                                            [lp_address, dex_owner.address.bech32()])
+                                            bytecode_path,
+                                            [], True)
 
         if not network_providers.check_simple_tx_status(tx_hash, f"upgrade farm v2 contract: {address}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -330,7 +345,16 @@ def upgrade_farmv2_contract(args: Any):
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
 
-    contract = retrieve_farm_by_address(farm_address)
+    contract = FarmContract.load_contract_by_address(farm_address)
+
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = get_file_from_url_or_path(config.FARM_V3_BYTECODE_PATH)
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     if compare_states:
         print("Fetching contract state before upgrade...")
@@ -340,7 +364,7 @@ def upgrade_farmv2_contract(args: Any):
             return
 
     tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                        config.FARM_V2_BYTECODE_PATH,
+                                        bytecode_path,
                                         [], True)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
@@ -379,12 +403,14 @@ def set_transfer_role_farmv13_contracts():
         count += 1
 
 
-def replace_v2_ownership(old_owner: str, compare_states: bool = False):
+def replace_v2_ownership(args: Any):
+    old_owner = args.old_owner
+    compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
     all_addresses = get_all_farm_v2_addresses()
-    cleaned_address = Address(old_owner).to_bech32()   # pass it through the Address class to check if it's valid
+    cleaned_address = Address.new_from_bech32(old_owner).to_bech32()   # pass it through the Address class to check if it's valid
 
     print(f"Searching farm ownership for {cleaned_address}...")
 
@@ -392,9 +418,9 @@ def replace_v2_ownership(old_owner: str, compare_states: bool = False):
     for address in all_addresses:
         print(f"Processing contract {count} / {len(all_addresses)}: {address}")
         contract = FarmContract("", "", "", address, FarmContractVersion.V2Boosted)
-        data_fetcher = FarmContractDataFetcher(Address(address), network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address.new_from_bech32(address), network_providers.proxy.url)
 
-        permissions = data_fetcher.get_data("getPermissions", [Address(cleaned_address).get_public_key()])
+        permissions = data_fetcher.get_data("getPermissions", [Address.new_from_bech32(cleaned_address).get_public_key()])
         if not permissions:
             continue
         print(f"Found permissions {permissions} for {cleaned_address} in contract {address}. Replace it?")
@@ -419,6 +445,29 @@ def replace_v2_ownership(old_owner: str, compare_states: bool = False):
 
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
+
+        count += 1
+
+
+def update_boosted_factors(_):
+    """Update boosted factors for all farms"""
+
+    print("Updating boosted factors for all farms...")
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    farm_addresses = get_all_farm_v2_addresses()
+
+    count = 1
+    for farm_address in farm_addresses:
+        print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
+        contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
+        tx_hash = contract.set_boosted_yields_factors(dex_owner, network_providers.proxy,
+                                                      FARM_BOOSTED_YIELD_FACTORS)
+        if not network_providers.check_simple_tx_status(tx_hash, f"set boosted yields for farm contract: {farm_address}"):
+            if not get_user_continue():
+                return
 
         count += 1
 
