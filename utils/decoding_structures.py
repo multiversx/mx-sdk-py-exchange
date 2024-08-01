@@ -12,7 +12,7 @@ ENERGY_ENTRY = {
 }
 
 USER_CLAIM_PROGRESS = {
-    'energy': 'bigint',
+    'energy': ENERGY_ENTRY,
     'week': 'u32'
 }
 
@@ -76,9 +76,9 @@ METASTAKE_TOKEN_ATTRIBUTES = {
 
 LKMEX_ATTRIBUTES = {
     'unlock_schedule_list': {
-            'unlock_epoch': 'u64',
-            'unlock_percent': 'u64'
-        },
+        'unlock_epoch': 'u64',
+        'unlock_percent': 'u64'
+    },
     'merged': 'u8'
 }
 
@@ -107,8 +107,8 @@ XMEXFARM_ATTRIBUTES = {
 
 TOTAL_REWARDS_FOR_WEEK = {
     'rewards_for_week_list': {
-            'token_id': 'string',
-            'nonce': 'u64',
-            'amount': 'biguint'
-        }
+        'token_id': 'string',
+        'nonce': 'u64',
+        'amount': 'biguint'
+    }
 }
