@@ -19,12 +19,12 @@ logger = get_logger(__name__)
 
 class BaseBoostedContract(DEXContractInterface, ABC):
     
-    def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
+    def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).get_public_key()])
         if not raw_results:
-            return {}
-        user_farm_position = decode_merged_attributes(raw_results, decoding_structures.USER_FARM_POSITION)
+            return 0
+        user_farm_position = int(raw_results)
 
         return user_farm_position
     

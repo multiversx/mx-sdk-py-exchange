@@ -186,7 +186,7 @@ class MetaStakingContract(BaseSCWhitelistContract):
         logger.debug(f"Account: {user.address}")
 
         metastake_fn = 'stakeFarmTokens'
-        gas_limit = 50000000
+        gas_limit = 70000000
 
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
                                         user, Address(self.address), metastake_fn, args)
