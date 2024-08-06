@@ -22,6 +22,10 @@ class ComposableTasksContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return ComposableTasksContract(address=config_dict['address'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None):
         """Expecting as args:
         """
@@ -84,3 +88,4 @@ class ComposableTasksContract(DEXContractInterface):
         logger.info(function_purpose)
 
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setPairAddrForTokens", args)
+

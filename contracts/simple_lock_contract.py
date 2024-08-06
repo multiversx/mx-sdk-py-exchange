@@ -33,6 +33,10 @@ class SimpleLockContract(DEXContractInterface):
                                   lp_proxy_token=config_dict['lp_proxy_token'],
                                   farm_proxy_token=config_dict.get('farm_proxy_token'))
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         function_purpose = f"Deploy simple lock contract"
         logger.info(function_purpose)

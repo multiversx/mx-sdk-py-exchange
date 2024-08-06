@@ -26,6 +26,10 @@ class LkWrapContract(DEXContractInterface):
         return LkWrapContract(address=config_dict['address'],
                               wrapped_token=config_dict['wrapped_token'])
 
+    @classmethod
+    def load_contract_by_address(cls, address: str):
+        raise NotImplementedError
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
             type[str]: energy factory address

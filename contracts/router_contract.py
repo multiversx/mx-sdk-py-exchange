@@ -27,6 +27,10 @@ class RouterContract(DEXContractInterface):
         return RouterContract(address=config_dict['address'],
                               version=RouterContractVersion(config_dict['version']))
 
+    @classmethod
+    def load_contract_by_address(cls, address: str, version=RouterContractVersion.V2):
+        return RouterContract(version, address)
+
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
         type[str]: pair template address
