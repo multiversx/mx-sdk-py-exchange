@@ -522,7 +522,7 @@
 
     "composable_tasks": [
         {
-            "egld_wrap": 0,
+            "egld_wrap": 1,
             "router_v2": 0
         }
     ],
