@@ -44,6 +44,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     add_generate_transaction_command(transactions_group, generate_unstake_farm_tokens_transaction, 'unstakeFarmTokens', 'unstake farm tokens command')
     add_generate_transaction_command(transactions_group, generate_stake_farm_tokens_transaction, 'stakeFarmTokens', 'stake farm tokens command')
 
+    return group_parser
 
 def fetch_and_save_metastakings_from_chain():
     """Fetch metastaking contracts from chain"""
