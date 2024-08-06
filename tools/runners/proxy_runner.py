@@ -20,7 +20,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_proxy_dex_contracts)
 
-    transaction_parser = subgroup_parser.add_parser('transaction', help='proxy dex transaction commands')
+    transaction_parser = subgroup_parser.add_parser('generate-transactions', help='proxy dex transaction commands')
     transactions_group = transaction_parser.add_subparsers()
     add_generate_transaction_command(transactions_group, exit_proxy, 'exitFarmProxy', 'exit farm proxy command')
 

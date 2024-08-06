@@ -64,6 +64,8 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     add_generate_transaction_command(transactions_group, generate_stake_farm_tokens_transaction, 'stakeFarmTokens', 'enter farm tokens command')
     add_generate_transaction_command(transactions_group, generate_exit_farm_locked_transaction, 'exitFarmLocked', 'exit simple lock command')
 
+    return group_parser
+
 def fetch_and_save_farms_from_chain():
     """Fetch and save farms from chain"""
 
