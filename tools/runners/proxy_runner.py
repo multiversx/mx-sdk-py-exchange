@@ -1,9 +1,11 @@
 from argparse import ArgumentParser
 from context import Context
-from contracts.contract_identities import ProxyContractVersion
-from contracts.dex_proxy_contract import DexProxyContract
+from contracts.contract_identities import FarmContractVersion, ProxyContractVersion
+from contracts.dex_proxy_contract import DexProxyContract, DexProxyExitFarmEvent
+from contracts.farm_contract import FarmContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_generate_transaction_command, add_upgrade_command, get_acounts_with_token, read_accounts_from_json
+from utils.utils_chain import Account, WrapperAddress, get_token_details_for_address
 from utils.utils_tx import NetworkProviders
 import config
 
@@ -17,6 +19,10 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_proxy_dex_contracts)
+
+    transaction_parser = subgroup_parser.add_parser('transaction', help='proxy dex transaction commands')
+    transactions_group = transaction_parser.add_subparsers()
+    add_generate_transaction_command(transactions_group, exit_proxy, 'exitFarmProxy', 'exit farm proxy command')
 
     return group_parser
 
@@ -51,3 +57,28 @@ def upgrade_proxy_dex_contracts(compare_states: bool = False):
 
     if compare_states:
         fetch_new_and_compare_contract_states("proxy_dex", proxy_dex_contract.address, context.network_provider)
+
+def exit_proxy(args: any):
+    farm_address = args.address
+    exported_accounts_path = args.accounts_export
+    
+    context = Context()
+    farm_contract = DexProxyContract.load_contract_by_address(farm_address)
+    network_providers = NetworkProviders(API, PROXY)
+
+    farm_contract: FarmContract
+    farm_contract = context.get_contracts(config.FARMS_V2)[0]
+    proxy_contract: DexProxyContract
+    proxy_contract = context.get_contracts(config.PROXIES_V2)[0]
+    
+    exported_accounts = read_accounts_from_json(exported_accounts_path)
+    accounts_with_token = get_acounts_with_token(exported_accounts, proxy_contract.proxy_farm_token)
+    
+    for account_with_token in accounts_with_token:
+        account = Account(account_with_token.address, config.DEFAULT_OWNER)
+        account.address = WrapperAddress.from_bech32(account_with_token.address)
+        account.sync_nonce(network_providers.proxy)
+        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == proxy_contract.proxy_farm_token ]
+        for token in tokens:
+                event = DexProxyExitFarmEvent(farm_contract, proxy_contract.proxy_farm_token, int(token.token_nonce_hex,16), int(token.supply) )
+                proxy_contract.exit_farm_proxy(account, context.network_provider.proxy, event)
