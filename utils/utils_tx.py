@@ -18,6 +18,7 @@ from multiversx_sdk.network_providers.transaction_events import \
 from multiversx_sdk.network_providers.transaction_status import \
     TransactionStatus
 from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
+from multiversx_sdk.network_providers.transaction_decoder import TransactionDecoder
 
 from utils.logger import get_logger
 from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction
@@ -177,6 +178,20 @@ class NetworkProviders:
             return transaction['operations']
 
         return []
+
+    def get_tx_specific_op(self, tx_hash: str, operation: dict, api: ApiNetworkProvider) -> dict:
+        # Get the transaction details
+        tx = api.get_transaction(tx_hash)
+        # Get and check transaction operations
+        ops = tx.raw_response['operations']
+        # Take each op in ops and match it with operation. Try to match only the fields expected in operation dictionary. 
+        # TX Operations are unordered. If any of the operations match, return it.
+        operations = []
+        for op in ops:
+            # print(f'Matching with {operation}')
+            if all(op.get(key) == operation.get(key) for key in operation.keys()):
+                operations.append(op.copy())
+        return operations
 
     def check_for_burn_operation(self, tx_hash: str, token: ESDTToken) -> bool:
         operations = self.get_tx_operations(tx_hash)
