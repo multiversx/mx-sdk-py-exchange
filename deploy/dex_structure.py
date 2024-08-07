@@ -374,7 +374,7 @@ class DeployStructure:
         energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
         whitelist = [config.PROXIES_V2, config.FEES_COLLECTORS,
                      config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED, 
-                     config.GOVERNANCES, config.LOCKED_TOKEN_POSITION_CREATOR]
+                     config.GOVERNANCES, config.POSITION_CREATOR, config.LOCKED_TOKEN_POSITION_CREATOR]
 
         # gather contract addresses to whitelist
         addresses = []
