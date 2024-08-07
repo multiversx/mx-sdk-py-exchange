@@ -2057,9 +2057,18 @@ class DeployStructure:
             tx_hash = proxy_dex_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy, contract_address)
             network_providers.check_simple_tx_status(tx_hash, "whitelist in proxy dex")
 
-            # setup whitelist for contract in energy factory
+            
             energy_factory_contract: SimpleLockEnergyContract
             energy_factory_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(contract_config['energy_factory'])
+
+            # set burn role on base token for locked token position creator
+            tx_hash = self.esdt_contract.set_special_role_token(deployer_account, network_providers.proxy, 
+                                                                [energy_factory_contract.base_token, 
+                                                                 locked_token_position_creator_contract.address, 
+                                                                 "ESDTRoleLocalBurn"])
+            if not network_providers.check_complex_tx_status(tx_hash, "set burn role on base token"): return
+
+            # setup whitelist for contract in energy factory
             tx_hash = energy_factory_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy, contract_address)
             network_providers.check_simple_tx_status(tx_hash, "whitelist in energy factory")
             tx_hash = energy_factory_contract.add_sc_to_token_transfer_whitelist(deployer_account, network_providers.proxy, contract_address)
