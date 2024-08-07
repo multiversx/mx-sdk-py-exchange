@@ -361,15 +361,15 @@ class DeployStructure:
                 for contract in contracts.deployed_contracts:
                     contract.contract_start(deployer_account, network_provider.proxy)
 
-        self.global_start_setups(deployer_account, network_provider, clean_deploy_override)
+        self.global_start_setups(deployer_account, network_provider, clean_deploy_override, clean_deploy_list)
 
     def global_start_setups(self, deployer_account: Account, network_provider: NetworkProviders,
-                            clean_deploy_override: bool):
-        self.set_transfer_role_locked_token(deployer_account, network_provider, clean_deploy_override)
+                            clean_deploy_override: bool, clean_deploy_list: List[str] = None):
+        self.set_transfer_role_locked_token(deployer_account, network_provider, clean_deploy_override, clean_deploy_list)
         # self.set_proxy_v2_in_pairs(deployer_account, network_provider, clean_deploy_override)     # used only when not done implicitly
 
     def set_transfer_role_locked_token(self, deployer_account: Account, network_provider: NetworkProviders,
-                                       clean_deploy_override: bool):
+                                       clean_deploy_override: bool, clean_deploy_list: List[str] = None):
         energy_factory: Optional[SimpleLockEnergyContract] = None
         energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
         whitelist = [config.PROXIES_V2, config.FEES_COLLECTORS,
@@ -380,7 +380,8 @@ class DeployStructure:
         addresses = []
         if energy_factory:
             for contracts in self.contracts.values():
-                if not contracts.deploy_clean and not clean_deploy_override:
+                if not contracts.deploy_clean and not clean_deploy_override and \
+                    not (clean_deploy_list and contracts.label in clean_deploy_list):
                     continue
                 if contracts.label not in whitelist:
                     continue
