@@ -214,8 +214,6 @@ def upgrade_staking_contracts(args: Any):
     count = 1
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        if not get_user_continue():
-            return
 
         staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
 
@@ -223,7 +221,7 @@ def upgrade_staking_contracts(args: Any):
         tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, 
                                                     [], True)
 
-        if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
+        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
             if not get_user_continue():
                 return
 
@@ -273,7 +271,7 @@ def upgrade_staking_contract(args: Any):
     tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path,
                                                 [], True)
 
-    if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
+    if not network_providers.check_simple_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
         if not get_user_continue():
             return
 
@@ -296,8 +294,8 @@ def setup_boosted_parameters_with_energy_address(staking_address: str, energy_ad
         print("Fetching contracts states before setup...")
         fetch_contracts_states("pre", network_providers, [staking_address], STAKINGS_LABEL)
 
-    if not get_user_continue():
-        return
+        if not get_user_continue():
+            return
 
     staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", staking_address)
 
@@ -306,17 +304,19 @@ def setup_boosted_parameters_with_energy_address(staking_address: str, energy_ad
     hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, STAKING_BOOSTED_YIELD_FACTORS))
     hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
     hashes.append(energy_contract.add_sc_to_whitelist(dex_owner, network_providers.proxy, staking_address))
-
-    for tx_hash in hashes:
-        log_explorer_transaction(tx_hash, network_providers.proxy.url)
         
     sleep(6)
+
+    for tx_hash in hashes:
+        if not network_providers.check_simple_tx_status(tx_hash, f"boosted parameters for: {staking_address}"):
+            if not get_user_continue():
+                return
 
     if compare_states:
         fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
 
-    if not get_user_continue():
-        return
+        if not get_user_continue():
+            return
     
 
 def setup_boosted_parameters_for_staking(args: Any):

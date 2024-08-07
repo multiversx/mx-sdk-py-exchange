@@ -296,19 +296,19 @@ def upgrade_farmv2_contracts(args: Any):
     print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
+    
+    if compare_states:
+        print("Fetching contracts states before upgrade...")
+        fetch_contracts_states("pre", network_providers, all_addresses, FARMSV2_LABEL)
+
+        if not get_user_continue():
+            return
 
     count = 1
     for address in all_addresses:
         print(f"Processing contract {count} / {len(all_addresses)}: {address}")
         contract: FarmContract
         contract = FarmContract.load_contract_by_address(address)
-
-        if compare_states:
-            print("Fetching contract state before upgrade...")
-            fetch_contracts_states("pre", network_providers, [address], FARMSV2_LABEL)
-
-            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                return
 
         tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
                                             bytecode_path,
@@ -367,7 +367,7 @@ def upgrade_farmv2_contract(args: Any):
                                         bytecode_path,
                                         [], True)
 
-    if not network_providers.check_complex_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
+    if not network_providers.check_simple_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 

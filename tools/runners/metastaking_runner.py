@@ -128,14 +128,12 @@ def upgrade_metastaking_contracts(label: str, file: str, bytecode_path: str = ''
     count = 1
     for metastaking_address in metastaking_addresses:
         print(f"Processing contract {count} / {len(metastaking_addresses)}: {metastaking_address}")
-        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-            return
 
         metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, version)
 
         tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode, [])
 
-        if not network_providers.check_complex_tx_status(tx_hash,
+        if not network_providers.check_simple_tx_status(tx_hash,
                                                          f"upgrade metastaking contract: {metastaking_address}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
@@ -211,7 +209,7 @@ def upgrade_metastaking_contract(args: Any):
     tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy,
                                                     bytecode_path, [], True)
 
-    if not network_providers.check_complex_tx_status(tx_hash,
+    if not network_providers.check_simple_tx_status(tx_hash,
                                                      f"upgrade metastaking contract: {metastaking_address}"):
         if not get_user_continue():
             return
@@ -250,8 +248,6 @@ def set_energy_factory(_):
     count = 1
     for metastaking_address in settable_addresses:
         print(f"Processing contract {count} / {len(settable_addresses)}: {metastaking_address}")
-        if not get_user_continue():
-            return
 
         metastaking_contract = MetaStakingContract("", "", "", "", "", "", "", MetaStakingContractVersion.V2, "", metastaking_address)
 
