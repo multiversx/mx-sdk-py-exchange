@@ -29,7 +29,7 @@ class ComposableTasksContract(DEXContractInterface):
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None):
         """Expecting as args:
         """
-        function_purpose = "Deploy escrow contract"
+        function_purpose = "Deploy composable tasks contract"
         logger.info(function_purpose)
 
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
@@ -55,7 +55,7 @@ class ComposableTasksContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        log_step_pass(f"Deployed escrow contract: {self.address}")
+        log_step_pass(f"Deployed composable tasks contract: {self.address}")
 
     def set_wrap_egld_address(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
