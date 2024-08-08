@@ -2058,6 +2058,13 @@ class DeployStructure:
             tx_hash = proxy_dex_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy, contract_address)
             network_providers.check_simple_tx_status(tx_hash, "whitelist in proxy dex")
 
+            # set transfer role for proxy dex wrapped tokens
+            tx_hash = proxy_dex_contract.set_transfer_role_wrapped_lp_token(deployer_account, network_providers.proxy, contract_address)
+            if not network_providers.check_complex_tx_status(tx_hash, "set transfer role wrapped lp token"): 
+                return
+            tx_hash = proxy_dex_contract.set_transfer_role_wrapped_farm_token(deployer_account, network_providers.proxy, contract_address)
+            if not network_providers.check_complex_tx_status(tx_hash, "set transfer role wrapped farm token"): 
+                return
             
             energy_factory_contract: SimpleLockEnergyContract
             energy_factory_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(contract_config['energy_factory'])
