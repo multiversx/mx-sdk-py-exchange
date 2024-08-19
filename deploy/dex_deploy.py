@@ -27,7 +27,7 @@ def main(cli_args: List[str]):
     args = parser.parse_args(cli_args)
 
     deploy_structure = DeployStructure()
-    deployer_account = Account(pem_file=config.DEFAULT_OWNER)
+    deployer_account = Account.from_file(config.DEFAULT_OWNER)
     if config.DEX_OWNER_ADDRESS:  # manual override only for shadowfork
         deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
 

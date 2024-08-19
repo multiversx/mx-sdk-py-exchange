@@ -20,10 +20,10 @@ class Context:
     def __init__(self):
 
         self.deploy_structure = DeployStructure()
-        self.deployer_account = Account(pem_file=config.DEFAULT_OWNER)
+        self.deployer_account = Account.from_file(config.DEFAULT_OWNER)
         if config.DEX_OWNER_ADDRESS:    # manual override only for shadowforks
             self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
-        self.admin_account = Account(pem_file=config.DEFAULT_ADMIN)
+        self.admin_account = Account.from_file(config.DEFAULT_ADMIN)
         if config.DEX_ADMIN_ADDRESS:  # manual override only for shadowforks
             self.admin_account.address = Address(config.DEX_ADMIN_ADDRESS)
         self.accounts = BunchOfAccounts.load_accounts_from_files([config.DEFAULT_ACCOUNTS])

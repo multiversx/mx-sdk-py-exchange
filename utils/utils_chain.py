@@ -1,5 +1,6 @@
 import base64
 import time
+from getpass import getpass
 from hashlib import blake2b
 from multiprocessing.dummy import Pool
 from os import path
@@ -82,6 +83,18 @@ class Account:
 
         logger.debug(f"Account.sign_message(): raw_data_to_sign = {data.hex()}, message_data_to_sign = {serialized_message.hex()}, signature = {signature.hex()}")
         return signature
+    
+    @classmethod
+    def from_file(cls, file: str, index: int = 0, password: str = ""):
+        """Returns an Account object from either a pem or keystore.
+        In case of keystore, if a password is not provided, it will be requested from the user."""
+        file = str(file)
+        if file.endswith(".pem"):
+            return cls(pem_file=file, pem_index=index)
+        elif file.endswith(".json"):
+            if not password:
+                password = getpass("Enter password: ")
+            return cls(key_file=file, password=password)
 
 
 class BunchOfAccounts:

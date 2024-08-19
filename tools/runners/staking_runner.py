@@ -95,6 +95,7 @@ def fetch_and_save_stakings_from_chain(_):
     print("Fetch staking contracts from chain")
 
     stakings = get_staking_addresses_from_chain()
+    print(f"Retrieved {len(stakings)} staking contracts.")
     fetch_and_save_contracts(stakings, STAKINGS_LABEL, OUTPUT_STAKING_CONTRACTS_FILE)
 
 

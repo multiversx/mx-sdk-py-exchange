@@ -70,6 +70,12 @@ def fetch_and_save_farms_from_chain(_):
     farmsv13locked = get_farm_addresses_locked_from_chain()
     farmsv12 = get_farm_addresses_from_chain("v1.2")
     farmsv2 = get_farm_addresses_from_chain("v2")
+
+    print(f"Retrieved {len(farmsv12)} farms v1.2 contracts.")
+    print(f"Retrieved {len(farmsv13)} farms v1.3 contracts.")
+    print(f"Retrieved {len(farmsv13locked)} farms v1.3 locked contracts.")
+    print(f"Retrieved {len(farmsv2)} farms v2 contracts.")
+
     fetch_and_save_contracts(farmsv13, FARMSV13_LABEL, OUTPUT_FARMV13_CONTRACTS_FILE)
     fetch_and_save_contracts(farmsv13locked, FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE)
     fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE)
