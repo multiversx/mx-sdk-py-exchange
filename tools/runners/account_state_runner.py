@@ -30,6 +30,7 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
         resource_url = f"address/{address}/keys?blockNonce={block_number}"
 
     proxy = ProxyNetworkProvider(proxy_url)
+    response = {}
 
     while True:
         try:
