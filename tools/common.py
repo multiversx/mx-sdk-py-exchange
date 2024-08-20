@@ -120,7 +120,7 @@ def get_saved_contract_addresses(contract_label: str, saved_file: Path, searched
 def get_owner(proxy) -> Account:
     """Get owner account"""
 
-    owner = Account(pem_file=config.DEFAULT_OWNER)
+    owner = Account.from_file(config.DEFAULT_OWNER)
     if SHADOWFORK:
         owner.address = Address.new_from_bech32(config.DEX_OWNER_ADDRESS)      # ONLY FOR SHADOWFORK
     owner.sync_nonce(proxy)
