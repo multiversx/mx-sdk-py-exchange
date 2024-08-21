@@ -283,41 +283,47 @@ def upgrade_staking_contract(args: Any):
         return
     
 
-def setup_boosted_parameters_with_energy_address(staking_address: str, energy_address: str, compare_states: bool = False):
+def setup_boosted_parameters_with_energy_address(staking_addresses: list[str], energy_address: str, compare_states: bool = False):
     """Setup boosted parameters for staking contract with provided energy address"""
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
     energy_contract = SimpleLockEnergyContract("", "", "", "", energy_address)
+    count = 1
 
-    if compare_states:
-        print("Fetching contracts states before setup...")
-        fetch_contracts_states("pre", network_providers, [staking_address], STAKINGS_LABEL)
+    for staking_address in staking_addresses:
+        print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
 
-        if not get_user_continue():
-            return
+        if compare_states:
+            print("Fetching contracts states before setup...")
+            fetch_contracts_states("pre", network_providers, [staking_address], STAKINGS_LABEL)
 
-    staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", staking_address)
-
-    hashes = []
-    hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, STAKING_BOOSTED_REWARDS_PERCENTAGE))
-    hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, STAKING_BOOSTED_YIELD_FACTORS))
-    hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
-    hashes.append(energy_contract.add_sc_to_whitelist(dex_owner, network_providers.proxy, staking_address))
-        
-    sleep(6)
-
-    for tx_hash in hashes:
-        if not network_providers.check_simple_tx_status(tx_hash, f"boosted parameters for: {staking_address}"):
             if not get_user_continue():
                 return
 
-    if compare_states:
-        fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
+        staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", staking_address)
 
-        if not get_user_continue():
-            return
+        hashes = []
+        hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, STAKING_BOOSTED_REWARDS_PERCENTAGE))
+        hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, STAKING_BOOSTED_YIELD_FACTORS))
+        hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
+        hashes.append(energy_contract.add_sc_to_whitelist(dex_owner, network_providers.proxy, staking_address))
+            
+        sleep(6)
+
+        for tx_hash in hashes:
+            if not network_providers.check_simple_tx_status(tx_hash, f"boosted parameters for: {staking_address}"):
+                if not get_user_continue():
+                    return
+
+        if compare_states:
+            fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
+
+            if not get_user_continue():
+                return
+        
+        count += 1
     
 
 def setup_boosted_parameters_for_staking(args: Any):
@@ -332,7 +338,7 @@ def setup_boosted_parameters_for_staking(args: Any):
     context = Context()
     energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
 
-    setup_boosted_parameters_with_energy_address(staking_address, energy_contract.address, compare_states)
+    setup_boosted_parameters_with_energy_address([staking_address], energy_contract.address, compare_states)
 
 
 def setup_boosted_parameters_for_all_stakings(args: Any):
@@ -344,11 +350,7 @@ def setup_boosted_parameters_for_all_stakings(args: Any):
     energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
     staking_addresses = get_all_staking_addresses()
 
-    count = 1
-    for staking_address in staking_addresses:
-        print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        setup_boosted_parameters_with_energy_address(staking_address, energy_contract.address, compare_states)
-        count += 1
+    setup_boosted_parameters_with_energy_address(staking_addresses, energy_contract.address, compare_states)
 
 
 def produce_staking_rewards(args: Any):
