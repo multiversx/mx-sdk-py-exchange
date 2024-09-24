@@ -74,13 +74,24 @@ METASTAKE_TOKEN_ATTRIBUTES = {
     'staking_farm_token_amount': 'biguint'
 }
 
-LKMEX_ATTRIBUTES = {
+LKMEX_ATTRIBUTES_V1 = {
+    'unlock_schedule_list': {
+            'unlock_epoch': 'u64',
+            'unlock_percent': 'u8'
+        },
+    'merged': 'u8'
+}
+
+LKMEX_ATTRIBUTES_V2 = {
     'unlock_schedule_list': {
             'unlock_epoch': 'u64',
             'unlock_percent': 'u64'
         },
     'merged': 'u8'
 }
+
+# TODO: Remove this when legacy code is refactored
+LKMEX_ATTRIBUTES = LKMEX_ATTRIBUTES_V2
 
 XMEX_ATTRIBUTES = {
     'original_token_id': 'string',
