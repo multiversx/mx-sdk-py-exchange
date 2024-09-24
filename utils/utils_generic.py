@@ -85,7 +85,7 @@ def uniquify(path: Path) -> Path:
     i = 1
     stem = path.stem
     while path.exists():
-        path = path.with_name(f"{stem}_{i}").with_suffix(path.suffix)
+        path = path.with_stem(f"{stem}_{i}")
         i += 1
     return path
 
