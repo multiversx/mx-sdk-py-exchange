@@ -4,7 +4,7 @@ from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_upgrade_command, add_verify_command, verify_contracts
 from tools.runners.pair_runner import get_all_pair_addresses
 from typing import Any
 
@@ -25,6 +25,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_fees_collector_contract)
+    add_verify_command(contract_group, verify_fees_collector)
 
     command_parser = contract_group.add_parser('set-pairs', help='set pairs contracts command')
     command_parser.set_defaults(func=set_pairs_in_fees_collector)
@@ -102,3 +103,13 @@ def upgrade_fees_collector_contract(args: Any):
 
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
+
+
+def verify_fees_collector(args: Any):
+    print("Verifying fees collector contract...")
+
+    context = Context()
+    fees_collector_address = context.get_contracts(config.FEES_COLLECTORS)[0].address
+    verify_contracts(args, [fees_collector_address])
+    
+    print("All contracts have been verified.")

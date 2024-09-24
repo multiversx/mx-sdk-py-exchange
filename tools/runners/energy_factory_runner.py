@@ -5,7 +5,7 @@ import config
 from context import Context
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tools.common import get_user_continue, fetch_contracts_states, fetch_new_and_compare_contract_states
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_upgrade_command, add_verify_command, verify_contracts
 
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import get_file_from_url_or_path
@@ -21,6 +21,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_energy_factory)
+    add_verify_command(contract_group, verify_energy_factory)
 
     command_parser = contract_group.add_parser('pause', help='pause contract command')
     command_parser.set_defaults(func=pause_energy_factory)
@@ -77,3 +78,14 @@ def upgrade_energy_factory(args: Any):
 
     if compare_states:
         fetch_new_and_compare_contract_states("energy", energy_contract.address, context.network_provider)
+
+
+def verify_energy_factory(args: Any):
+    print("Verifying energy contract...")
+
+    context = Context()
+    energy_factory_address = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0].address
+    verify_contracts(args, [energy_factory_address])
+    
+    print("All contracts have been verified.")
+    

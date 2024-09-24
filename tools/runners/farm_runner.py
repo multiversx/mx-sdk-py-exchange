@@ -10,7 +10,7 @@ from contracts.farm_contract import FarmContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
-from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command
+from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command, add_verify_command, verify_contracts
 from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import get_bytecode_codehash
@@ -38,6 +38,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_farmv2_contract)
     add_upgrade_all_command(contract_group, upgrade_farmv2_contracts)
+    add_verify_command(contract_group, verify_farmv2_contracts)
 
     command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
     command_parser.set_defaults(func=fetch_and_save_farms_from_chain)
@@ -382,6 +383,15 @@ def upgrade_farmv2_contract(args: Any):
 
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
+    
+
+def verify_farmv2_contracts(args: Any):
+    print("Verifying v2 farms...")
+
+    all_addresses = get_all_farm_v2_addresses()
+    verify_contracts(args, all_addresses)
+    
+    print("All contracts have been verified.")
 
 
 def set_transfer_role_farmv13_contracts():

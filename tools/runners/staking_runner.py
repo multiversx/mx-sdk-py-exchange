@@ -17,7 +17,7 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
 from tools.runners.common_runner import add_generate_transaction_command, \
     add_upgrade_all_command, add_upgrade_command, fund_shadowfork_accounts, \
     get_acounts_with_token, get_default_signature, read_accounts_from_json, \
-    sync_account_nonce
+    sync_account_nonce, verify_contracts, add_verify_command
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.utils_chain import Account, WrapperAddress
 from utils.utils_generic import split_to_chunks, get_file_from_url_or_path
@@ -46,6 +46,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_staking_contract)
     add_upgrade_all_command(contract_group, upgrade_staking_contracts)
+    add_verify_command(contract_group, verify_staking_contracts)
 
     command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
     command_parser.set_defaults(func=fetch_and_save_stakings_from_chain)
@@ -281,6 +282,15 @@ def upgrade_staking_contract(args: Any):
 
     if not get_user_continue():
         return
+    
+
+def verify_staking_contracts(args: Any):
+    print("Verifying staking contracts...")
+
+    all_addresses = get_staking_addresses_from_chain()
+    verify_contracts(args, all_addresses)
+    
+    print("All contracts have been verified.")
     
 
 def setup_boosted_parameters_with_energy_address(staking_addresses: list[str], energy_address: str, compare_states: bool = False):

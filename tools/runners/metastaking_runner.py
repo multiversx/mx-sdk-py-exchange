@@ -8,7 +8,8 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
 from tools.runners.common_runner import add_generate_transaction_command, \
     add_upgrade_all_command, add_upgrade_command, \
-    get_acounts_with_token, read_accounts_from_json
+    get_acounts_with_token, read_accounts_from_json, verify_contracts, \
+    add_verify_command, verify_contracts
 from tools.runners.farm_runner import get_farm_addresses_from_chain
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash
 from utils.utils_tx import ESDTToken, NetworkProviders
@@ -58,6 +59,9 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser.set_defaults(func=upgrade_metastaking_contracts_by_codehash)
 
     add_upgrade_command(contract_group, upgrade_metastaking_contract)
+
+    add_verify_command(contract_group, verify_metastaking_v1_contracts, "verify-v1")
+    add_verify_command(contract_group, verify_metastaking_v2_contracts, "verify-v2")
 
     command_parser = contract_group.add_parser('set-energy-factory-all', help='set energy factory for all v2 contracts command')
     command_parser.set_defaults(func=set_energy_factory)
@@ -219,6 +223,24 @@ def upgrade_metastaking_contract(args: Any):
 
     if not get_user_continue():
         return
+    
+
+def verify_metastaking_v1_contracts(args: Any):
+    print("Verifying metastaking v1 contracts...")
+
+    all_addresses = get_metastaking_addresses(METASTAKINGS_V1_LABEL, OUTPUT_METASTAKING_V1_CONTRACTS_FILE)
+    verify_contracts(args, all_addresses)
+    
+    print("All contracts have been verified.")
+
+
+def verify_metastaking_v2_contracts(args: Any):
+    print("Verifying metastaking v2 contracts...")
+
+    all_addresses = get_metastaking_addresses(METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE)
+    verify_contracts(args, all_addresses)
+    
+    print("All contracts have been verified.")
 
 
 def set_energy_factory(_):
