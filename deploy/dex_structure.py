@@ -1537,6 +1537,9 @@ class DeployStructure:
                                                         lock_epochs)
             if not network_providers.check_simple_tx_status(tx_hash, "set lock epochs in farm"): return
 
+            deployed_contract.resume(deployer_account, network_providers.proxy)
+            network_providers.check_simple_tx_status(tx_hash, "resume farm")
+
             # Set boosted yields rewards percentage
             if 'boosted_rewards' not in contract_config:
                 boosted_rewards = 6000
@@ -1799,6 +1802,15 @@ class DeployStructure:
                 version = StakingContractVersion.V2
             elif contracts_index == config.STAKINGS_BOOSTED:
                 version = StakingContractVersion.V3Boosted
+
+                # get lock factory
+                if 'lock_factory' not in config_staking:
+                    log_step_fail("Aborting deploy: Energy factory contract not existing!")
+                    return
+                locking_contract: Optional[SimpleLockEnergyContract] = None
+                locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                    config_staking['lock_factory']
+                )
             else:
                 log_step_fail(f"FAIL: unknown staking contract version: {contracts_index}")
                 return
@@ -1839,9 +1851,12 @@ class DeployStructure:
             if not network_providers.check_simple_tx_status(tx_hash, "set rewards per block in stake contract"): return
 
             if version == StakingContractVersion.V3Boosted:
+                deployed_staking_contract.resume(deployer_account, network_providers.proxy)
+                network_providers.check_complex_tx_status(tx_hash, "resume stake contract")
+
                 # Set boosted yields rewards percentage
                 if 'boosted_rewards' not in config_staking:
-                    boosted_rewards = 6000
+                    boosted_rewards = 4000
                     log_step_fail(f"Boosted yields rewards percentage not configured! "
                                   f"Setting default: {boosted_rewards}")
                 else:
@@ -1868,6 +1883,21 @@ class DeployStructure:
                                                                                 config_staking['min_farm']])
                 if not network_providers.check_simple_tx_status(tx_hash, "set boosted yields factors in farm"):
                     return
+                
+                # Set energy contract
+                if locking_contract is not None:
+                    tx_hash = deployed_staking_contract.set_energy_factory_address(deployer_account, network_providers.proxy,
+                                                                        locking_contract.address)
+                    if not network_providers.check_simple_tx_status(tx_hash, "set energy address in staking"): return
+
+                    # Whitelist staking in locking contract
+                    tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
+                                                                deployed_staking_contract.address)
+                    if not network_providers.check_simple_tx_status(tx_hash, "whitelist staking in locking contract"):
+                        if not get_continue_confirmation(): return
+                else:
+                    log_step_fail(f"Failed to set up energy contract in staking. Energy contract not available!")
+                    if not get_continue_confirmation(): return
 
             # topup rewards
             if topup_rewards > 0:
@@ -1925,6 +1955,18 @@ class DeployStructure:
             else:
                 log_step_fail(f"Aborting deploy: unknown metastaking contract version")
                 return
+            
+            args = []
+            if version == MetaStakingContractVersion.V3Boosted:
+                # get lock factory
+                if 'lock_factory' not in config_metastaking:
+                    log_step_fail("Aborting deploy: Energy factory contract not existing!")
+                    return
+                locking_contract: Optional[SimpleLockEnergyContract] = None
+                locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                    config_metastaking['lock_factory']
+                )
+                args = [locking_contract.address]
 
             # deploy contract
             deployed_metastaking_contract = MetaStakingContract(
@@ -1939,7 +1981,7 @@ class DeployStructure:
             )
 
             tx_hash, contract_address = deployed_metastaking_contract.contract_deploy(
-                deployer_account, network_providers.proxy, contract_structure.bytecode)
+                deployer_account, network_providers.proxy, contract_structure.bytecode, args)
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "metastake"):
                 return
@@ -1972,13 +2014,6 @@ class DeployStructure:
             if not network_providers.check_simple_tx_status(tx_hash,
                                                             "whitelist metastaking contract in staking contract"):
                 if not get_continue_confirmation(): return
-
-            if version == MetaStakingContractVersion.V3Boosted:
-                # set burn role from staking contract
-                tx_hash = staking.set_burn_role_for_address(deployer_account, network_providers.proxy, contract_address)
-                if not network_providers.check_simple_tx_status(tx_hash,
-                                                                "set burn role from staking contract"):
-                    return
 
             deployed_contracts.append(deployed_metastaking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts

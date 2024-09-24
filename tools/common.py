@@ -9,6 +9,7 @@ from tools.runners.account_state_runner import get_account_keys_online, report_k
 from utils.utils_chain import Account, base64_to_hex
 import config
 from utils.utils_tx import NetworkProviders
+from utils.utils_generic import ensure_folder
 
 
 PROXY = config.DEFAULT_PROXY
@@ -41,6 +42,8 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
             }
             save_wasm(account_data.code.hex(), code_hash)
         pairs_data[code_hash][contract_label].append(contract_addr.bech32())
+
+    ensure_folder(save_path.parent)
 
     with open(save_path, "w", encoding="UTF-8") as writer:
         json.dump(pairs_data, writer, indent=4)
