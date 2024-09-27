@@ -45,5 +45,6 @@ def get_logger(name: str) -> logging.Logger:
 
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
+    logger.propagate = False
 
     return logger

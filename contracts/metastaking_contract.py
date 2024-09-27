@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Tuple, override
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractVersion
+from contracts.base_contracts import BaseSCWhitelistContract
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
@@ -10,10 +11,12 @@ from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 import config
 
+from utils.contract_data_fetchers import MetaStakingContractDataFetcher
+
 logger = get_logger(__name__)
 
 
-class MetaStakingContract(DEXContractInterface):
+class MetaStakingContract(BaseSCWhitelistContract):
     def __init__(self, staking_token: str, lp_token: str, farm_token: str, stake_token: str,
                  lp_address: str, farm_address: str, stake_address: str,
                  version: MetaStakingContractVersion, metastake_token: str = "", address: str = ""):
@@ -183,7 +186,7 @@ class MetaStakingContract(DEXContractInterface):
         logger.debug(f"Account: {user.address}")
 
         metastake_fn = 'stakeFarmTokens'
-        gas_limit = 50000000
+        gas_limit = 70000000
 
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
                                         user, Address(self.address), metastake_fn, args)
@@ -231,6 +234,15 @@ class MetaStakingContract(DEXContractInterface):
         gas_limit = 50000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
                              [energy_address])
+    
+    def get_energy_factory_address(self, proxy: ProxyNetworkProvider) -> str:
+        data_fetcher = MetaStakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getEnergyFactoryAddress')
+        if not raw_results:
+            return ""
+        address = Address.from_hex(raw_results).bech32()
+
+        return address
 
     def get_all_decoded_metastake_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
                                                               holder_address: str, token_nonce: int) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:

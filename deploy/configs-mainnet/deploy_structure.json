@@ -5,6 +5,18 @@
             "number_of_tokens": 10
         },
 
+    "egld_wraps": [
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        }
+    ],
+
     "locked_assets": [
         {
             "unlocked_asset": 0,
@@ -487,6 +499,44 @@
             "lock_factory:": 0,
             "wrapped_token": "WXMEX",
             "wrapped_token_name": "WrappedXMEX"
+        }
+    ],
+
+    "position_creator": [
+        {
+            "egld_wrap": 1,
+            "router_v2": 0
+        }
+    ],
+
+    "locked_token_position_creator": [
+        {
+            "energy_factory": 0,
+            "egld_wrap": 1,
+            "mex_wegld_pair": 0,
+            "mex_wegld_farm": 0,
+            "proxy_dex": 0,
+            "router_v2": 0
+        }
+    ],
+
+    "composable_tasks": [
+        {
+            "egld_wrap": 1,
+            "router_v2": 0
+        }
+    ],
+
+    "governances": [
+        {
+            "energy_factory": 0,
+            "fees_collector": 0,
+            "min_energy_for_propose": 0,
+            "min_fee_for_propose": 1000000000000000000000000000,
+            "quorum_percentage": 4000,
+            "voting_delay_in_blocks": 1,
+            "voting_period_in_blocks": 144000,
+            "withdraw_percentage_defeated": 5000
         }
     ]
 }
