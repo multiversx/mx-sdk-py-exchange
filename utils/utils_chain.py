@@ -409,14 +409,17 @@ def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
         if type(primitive) is dict:
             # primitive now becomes a dictionary of keys/primitives
             list_decode_fields = primitive
-            decoded_list_fields = {}
-            for field_key, field_primitive in list_decode_fields.items():
-                if field_primitive in implemented_primitives:
-                    decoded_result, sliding_index = implemented_primitives[field_primitive](
-                        attributes_hex, sliding_index)
-                    decoded_list_fields[field_key] = decoded_result
-
-            results_dict[key] = decoded_list_fields
+            list_len, sliding_index = implemented_primitives['u32'](attributes_hex, sliding_index)
+            decoded_list = []
+            for _ in range(list_len):
+                decoded_list_fields = {}
+                for field_key, field_primitive in list_decode_fields.items():
+                    if field_primitive in implemented_primitives:
+                        decoded_result, sliding_index = implemented_primitives[field_primitive](
+                            attributes_hex, sliding_index)
+                        decoded_list_fields[field_key] = decoded_result
+                decoded_list.append(decoded_list_fields)
+            results_dict[key] = decoded_list
 
         elif primitive in implemented_primitives:
             decoded_result, sliding_index = implemented_primitives[primitive](attributes_hex, sliding_index)

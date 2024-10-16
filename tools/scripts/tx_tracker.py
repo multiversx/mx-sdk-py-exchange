@@ -186,9 +186,11 @@ class BQTx:
         self.hash = tx.get("_id")
         self.sender = Address.from_bech32(tx.get("sender"))
         self.source_nonce = tx.get("source_nonce")
-        self.source_epoch = tx.get("source_epoch")
+        self.source_epoch: int = tx.get("source_epoch")
         self.tokens = [Token.from_unknown(token) for token in tx.get("tokens", [])]
         self.cross_attrs = tx.get("cross_attrs", "")
+        self.attrs = tx.get("attributes", "")
+        self.amounts = tx.get("amount", [])
     
 
 def select_transactions_from_chain(address: Address, searched_method: str, since_when: int) -> list[TransactionOnNetwork]:
@@ -285,7 +287,7 @@ def get_token_attributes_from_bq(tx: BQTx, token: Token) -> str:
     return attributes_hex
 
 
-def get_decoded_token_attributes(attributes: str) -> dict[str, Any]:
+def get_decoded_token_attributes_by_unknown_token(attributes: str) -> dict[str, Any]:
     decoded = {}
     try:
         decoded = decode_merged_attributes(attributes, LKMEX_ATTRIBUTES_V2)
@@ -312,10 +314,37 @@ def get_decoded_token_attributes(attributes: str) -> dict[str, Any]:
     return decoded
 
 
+def get_decoded_token_attributes_by_known_token(attributes: str, token: Any) -> dict[str, Any]:
+    decoded = {}
+    if type(token) is not Token:
+        tk = Token.from_unknown(token)
+    else:
+        tk = token
+
+    if int(tk.nonce, 16) >= 2286815:
+        decoded = decode_merged_attributes(attributes, LKMEX_ATTRIBUTES_V2)
+        v2_checksum = 0
+        for schedule in decoded.get("unlock_schedule_list", []):
+            v2_checksum += schedule.get("unlock_percent", 0)
+        if v2_checksum != 100000:
+            print(f"Checksum failed for v2 attributes {attributes}")
+            raise ValueError("Checksum failed")
+    else:
+        decoded = decode_merged_attributes(attributes, LKMEX_ATTRIBUTES_V1)
+        v1_checksum = 0
+        for schedule in decoded.get("unlock_schedule_list", []):
+            v1_checksum += schedule.get("unlock_percent", 0)
+        if v1_checksum != 100:
+            print(f"Checksum failed for v1 attributes {attributes}")
+            raise ValueError("Checksum failed")
+
+    return decoded
+
+
 def check_affected_token_attributes(attributes: str, unlock_epoch: int) -> bool:
     affected = False
 
-    decoded_attrs = get_decoded_token_attributes(attributes)
+    decoded_attrs = get_decoded_token_attributes_by_unknown_token(attributes)
     if not decoded_attrs:
         print(f"Token has no decoded attributes")
         raise ValueError("Token has no decoded attributes")
@@ -333,34 +362,44 @@ def check_affected_token_attributes(attributes: str, unlock_epoch: int) -> bool:
 
 def check_affected_tx(tx: Union[BQTx, dict[str, Any]]) -> bool:
     if type(tx) is dict:
-        tx = BQTx(tx)
+        tx_obj = BQTx(tx)
+    else:
+        tx_obj = tx
 
     affected = False
 
-    tokens = tx.tokens
+    tokens = tx_obj.tokens
     if not len(tokens):
-        print(f"Transaction {tx.hash} has no tokens")
+        print(f"Transaction {tx_obj.hash} has no tokens")
         return
 
     for token in tokens:
-        attributes_hex = get_token_attributes_from_bq(tx, token)
+        attributes_hex = get_token_attributes_from_bq(tx_obj, token)
 
         # process attributes to see if it's affected
         if not attributes_hex:
-            print(f"Tx {tx.hash} token {token.collection} {token.nonce} has no attributes")
+            # TODO: this case can still add uncertainty
+            print(f"Tx {tx_obj.hash} token {token.collection} {token.nonce} has no attributes")
             return False
+        
+        affected = affected or check_affected_token_attributes(attributes_hex, tx_obj.source_epoch)
 
-        affected = affected or check_affected_token_attributes(attributes_hex, tx.source_epoch)
+        # if affected is True, write original tx along with the attributes to a file
+        if affected and type(tx) is dict:
+            tx['attributes'] = attributes_hex
+            with open("affected_full_txs.json", "a") as f:
+                json.dump(tx, f)
+                f.write("\n")
 
     return affected
 
 
-def find_affected_accounts(txs: list[dict]) -> list[str]:
+def find_affected_txs(txs: list[dict]) -> list[dict]:
     parallel = True
     affected = []
 
     if parallel:
-        pool = Pool(3)
+        pool = Pool(20)
         affected = pool.map(check_affected_tx, txs)
     else:
         i = 1
@@ -371,7 +410,7 @@ def find_affected_accounts(txs: list[dict]) -> list[str]:
             affected.append(check_affected_tx(tx))
             i += 1
 
-    return [txs[i].get("sender") for i in range(len(txs)) if affected[i]]
+    return [txs[i] for i in range(len(txs)) if affected[i]]
 
 
 def find_showing_effects():
@@ -410,22 +449,52 @@ def find_affected(source: str):
         # load txs from json file
         txs = load_bq_from_file()
 
-    accounts = find_affected_accounts(txs)
+    affected_txs = find_affected_txs(txs)
+    accounts = [tx.get("sender", "") for tx in affected_txs]
+
+    # save affected txs into json file
+    with open("affected_txs.json", "w") as f:
+        json.dump(affected_txs, f)
 
     # save affected accounts into json file
     with open("affected_accounts.json", "w") as f:
         json.dump(accounts, f)
 
 
-def calculate_energy_difference(tx: dict[str, Any]) -> int:
-    energy_diff = 0
+def get_full_txs_from_file() -> list[dict[str, Any]]:
+    txs = []
+    with open("full_txs_with_amounts.json", "r") as f:
+        for line in f:
+            tx_obj = json.loads(line)
+            txs.append(tx_obj)
 
-    if "operations" in tx:
-        for operation in tx.get("operations"):
-            if "energy" in operation:
-                energy_diff += operation.get("energy", 0)
+    return txs
 
-    return energy_diff
+
+def calculate_energy_difference() -> list[dict[str, Any]]:
+    txs = get_full_txs_from_file()
+
+    for tx in txs:
+        tx_obj = BQTx(tx)
+        if not tx_obj.attrs:
+            print(f"Tx {tx_obj.hash} has no attributes")
+            continue
+
+        decoded_attrs = get_decoded_token_attributes_by_known_token(tx_obj.attrs, tx_obj.tokens[0])
+        energy_diff = 0
+        print(decoded_attrs)
+
+        # if token unlock epoch is lower than 30 days, it's affected
+        for schedule in decoded_attrs.get("unlock_schedule_list", []):
+            token_unlock_epoch = int(schedule.get("unlock_epoch"))
+            if tx_obj.source_epoch - 30 < token_unlock_epoch < tx_obj.source_epoch:
+                denominator = 100 if int(tx_obj.tokens[0].nonce, 16) < 2286815 else 100000
+                remainder_tk_amount = int(tx_obj.amounts[0]) * token_unlock_epoch // denominator
+                energy_diff += remainder_tk_amount * (tx_obj.source_epoch - token_unlock_epoch)
+                print(f"Tx {tx_obj.hash} of user {tx_obj.sender.bech32()} has energy difference of {energy_diff} from token {tx_obj.tokens[0].collection} {tx_obj.tokens[0].nonce}, unlock epoch {token_unlock_epoch}")
+
+    return txs
+    
 
 
 def confirm_affected_accounts(accounts: list[str]):
@@ -436,12 +505,23 @@ def confirm_affected_accounts(accounts: list[str]):
 
 
 def main(args):
+    ### first step
     # accounts = find_showing_effects()
+
+    ### second step
     # find_affected("bq")
+
+    ### third step
+    # txs = get_full_txs_from_file()
+    # print(len(txs))
     
-    with open("affected_accounts.json", "r") as f:
-        accounts = json.load(f)
-    confirm_affected_accounts(accounts)
+    ### fourth step
+    # with open("affected_accounts.json", "r") as f:
+    #     accounts = json.load(f)
+    # confirm_affected_accounts(accounts)
+
+    ### fifth step
+    calculate_energy_difference()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
