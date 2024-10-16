@@ -20,7 +20,7 @@ import sys
 from multiversx_sdk_network_providers.interface import IAddress, IPagination
 
 API_URL = "https://next-api.multiversx.com"
-DEEP_PROXY_URL = "https://***REMOVED***deep-history.multiversx.com:4443/mainnet-gateway"
+DEEP_PROXY_URL = "https://deep-history.multiversx.com:4443/mainnet-gateway"
 LOCKED_ASSET_CONTRACT = Address.from_bech32("erd1qqqqqqqqqqqqqpgqjpt0qqgsrdhp2xqygpjtfrpwf76f9nvg2jpsg4q7th")
 SAVED_FILE = "txs.json"
 BQ_FILE = "bq-results-3.json"
