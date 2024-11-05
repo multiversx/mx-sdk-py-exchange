@@ -473,6 +473,7 @@ def get_full_txs_from_file() -> list[dict[str, Any]]:
 
 def calculate_energy_difference() -> list[dict[str, Any]]:
     txs = get_full_txs_from_file()
+    diff_results = []
 
     for tx in txs:
         tx_obj = BQTx(tx)
@@ -492,8 +493,15 @@ def calculate_energy_difference() -> list[dict[str, Any]]:
                 remainder_tk_amount = int(tx_obj.amounts[0]) * token_unlock_epoch // denominator
                 energy_diff += remainder_tk_amount * (tx_obj.source_epoch - token_unlock_epoch)
                 print(f"Tx {tx_obj.hash} of user {tx_obj.sender.bech32()} has energy difference of {energy_diff} from token {tx_obj.tokens[0].collection} {tx_obj.tokens[0].nonce}, unlock epoch {token_unlock_epoch}")
+                diff_dict = {
+                    "hash": tx_obj.hash,
+                    "sender": tx_obj.sender.bech32(),
+                    "token": f"{tx_obj.tokens[0].collection}-{tx_obj.tokens[0].nonce}",
+                    "energy_diff": energy_diff
+                }
+                diff_results.append(diff_dict)
 
-    return txs
+    return diff_results
     
 
 
@@ -521,7 +529,11 @@ def main(args):
     # confirm_affected_accounts(accounts)
 
     ### fifth step
-    calculate_energy_difference()
+    result = calculate_energy_difference()
+
+    # save results into json file
+    with open("energy_diff_results.json", "w") as f:
+        json.dump(result, f, indent=4)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
