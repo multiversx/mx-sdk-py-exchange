@@ -24,6 +24,14 @@ class Context:
 
         self.deployer_account = Account.from_file(config.DEFAULT_OWNER)
 
+        if "shadowfork" in config.DEFAULT_PROXY and config.SF_DEX_REFERENCE_ADDRESS:
+            # get owner of the SF reference contract
+            owner = self.network_provider.proxy.get_account(Address(config.SF_DEX_REFERENCE_ADDRESS)).owner_address.to_bech32()
+            print(f"Shadowfork detected. Owner: {owner}")
+
+            config.DEX_OWNER_ADDRESS = owner
+            config.DEX_ADMIN_ADDRESS = owner
+
         if config.DEX_OWNER_ADDRESS:    # manual override only for shadowforks
             self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
 
@@ -75,23 +83,6 @@ class Context:
 
         self.observable = Observable()
         # self.init_observers()     # call should be parameterized so that observers can be disabled programmatically
-
-        if "shadowfork" in config.DEFAULT_PROXY:
-            for labeled_contracts in self.deploy_structure.contracts.values():
-                if len(labeled_contracts.deployed_contracts) > 0:
-                    # get owner of the first contract
-                    owner = self.network_provider.proxy.get_account(Address(labeled_contracts.deployed_contracts[0].address)).owner_address.to_bech32()
-                    print(f"Shadowfork detected. Owner: {owner}")
-
-                    config.DEX_OWNER_ADDRESS = owner
-                    config.DEX_ADMIN_ADDRESS = owner
-                    self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
-                    self.admin_account.address = Address(config.DEX_ADMIN_ADDRESS)
-
-                    self.deployer_account.sync_nonce(self.network_provider.proxy)
-                    self.admin_account.sync_nonce(self.network_provider.proxy)
-
-                    break
 
     def init_observers(self):
 
