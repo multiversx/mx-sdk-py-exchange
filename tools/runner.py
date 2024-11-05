@@ -11,7 +11,7 @@ from tools.runners import pair_runner, farm_runner, \
     staking_runner, metastaking_runner, router_runner, \
     proxy_runner, locked_asset_runner, fees_collector_runner, \
     account_state_runner, energy_factory_runner, position_creator_runner, \
-    locked_token_position_creator_runner, simple_lock_runner
+    locked_token_position_creator_runner, simple_lock_runner, generic_runner
 from utils.contract_data_fetchers import FarmContractDataFetcher, PairContractDataFetcher, RouterContractDataFetcher, StakingContractDataFetcher
 from utils.utils_generic import log_step_fail
 from utils.utils_tx import NetworkProviders
@@ -46,6 +46,7 @@ def setup_parser():
     commands.append(position_creator_runner.setup_parser(subparsers))
     commands.append(locked_token_position_creator_runner.setup_parser(subparsers))
     commands.append(simple_lock_runner.setup_parser(subparsers))
+    commands.append(generic_runner.setup_parser(subparsers))
 
     all_subparser = subparsers.add_parser('all', help='general group commands')
     all_subgroup_parser = all_subparser.add_subparsers()

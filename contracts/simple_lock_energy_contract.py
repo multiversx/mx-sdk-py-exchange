@@ -506,6 +506,17 @@ class SimpleLockEnergyContract(DEXContractInterface):
         logger.info(function_purpose)
 
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setEnergyForOldTokens", args)
+    
+    def adjust_user_energy(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: user address
+            type[str]: energy
+            type[str]: amount
+        """
+        function_purpose = "adjust delta difference for user energy"
+        logger.info(function_purpose)
+
+        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "adjustUserEnergy", args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         self.set_transfer_role_locked_token(deployer, proxy, [])

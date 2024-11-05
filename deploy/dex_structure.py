@@ -374,7 +374,8 @@ class DeployStructure:
         energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
         whitelist = [config.PROXIES_V2, config.FEES_COLLECTORS,
                      config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED, 
-                     config.GOVERNANCES, config.POSITION_CREATOR, config.LOCKED_TOKEN_POSITION_CREATOR]
+                     config.GOVERNANCES, config.POSITION_CREATOR, config.LOCKED_TOKEN_POSITION_CREATOR,
+                     config.LK_WRAPS, config.ESCROWS]
 
         # gather contract addresses to whitelist
         addresses = []
@@ -2149,6 +2150,12 @@ class DeployStructure:
                 return
             log_step_pass(f"escrow contract address: {contract_address}")
             contract.address = contract_address
+
+            # whitelist in energy factory
+            tx_hash = locking_contract.add_sc_to_token_transfer_whitelist(deployer_account, network_providers.proxy, contract_address)
+            if not network_providers.check_simple_tx_status(tx_hash, "whitelist in energy factory"): 
+                return
+            
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
@@ -2185,6 +2192,11 @@ class DeployStructure:
             wrapped_token_hex = LkWrapContractDataFetcher(Address(contract.address),
                                                           network_providers.proxy.url).get_data("getWrappedTokenId")
             contract.wrapped_token = hex_to_string(wrapped_token_hex)
+
+            # whitelist in energy factory
+            tx_hash = locking_contract.add_sc_to_token_transfer_whitelist(deployer_account, network_providers.proxy, contract_address)
+            if not network_providers.check_simple_tx_status(tx_hash, "whitelist in energy factory"): 
+                return
 
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
