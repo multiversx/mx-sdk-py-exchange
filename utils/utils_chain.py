@@ -1,5 +1,7 @@
 import base64
 import time
+from getpass import getpass
+from hashlib import blake2b
 from multiprocessing.dummy import Pool
 from os import path
 from pathlib import Path
@@ -81,6 +83,18 @@ class Account:
 
         logger.debug(f"Account.sign_message(): raw_data_to_sign = {data.hex()}, message_data_to_sign = {serialized_message.hex()}, signature = {signature.hex()}")
         return signature
+    
+    @classmethod
+    def from_file(cls, file: str, index: int = 0, password: str = ""):
+        """Returns an Account object from either a pem or keystore.
+        In case of keystore, if a password is not provided, it will be requested from the user."""
+        file = str(file)
+        if file.endswith(".pem"):
+            return cls(pem_file=file, pem_index=index)
+        elif file.endswith(".json"):
+            if not password:
+                password = getpass("Enter password: ")
+            return cls(key_file=file, password=password)
 
 
 class BunchOfAccounts:
@@ -204,6 +218,12 @@ def string_to_hex(s):
 
 def hex_to_string(s):
     return bytearray.fromhex(s).decode("utf-8")
+
+
+def get_bytecode_codehash(bytecode_path: Path) -> str:
+    bytecode = bytecode_path.read_bytes()
+    code_hash = blake2b(bytecode, digest_size=32).hexdigest()
+    return code_hash
 
 
 def _get_all_esdts_for_account(address: str, proxy: ProxyNetworkProvider):
@@ -371,7 +391,7 @@ def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
     
     def address(attributes: str, start_index: int):
         _, result, index = fixed_length_primitive(attributes, start_index, 32)
-        bech32 = Address.from_hex(result, "erd").bech32()
+        bech32 = Address.new_from_hex(result, "erd").to_bech32()
         return bech32, index
 
     results_dict = {}
@@ -450,6 +470,12 @@ def log_explorer(proxy: str, name: str, path: str, details: str):
             ("MultiversX Devnet Explorer", "https://devnet-explorer.multiversx.com"),
         "https://gateway.multiversx.com":
             ("MultiversX Mainnet Explorer", "https://explorer.multiversx.com"),
+        "https://proxy-shadowfork-one.elrond.ro":
+            ("MVX SF1 Explorer", "https://testnet.internal-explorer.multiversx.com/testnet-tc-shadowfork-one"),
+        "https://proxy-shadowfork-three.elrond.ro":
+            ("MVX SF3 Explorer", "https://testnet.internal-explorer.multiversx.com/testnet-tc-shadowfork-three"),
+        "https://proxy-shadowfork-four.elrond.ro":
+            ("MVX SF4 Explorer", "https://testnet.internal-explorer.multiversx.com/testnet-tc-shadowfork-four"),
     }
     try:
         explorer_name, explorer_url = networks[proxy]

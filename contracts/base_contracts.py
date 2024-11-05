@@ -8,7 +8,7 @@ from contracts.contract_identities import DEXContractInterface
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from utils.utils_generic import log_unexpected_args
 from utils.utils_tx import endpoint_call
-from utils.contract_data_fetchers import BaseBoostedContractDataFetcher, BaseFarmContractDataFetcher
+from utils.contract_data_fetchers import BaseBoostedContractDataFetcher, BaseContractWhitelistDataFetcher, BaseFarmContractDataFetcher
 from utils import decoding_structures
 from typing import Dict, List, Any
 from abc import abstractmethod, ABC
@@ -19,12 +19,12 @@ logger = get_logger(__name__)
 
 class BaseBoostedContract(DEXContractInterface, ABC):
     
-    def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
+    def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).get_public_key()])
         if not raw_results:
-            return {}
-        user_farm_position = decode_merged_attributes(raw_results, decoding_structures.USER_FARM_POSITION)
+            return 0
+        user_farm_position = int(raw_results)
 
         return user_farm_position
     
@@ -261,4 +261,32 @@ class BaseFarmContract(DEXContractInterface, ABC):
             "state": self.get_state(proxy)
         }
         return farm_stats
+    
+
+class BaseSCWhitelistContract(DEXContractInterface, ABC):
+    
+    def add_contract_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str) -> str:
+        function_purpose = "Add contract to sc whitelist"
+        logger.info(function_purpose)
+        
+        gas_limit = 30000000
+        sc_args = [whitelisted_sc_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
+    
+    def remove_contract_from_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str) -> str:
+        function_purpose = "Remove contract from sc whitelist"
+        logger.info(function_purpose)
+        
+        gas_limit = 30000000
+        sc_args = [whitelisted_sc_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeSCAddressFromWhitelist", sc_args)
+    
+    def is_contract_whitelisted(self, address: str, proxy: ProxyNetworkProvider) -> bool:
+        data_fetcher = BaseContractWhitelistDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('isSCAddressWhitelisted', [Address(address).get_public_key()])
+        if not raw_results:
+            return False
+        return bool(raw_results)
     

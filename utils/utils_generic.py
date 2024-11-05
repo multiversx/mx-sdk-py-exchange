@@ -6,6 +6,7 @@ import stat
 import sys
 import tarfile
 import zipfile
+import wget
 
 import toml
 from enum import Enum
@@ -84,9 +85,36 @@ def uniquify(path: Path) -> Path:
     i = 1
     stem = path.stem
     while path.exists():
-        path = path.with_name(f"{stem}_{i}").with_suffix(path.suffix)
+        path = path.with_stem(f"{stem}_{i}")
         i += 1
     return path
+
+
+def download_file(url: str, destination_folder: Path = None) -> Path:
+    if not destination_folder:
+        destination_folder = Path.cwd() / 'downloads'
+        
+    ensure_folder(destination_folder)
+    unique_destination = uniquify(destination_folder / Path(url).name)
+
+    logger.debug(f"Downloading file from [{url}] to [{unique_destination}].")
+    try:
+        wget.download(url, str(unique_destination))
+        print("")  # wget does not print newline
+        return unique_destination
+    except Exception as err:
+        logger.error(f"Failed to download file from [{url}] with {err}. Closing process.")
+        exit(1)
+    
+
+def get_file_from_url_or_path(url_or_path: Any) -> Path:
+    if str(url_or_path).startswith("http"):
+        return download_file(url_or_path)
+    
+    local_path = Path(url_or_path) if type(url_or_path) != Path else url_or_path
+    if not local_path.exists():
+        raise FileNotFoundError(f"File [{local_path}] not found!")
+    return local_path
 
 
 def read_lines(file: Path) -> List[str]:

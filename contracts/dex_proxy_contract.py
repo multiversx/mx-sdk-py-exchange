@@ -181,8 +181,7 @@ class DexProxyContract(DEXContractInterface):
 
         sc_args = [
             tokens,
-            Address(event.farmContract.address),
-            event.amount
+            Address(event.farmContract.address)
         ]
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
                                         "exitFarmProxy", sc_args)
@@ -445,6 +444,28 @@ class DexProxyContract(DEXContractInterface):
         gas_limit = 100000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleLockedFarmToken", [address])
     
+    def set_transfer_role_wrapped_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
+        function_purpose = "Set transfer role on address for lp token"
+        logger.info(function_purpose)
+
+        if address == "":
+            log_unexpected_args(function_purpose, address)
+            return ""
+
+        gas_limit = 100000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleWrappedLpToken", [address])
+    
+    def set_transfer_role_wrapped_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
+        function_purpose = "Set transfer role on address for farm token"
+        logger.info(function_purpose)
+
+        if address == "":
+            log_unexpected_args(function_purpose, address)
+            return ""
+
+        gas_limit = 100000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleWrappedFarmToken", [address])
+    
     def add_farm_to_intermediate(self, deployer: Account, proxy: ProxyNetworkProvider, farm_address: str):
         function_purpose = "Add farm to intermediate in proxy contract"
         logger.info(function_purpose)
@@ -455,6 +476,15 @@ class DexProxyContract(DEXContractInterface):
 
         gas_limit = 50000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addFarmToIntermediate", [farm_address])
+    
+    def add_contract_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
+        function_purpose = "Add contract to proxy dex whitelist"
+        logger.info(function_purpose)
+        
+        gas_limit = 30000000
+        sc_args = [whitelisted_sc_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

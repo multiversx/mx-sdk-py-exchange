@@ -8,6 +8,7 @@ from contracts.escrow_contract import EscrowContract
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.lk_wrap_contract import LkWrapContract
 from contracts.position_creator_contract import PositionCreatorContract
+from contracts.locked_token_position_creator_contract import LockedTokenPositionCreatorContract
 from contracts.proxy_deployer_contract import ProxyDeployerContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.unstaker_contract import UnstakerContract
@@ -29,6 +30,8 @@ from contracts.contract_identities import FarmContractVersion, DEXContractInterf
 from contracts.metastaking_contract import MetaStakingContract
 from contracts.staking_contract import StakingContract
 from contracts.dex_proxy_contract import DexProxyContract
+from contracts.governance_contract import GovernanceContract
+from contracts.composable_tasks_contract import ComposableTasksContract
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import hex_to_string
 from utils.utils_chain import Account, WrapperAddress as Address
@@ -106,7 +109,7 @@ class ContractStructure:
 
 class DeployStructureArguments:
     @classmethod
-    def add_parsed_arguments(cls, parser: ArgumentParser):
+    def add_clean_contract_deploy_arguments(cls, parser: ArgumentParser):
         parser.add_argument("--egld-wraps", action="store_true", help="Deploy clean EGLD wraps")
         parser.add_argument("--locked-assets", action="store_true", help="Deploy clean locked assets")
         parser.add_argument("--proxies", action="store_true", help="Deploy clean proxies")
@@ -119,11 +122,12 @@ class DeployStructureArguments:
         parser.add_argument("--router-v2", action="store_true", help="Deploy clean router v2")
         parser.add_argument("--pairs", action="store_true", help="Deploy clean pairs")
         parser.add_argument("--pairs-v2", action="store_true", help="Deploy clean pairs v2")
+        parser.add_argument("--pairs-view", action="store_true", help="Deploy clean pair views")
         parser.add_argument("--farms-community", action="store_true", help="Deploy clean farms community")
         parser.add_argument("--farms-unlocked", action="store_true", help="Deploy clean farms unlocked")
         parser.add_argument("--farms-locked", action="store_true", help="Deploy clean farms locked")
         parser.add_argument("--proxy-deployers", action="store_true", help="Deploy clean proxy deployers")
-        parser.add_argument("--farms-v2", action="store_true", help="Deploy clean farms v2")
+        parser.add_argument("--farms-boosted", action="store_true", help="Deploy clean farms v2")
         parser.add_argument("--price-discoveries", action="store_true", help="Deploy clean price discoveries")
         parser.add_argument("--stakings", action="store_true", help="Deploy clean stakings")
         parser.add_argument("--stakings-v2", action="store_true", help="Deploy clean stakings v2")
@@ -131,6 +135,12 @@ class DeployStructureArguments:
         parser.add_argument("--metastakings", action="store_true", help="Deploy clean metastakings")
         parser.add_argument("--metastakings-v2", action="store_true", help="Deploy clean metastakings v2")
         parser.add_argument("--metastakings-boosted", action="store_true", help="Deploy clean metastakings boosted")
+        parser.add_argument("--governances", action="store_true", help="Deploy clean governances")
+        parser.add_argument("--position-creator", action="store_true", help="Deploy clean position_ reators")
+        parser.add_argument("--locked-token-position-creator", action="store_true", help="Deploy clean locked token position creator")
+        parser.add_argument("--escrows", action="store_true", help="Deploy clean escrows")
+        parser.add_argument("--lk-wraps", action="store_true", help="Deploy clean lk token wrappers")
+        parser.add_argument("--composable-tasks", action="store_true", help="Deploy clean composable tasks")
 
 
 class DeployStructure:
@@ -219,12 +229,21 @@ class DeployStructure:
             config.POSITION_CREATOR:
                 ContractStructure(config.POSITION_CREATOR, PositionCreatorContract, config.POSITION_CREATOR_BYTECODE_PATH,
                                   self.position_creator_deploy, False),
+            config.LOCKED_TOKEN_POSITION_CREATOR:
+                ContractStructure(config.LOCKED_TOKEN_POSITION_CREATOR, LockedTokenPositionCreatorContract, config.LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH,
+                                  self.locked_token_position_creator_deploy, False),
             config.ESCROWS:
                 ContractStructure(config.ESCROWS, EscrowContract, config.ESCROW_BYTECODE_PATH,
                                   self.escrow_deploy, False),
             config.LK_WRAPS:
                 ContractStructure(config.LK_WRAPS, LkWrapContract, config.LK_WRAP_BYTECODE_PATH,
                                   self.lk_wrap_deploy, False),
+            config.GOVERNANCES:
+                ContractStructure(config.GOVERNANCES, GovernanceContract, config.GOVERNANCE_BYTECODE_PATH,
+                                  self.governance_deploy, False),
+            config.COMPOSABLE_TASKS:
+                ContractStructure(config.COMPOSABLE_TASKS, ComposableTasksContract, config.COMPOSABLE_TASKS_BYTECODE_PATH,
+                                  self.composable_tasks_deploy, False),
         }
 
     # main entry method to deploy tokens (either deploy fresh ones or reuse existing ones)
@@ -307,10 +326,11 @@ class DeployStructure:
 
     # main entry method to deploy the DEX contract structure (either fresh deploy or loading existing ones)
     def deploy_structure(self, deployer_account: Account, network_provider: NetworkProviders,
-                         clean_deploy_override: bool):
+                         clean_deploy_override: bool, clean_deploy_list: List[str] = None):
         deployer_account.sync_nonce(network_provider.proxy)
         for contract_label, contracts in self.contracts.items():
-            if not clean_deploy_override and not contracts.deploy_clean:
+            if not clean_deploy_override and not contracts.deploy_clean and \
+                (not clean_deploy_list or contract_label not in clean_deploy_list):
                 contracts.load_deployed_contracts()
             else:
                 log_step_pass(f"Starting setup process for {contract_label}:")
@@ -333,32 +353,35 @@ class DeployStructure:
 
     # should be run for fresh deployed contracts
     def start_deployed_contracts(self, deployer_account: Account, network_provider: NetworkProviders,
-                                 clean_deploy_override: bool):
+                                 clean_deploy_override: bool, clean_deploy_list: List[str] = None):
         deployer_account.sync_nonce(network_provider.proxy)
         for contracts in self.contracts.values():
-            if contracts.deploy_clean or clean_deploy_override:
+            if contracts.deploy_clean or clean_deploy_override or \
+                (clean_deploy_list and contracts.label in clean_deploy_list):
                 for contract in contracts.deployed_contracts:
                     contract.contract_start(deployer_account, network_provider.proxy)
 
-        self.global_start_setups(deployer_account, network_provider, clean_deploy_override)
+        self.global_start_setups(deployer_account, network_provider, clean_deploy_override, clean_deploy_list)
 
     def global_start_setups(self, deployer_account: Account, network_provider: NetworkProviders,
-                            clean_deploy_override: bool):
-        self.set_transfer_role_locked_token(deployer_account, network_provider, clean_deploy_override)
+                            clean_deploy_override: bool, clean_deploy_list: List[str] = None):
+        self.set_transfer_role_locked_token(deployer_account, network_provider, clean_deploy_override, clean_deploy_list)
         # self.set_proxy_v2_in_pairs(deployer_account, network_provider, clean_deploy_override)     # used only when not done implicitly
 
     def set_transfer_role_locked_token(self, deployer_account: Account, network_provider: NetworkProviders,
-                                       clean_deploy_override: bool):
+                                       clean_deploy_override: bool, clean_deploy_list: List[str] = None):
         energy_factory: Optional[SimpleLockEnergyContract] = None
         energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
         whitelist = [config.PROXIES_V2, config.FEES_COLLECTORS,
-                     config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED]
+                     config.UNSTAKERS, config.METASTAKINGS_V2, config.METASTAKINGS_BOOSTED, 
+                     config.GOVERNANCES, config.POSITION_CREATOR, config.LOCKED_TOKEN_POSITION_CREATOR]
 
         # gather contract addresses to whitelist
         addresses = []
         if energy_factory:
             for contracts in self.contracts.values():
-                if not contracts.deploy_clean and not clean_deploy_override:
+                if not contracts.deploy_clean and not clean_deploy_override and \
+                    not (clean_deploy_list and contracts.label in clean_deploy_list):
                     continue
                 if contracts.label not in whitelist:
                     continue
@@ -1476,7 +1499,8 @@ class DeployStructure:
             # Whitelist farm in pool if it's linked to pool
             if lp_contract is not None:
                 tx_hash = lp_contract.whitelist_contract(deployer_account, network_providers.proxy, contract_address)
-                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in pool"): return
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in pool"): 
+                    if not get_continue_confirmation(): return
 
             # Set energy contract
             if locking_contract is not None:
@@ -1496,10 +1520,11 @@ class DeployStructure:
                 # Whitelist farm in locking contract
                 tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
                                                                deployed_contract.address)
-                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in locking contract"): return
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist farm in locking contract"):
+                    if not get_continue_confirmation(): return
             else:
                 log_step_fail(f"Failed to set up locking contract in farm. Locking contract not available!")
-                return
+                if not get_continue_confirmation(): return
 
             # Set lock epochs
             if 'lock_epochs' not in contract_config:
@@ -1774,6 +1799,15 @@ class DeployStructure:
                 version = StakingContractVersion.V2
             elif contracts_index == config.STAKINGS_BOOSTED:
                 version = StakingContractVersion.V3Boosted
+
+                # get lock factory
+                if 'lock_factory' not in config_staking:
+                    log_step_fail("Aborting deploy: Energy factory contract not existing!")
+                    return
+                locking_contract: Optional[SimpleLockEnergyContract] = None
+                locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                    config_staking['lock_factory']
+                )
             else:
                 log_step_fail(f"FAIL: unknown staking contract version: {contracts_index}")
                 return
@@ -1814,9 +1848,10 @@ class DeployStructure:
             if not network_providers.check_simple_tx_status(tx_hash, "set rewards per block in stake contract"): return
 
             if version == StakingContractVersion.V3Boosted:
+
                 # Set boosted yields rewards percentage
                 if 'boosted_rewards' not in config_staking:
-                    boosted_rewards = 6000
+                    boosted_rewards = 4000
                     log_step_fail(f"Boosted yields rewards percentage not configured! "
                                   f"Setting default: {boosted_rewards}")
                 else:
@@ -1843,6 +1878,21 @@ class DeployStructure:
                                                                                 config_staking['min_farm']])
                 if not network_providers.check_simple_tx_status(tx_hash, "set boosted yields factors in farm"):
                     return
+                
+                # Set energy contract
+                if locking_contract is not None:
+                    tx_hash = deployed_staking_contract.set_energy_factory_address(deployer_account, network_providers.proxy,
+                                                                        locking_contract.address)
+                    if not network_providers.check_simple_tx_status(tx_hash, "set energy address in staking"): return
+
+                    # Whitelist staking in locking contract
+                    tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
+                                                                deployed_staking_contract.address)
+                    if not network_providers.check_simple_tx_status(tx_hash, "whitelist staking in locking contract"):
+                        if not get_continue_confirmation(): return
+                else:
+                    log_step_fail(f"Failed to set up energy contract in staking. Energy contract not available!")
+                    if not get_continue_confirmation(): return
 
             # topup rewards
             if topup_rewards > 0:
@@ -1900,6 +1950,18 @@ class DeployStructure:
             else:
                 log_step_fail(f"Aborting deploy: unknown metastaking contract version")
                 return
+            
+            args = []
+            if version == MetaStakingContractVersion.V3Boosted:
+                # get lock factory
+                if 'lock_factory' not in config_metastaking:
+                    log_step_fail("Aborting deploy: Energy factory contract not existing!")
+                    return
+                locking_contract: Optional[SimpleLockEnergyContract] = None
+                locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                    config_metastaking['lock_factory']
+                )
+                args = [locking_contract.address]
 
             # deploy contract
             deployed_metastaking_contract = MetaStakingContract(
@@ -1914,7 +1976,7 @@ class DeployStructure:
             )
 
             tx_hash, contract_address = deployed_metastaking_contract.contract_deploy(
-                deployer_account, network_providers.proxy, contract_structure.bytecode)
+                deployer_account, network_providers.proxy, contract_structure.bytecode, args)
             # check for deployment success and save the deployed address
             if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "metastake"):
                 return
@@ -1934,7 +1996,7 @@ class DeployStructure:
             tx_hash = lp.whitelist_contract(deployer_account, network_providers.proxy, contract_address)
             if not network_providers.check_simple_tx_status(tx_hash,
                                                             "whitelist metastaking contract in pair contract"):
-                return
+                if not get_continue_confirmation(): return
 
             # whitelist in farm contract
             tx_hash = farm.add_contract_to_whitelist(deployer_account, network_providers.proxy, contract_address)
@@ -1946,14 +2008,7 @@ class DeployStructure:
             tx_hash = staking.whitelist_contract(deployer_account, network_providers.proxy, contract_address)
             if not network_providers.check_simple_tx_status(tx_hash,
                                                             "whitelist metastaking contract in staking contract"):
-                return
-
-            if version == MetaStakingContractVersion.V3Boosted:
-                # set burn role from staking contract
-                tx_hash = staking.set_burn_role_for_address(deployer_account, network_providers.proxy, contract_address)
-                if not network_providers.check_simple_tx_status(tx_hash,
-                                                                "set burn role from staking contract"):
-                    return
+                if not get_continue_confirmation(): return
 
             deployed_contracts.append(deployed_metastaking_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
@@ -1961,17 +2016,25 @@ class DeployStructure:
     def position_creator_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]
         deployed_contracts = []
+
         for contract_config in contract_structure.deploy_structure_list:
+            if contract_config.get('egld_wrap_address'):
+                egld_wrapper_contract_address = contract_config.get('egld_wrap_address')
+            else: 
+                egld_wrapper_contract_address = self.contracts[config.EGLD_WRAPS].get_deployed_contract_by_index(contract_config['egld_wrap']).address
+            
+            router_contract_address = self.contracts[config.ROUTER_V2].get_deployed_contract_by_index(contract_config['router_v2']).address
+
             position_creator_contract = PositionCreatorContract(
-                "", contract_config['egld_wrapped_address'], contract_config['wrapped_token_id']
+                "", egld_wrapper_contract_address, router_contract_address
             )
             tx_hash, contract_address = position_creator_contract.contract_deploy(
                 deployer_account,
                 network_providers.proxy,
                 contract_structure.bytecode,
                 [
-                    position_creator_contract.egld_wrapper_address,
-                    position_creator_contract.wrapped_token_id
+                    egld_wrapper_contract_address,
+                    router_contract_address
                 ]
             )
 
@@ -1979,7 +2042,77 @@ class DeployStructure:
                 return
             log_step_pass(f"Position creator contract address: {contract_address}")
             position_creator_contract.address = contract_address
+            
             deployed_contracts.append(position_creator_contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def locked_token_position_creator_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+
+        for contract_config in contract_structure.deploy_structure_list:
+            energy_factory_address = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(contract_config['energy_factory']).address
+            egld_wrapper_contract_address = self.contracts[config.EGLD_WRAPS].get_deployed_contract_by_index(contract_config['egld_wrap']).address
+            mex_wegld_pair_address = self.contracts[config.PAIRS_V2].get_deployed_contract_by_index(contract_config['mex_wegld_pair']).address
+            mex_wegld_farm_address = self.contracts[config.FARMS_V2].get_deployed_contract_by_index(contract_config['mex_wegld_farm']).address
+            proxy_dex_address = self.contracts[config.PROXIES_V2].get_deployed_contract_by_index(contract_config['proxy_dex']).address
+            router_contract_address = self.contracts[config.ROUTER_V2].get_deployed_contract_by_index(contract_config['router_v2']).address
+            
+            locked_token_position_creator_contract = LockedTokenPositionCreatorContract(
+                "", energy_factory_address, egld_wrapper_contract_address, 
+                mex_wegld_pair_address, mex_wegld_farm_address, proxy_dex_address,
+                router_contract_address
+            )
+            tx_hash, contract_address = locked_token_position_creator_contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    energy_factory_address,
+                    egld_wrapper_contract_address,
+                    mex_wegld_pair_address,
+                    mex_wegld_farm_address,
+                    proxy_dex_address,
+                    router_contract_address
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "locked token position creator contract"):
+                return
+            log_step_pass(f"Locked token position creator contract address: {contract_address}")
+            locked_token_position_creator_contract.address = contract_address
+
+            # setup whitelist for contract in proxy dex
+            proxy_dex_contract: DexProxyContract
+            proxy_dex_contract = self.contracts[config.PROXIES_V2].get_deployed_contract_by_index(contract_config['proxy_dex'])
+            tx_hash = proxy_dex_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy, contract_address)
+            network_providers.check_simple_tx_status(tx_hash, "whitelist in proxy dex")
+
+            # set transfer role for proxy dex wrapped tokens
+            tx_hash = proxy_dex_contract.set_transfer_role_wrapped_lp_token(deployer_account, network_providers.proxy, contract_address)
+            if not network_providers.check_complex_tx_status(tx_hash, "set transfer role wrapped lp token"): 
+                return
+            tx_hash = proxy_dex_contract.set_transfer_role_wrapped_farm_token(deployer_account, network_providers.proxy, contract_address)
+            if not network_providers.check_complex_tx_status(tx_hash, "set transfer role wrapped farm token"): 
+                return
+            
+            energy_factory_contract: SimpleLockEnergyContract
+            energy_factory_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(contract_config['energy_factory'])
+
+            # set burn role on base token for locked token position creator
+            tx_hash = self.esdt_contract.set_special_role_token(deployer_account, network_providers.proxy, 
+                                                                [energy_factory_contract.base_token, 
+                                                                 locked_token_position_creator_contract.address, 
+                                                                 "ESDTRoleLocalBurn"])
+            if not network_providers.check_complex_tx_status(tx_hash, "set burn role on base token"): return
+
+            # setup whitelist for contract in energy factory
+            tx_hash = energy_factory_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy, contract_address)
+            network_providers.check_simple_tx_status(tx_hash, "whitelist in energy factory")
+            tx_hash = energy_factory_contract.add_sc_to_token_transfer_whitelist(deployer_account, network_providers.proxy, contract_address)
+            network_providers.check_simple_tx_status(tx_hash, "whitelist for transfers in energy factory")
+
+            deployed_contracts.append(locked_token_position_creator_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
     def escrow_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
@@ -2035,7 +2168,7 @@ class DeployStructure:
                 ]
             )
 
-            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "position creator contract"):
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "Lk Token Wrapping contract"):
                 return
             log_step_pass(f"Lk Token Wrapping contract address: {contract_address}")
             contract.address = contract_address
@@ -2048,5 +2181,85 @@ class DeployStructure:
                                                           network_providers.proxy.url).get_data("getWrappedTokenId")
             contract.wrapped_token = hex_to_string(wrapped_token_hex)
 
+            deployed_contracts.append(contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def governance_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for contract_config in contract_structure.deploy_structure_list:
+            locking_contract: Optional[SimpleLockEnergyContract] = None
+            locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                contract_config.get('energy_factory', 0)
+            )
+            fees_collector: Optional[FeesCollectorContract] = None
+            fees_collector = self.contracts[config.FEES_COLLECTORS].get_deployed_contract_by_index(
+                contract_config.get('fees_collector', 0)
+            )
+            min_energy_for_propose = contract_config['min_energy_for_propose']
+            min_fee_for_propose = contract_config['min_fee_for_propose']
+            quorum_percentage = contract_config['quorum_percentage']
+            voting_delay_in_blocks = contract_config['voting_delay_in_blocks']
+            voting_period_in_blocks = contract_config['voting_period_in_blocks']
+            withdraw_percentage_defeated = contract_config['withdraw_percentage_defeated']
+
+            contract = GovernanceContract(locking_contract.base_token)
+            tx_hash, contract_address = contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    min_energy_for_propose,
+                    min_fee_for_propose,
+                    quorum_percentage,
+                    voting_delay_in_blocks,
+                    voting_period_in_blocks,
+                    withdraw_percentage_defeated,
+                    locking_contract.address,
+                    fees_collector.address
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "governance contract"):
+                return
+            log_step_pass(f"Governance contract address: {contract_address}")
+            contract.address = contract_address
+            
+            # setup whitelist in fees collector
+            tx_hash = fees_collector.add_known_contracts(deployer_account, network_providers.proxy, [contract_address])
+            network_providers.check_simple_tx_status(tx_hash, "whitelist in fees collector")
+            
+            deployed_contracts.append(contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def composable_tasks_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for contract_config in contract_structure.deploy_structure_list:
+            egld_wrapper_contract_address = self.contracts[config.EGLD_WRAPS].get_deployed_contract_by_index(contract_config['egld_wrap']).address
+            router_contract_address = self.contracts[config.ROUTER_V2].get_deployed_contract_by_index(contract_config['router_v2']).address
+
+            contract = ComposableTasksContract()
+            tx_hash, contract_address = contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                []
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "composable tasks contract"):
+                return
+            log_step_pass(f"Composable tasks contract address: {contract_address}")
+            contract.address = contract_address
+            
+            # setup contract
+            tx_hash = contract.set_wrap_egld_address(deployer_account, network_providers.proxy, [egld_wrapper_contract_address])
+            if not network_providers.check_simple_tx_status(tx_hash, "set wrap egld address"):
+                return
+
+            tx_hash = contract.set_router_address(deployer_account, network_providers.proxy, [router_contract_address])
+            if not network_providers.check_simple_tx_status(tx_hash, "set router address"):
+                return
+            
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts

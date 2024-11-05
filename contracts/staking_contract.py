@@ -1,7 +1,7 @@
 from typing import Any, Dict
 import config
 from contracts.contract_identities import StakingContractVersion
-from contracts.base_contracts import BaseFarmContract, BaseBoostedContract
+from contracts.base_contracts import BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
@@ -17,7 +17,7 @@ from utils import decoding_structures
 logger = get_logger(__name__)
 
 
-class StakingContract(BaseFarmContract, BaseBoostedContract):
+class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract):
     def __init__(self, farming_token: str, max_apr: int, rewards_per_block: int, unbond_epochs: int,
                  version: StakingContractVersion, farm_token: str = "", address: str = ""):
         self.farming_token = farming_token
@@ -172,9 +172,10 @@ class StakingContract(BaseFarmContract, BaseBoostedContract):
             self.farming_token,
             1000000000000,
             self.max_apr,
-            self.unbond_epochs,
-            0, 0
+            self.unbond_epochs
         ]
+        if self.version == StakingContractVersion.V2:
+            arguments.extend([0, 0])
         if self.version == StakingContractVersion.V2 or self.version == StakingContractVersion.V3Boosted:
             arguments.extend(args)
 
@@ -390,6 +391,15 @@ class StakingContract(BaseFarmContract, BaseBoostedContract):
 
         endpoint_name = "addAdmin"
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
+    
+    def update_owner_or_admin(self, deployer: Account, proxy: ProxyNetworkProvider, old_address: str):
+        function_purpose = "Update owner or admin"
+        logger.info(function_purpose)
+        
+        gas_limit = 70000000
+        sc_args = [old_address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "updateOwnerOrAdmin", sc_args)
     
     def get_reward_capacity(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
