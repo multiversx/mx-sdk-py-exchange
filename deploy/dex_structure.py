@@ -122,7 +122,7 @@ class DeployStructureArguments:
         parser.add_argument("--router-v2", action="store_true", help="Deploy clean router v2")
         parser.add_argument("--pairs", action="store_true", help="Deploy clean pairs")
         parser.add_argument("--pairs-v2", action="store_true", help="Deploy clean pairs v2")
-        parser.add_argument("--pairs-view", action="store_true", help="Deploy clean pairs v2")
+        parser.add_argument("--pairs-view", action="store_true", help="Deploy clean pair views")
         parser.add_argument("--farms-community", action="store_true", help="Deploy clean farms community")
         parser.add_argument("--farms-unlocked", action="store_true", help="Deploy clean farms unlocked")
         parser.add_argument("--farms-locked", action="store_true", help="Deploy clean farms locked")
@@ -1537,9 +1537,6 @@ class DeployStructure:
                                                         lock_epochs)
             if not network_providers.check_simple_tx_status(tx_hash, "set lock epochs in farm"): return
 
-            deployed_contract.resume(deployer_account, network_providers.proxy)
-            network_providers.check_simple_tx_status(tx_hash, "resume farm")
-
             # Set boosted yields rewards percentage
             if 'boosted_rewards' not in contract_config:
                 boosted_rewards = 6000
@@ -1851,8 +1848,6 @@ class DeployStructure:
             if not network_providers.check_simple_tx_status(tx_hash, "set rewards per block in stake contract"): return
 
             if version == StakingContractVersion.V3Boosted:
-                deployed_staking_contract.resume(deployer_account, network_providers.proxy)
-                network_providers.check_complex_tx_status(tx_hash, "resume stake contract")
 
                 # Set boosted yields rewards percentage
                 if 'boosted_rewards' not in config_staking:
