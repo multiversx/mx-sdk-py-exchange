@@ -205,9 +205,6 @@ def set_fees_collector_in_pairs(_):
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
-
-    network_providers = NetworkProviders(API, PROXY)
-    dex_owner = get_owner(network_providers.proxy)
     context = Context()
 
     fees_collector = FeesCollectorContract(context.get_contracts(config.FEES_COLLECTORS)[0].address)
