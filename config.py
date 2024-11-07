@@ -16,8 +16,11 @@ DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
 DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
-DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
-DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
+
+# SF related configuration
+SF_DEX_REFERENCE_ADDRESS = "erd1qqqqqqqqqqqqqpgqq66xk9gfr4esuhem3jru86wg5hvp33a62jps2fy57p"
+DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks; will be used if reference address not set
+DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks; will be used if reference address not set
 SHADOWFORK_FUNDING_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration

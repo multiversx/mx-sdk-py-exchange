@@ -20,7 +20,18 @@ class Context:
     def __init__(self):
 
         self.deploy_structure = DeployStructure()
+        self.network_provider = NetworkProviders(config.DEFAULT_API, config.DEFAULT_PROXY)
+
         self.deployer_account = Account.from_file(config.DEFAULT_OWNER)
+
+        if "shadowfork" in config.DEFAULT_PROXY and config.SF_DEX_REFERENCE_ADDRESS:
+            # get owner of the SF reference contract
+            owner = self.network_provider.proxy.get_account(Address(config.SF_DEX_REFERENCE_ADDRESS)).owner_address.to_bech32()
+            print(f"Shadowfork detected. Owner: {owner}")
+
+            config.DEX_OWNER_ADDRESS = owner
+            config.DEX_ADMIN_ADDRESS = owner
+
         if config.DEX_OWNER_ADDRESS:    # manual override only for shadowforks
             self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
 
@@ -35,8 +46,6 @@ class Context:
         self.accounts = BunchOfAccounts.load_accounts_from_files([config.DEFAULT_ACCOUNTS])
         self.nonces_file = config.DEFAULT_WORKSPACE / "_nonces.json"
         self.debug_level = 1
-
-        self.network_provider = NetworkProviders(config.DEFAULT_API, config.DEFAULT_PROXY)
 
         # logger
         self.start_time = datetime.now()

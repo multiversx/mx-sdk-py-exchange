@@ -41,7 +41,7 @@ class SimpleLockContract(DEXContractInterface):
         function_purpose = f"Deploy simple lock contract"
         logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable=True)
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
 
         arguments = []

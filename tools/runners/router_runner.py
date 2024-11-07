@@ -37,6 +37,12 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser.add_argument('--state', action='store_true', help='pair creation state')
     command_parser.set_defaults(func=enable_pair_creation)
 
+    command_parser = contract_group.add_parser('pause', help='pause router command')
+    command_parser.set_defaults(func=pause)
+
+    command_parser = contract_group.add_parser('resume', help='resume router command')
+    command_parser.set_defaults(func=resume)
+
     return group_parser
 
 
@@ -142,5 +148,33 @@ def enable_pair_creation(args: Any):
     tx_hash = router_contract.set_pair_creation_enabled(dex_owner, network_providers.proxy, [args.state])
 
     if not network_providers.check_simple_tx_status(tx_hash, f"{action} pair creation"):
+        if not get_user_continue():
+            return
+
+def pause(args: Any):
+    """Pause router contract"""
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+    context = Context()
+
+    router_contract = RouterContract.load_contract_by_address(context.get_contracts(config.ROUTER_V2)[0].address)
+    tx_hash = router_contract.pause(dex_owner, network_providers.proxy)
+
+    if not network_providers.check_simple_tx_status(tx_hash, "pause router contract"):
+        if not get_user_continue():
+            return
+
+def resume(args: Any):
+    """Resume router contract"""
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+    context = Context()
+
+    router_contract = RouterContract.load_contract_by_address(context.get_contracts(config.ROUTER_V2)[0].address)
+    tx_hash = router_contract.resume(dex_owner, network_providers.proxy)
+
+    if not network_providers.check_simple_tx_status(tx_hash, "resume router contract"):
         if not get_user_continue():
             return
