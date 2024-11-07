@@ -237,6 +237,17 @@
             "special_fee": 100,
             "fees_collector": 0,
             "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 15,
+            "accepted_token": 1,
+            "lp_token": "USHWEGLD",
+            "lp_token_name": "USHWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
         }
     ],
 
@@ -399,6 +410,23 @@
             "farm_const": 0,
             "min_energy": 1,
             "min_farm": 1
+        },
+        {
+            "farming_pool": 12,
+            "farm_token": "USHWEGLDFL",
+            "farm_token_name": "USHWEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 10000000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1000
         }
     ],
 
@@ -512,6 +540,60 @@
             "staking_v2": 5,
             "metastake_token": "METACRTLK",
             "metastake_token_name": "MetaStakedCRTLK"
+        }
+    ],
+
+    "escrows": [
+        {
+            "lock_factory": 0,
+            "lock_epochs": 30,
+            "cooldown_epochs": 30
+        }
+    ],
+
+    "lk_wraps": [
+        {
+            "lock_factory:": 0,
+            "wrapped_token": "WXMEX",
+            "wrapped_token_name": "WrappedXMEX"
+        }
+    ],
+
+    "position_creator": [
+        {
+            "egld_wrap": 1,
+            "router_v2": 0
+        }
+    ],
+
+    "locked_token_position_creator": [
+        {
+            "energy_factory": 0,
+            "egld_wrap": 1,
+            "mex_wegld_pair": 0,
+            "mex_wegld_farm": 2,
+            "proxy_dex": 0,
+            "router_v2": 0
+        }
+    ],
+
+    "composable_tasks": [
+        {
+            "egld_wrap": 1,
+            "router_v2": 0
+        }
+    ],
+
+    "governances": [
+        {
+            "energy_factory": 0,
+            "fees_collector": 0,
+            "min_energy_for_propose": 0,
+            "min_fee_for_propose": 1000000000000000000000000000,
+            "quorum_percentage": 4000,
+            "voting_delay_in_blocks": 1,
+            "voting_period_in_blocks": 144000,
+            "withdraw_percentage_defeated": 5000
         }
     ]
 }
