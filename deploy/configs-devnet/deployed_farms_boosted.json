@@ -54,5 +54,12 @@
         "farmedToken": "MEX-a659d0",
         "address": "erd1qqqqqqqqqqqqqpgq0qrv3nqsfv5sg936anqu2a56x99jt4370n4sp55uny",
         "version": 4
+    },
+    {
+        "farmingToken": "USHWEGLD-0b8b66",
+        "farmToken": "USHWEGLDFL-d08e3d",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgqjxazy2gwxv4m8tat6vsen56hhpsdff2f0n4srjdw3h",
+        "version": 4
     }
 ]
