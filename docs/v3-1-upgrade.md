@@ -2,13 +2,13 @@
 
 ## Prerequisites
 
-[] Add some egld into owner account.
-[] Make some space for the repo and source downloads
-[] Clone https://github.com/multiversx/mx-sdk-py-exchange 
-[] python3 -m venv .venv
-[] source .venv/bin/activate
-[] pip3 install -r requirements.txt
-[] Edit config.py
+[ ] Add some egld into owner account.
+[ ] Make some space for the repo and source downloads
+[ ] Clone https://github.com/multiversx/mx-sdk-py-exchange 
+[ ] python3 -m venv .venv
+[ ] source .venv/bin/activate
+[ ] pip3 install -r requirements.txt
+[ ] Edit config.py
 
 1. export PYTHONPATH=.
 2. python3 tools/runner.py stakings contract fetch-all
