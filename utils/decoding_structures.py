@@ -123,3 +123,4 @@ TOTAL_REWARDS_FOR_WEEK = {
         'amount': 'biguint'
     }
 }
+
