@@ -78,6 +78,21 @@ class RouterContract(DEXContractInterface):
             sc_args.append(token)
 
         return endpoint_call(proxy, gas_limit, owner, Address(self.address), "addCommonTokensForUserPairs", sc_args)
+    
+    def remove_common_tokens_for_user_pairs(self, owner: Account, proxy: ProxyNetworkProvider, *tokens):
+        """Expecting as args:
+            type[str..]: common token IDs
+        """
+        function_purpose = f"Remove common tokens for user pairs"
+        logger.info(function_purpose)
+
+        gas_limit = 100000000
+
+        sc_args = []
+        for token in tokens:
+            sc_args.append(token)
+
+        return endpoint_call(proxy, gas_limit, owner, Address(self.address), "removeCommonTokensForUserPairs", sc_args)
 
     def config_enable_by_user_parameters(self, deployer: Account, proxy: ProxyNetworkProvider, **kargs):
         """Expecting as args:
