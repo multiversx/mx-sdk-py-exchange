@@ -150,6 +150,51 @@ class GovernanceContract(DEXContractInterface):
         gas_limit = 10000000
         sc_args = args
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "withdrawDeposit", sc_args)
+    
+    def set_voting_period(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[int]: delay in blocks
+        """
+        function_purpose = f"Change voting period in blocks"
+        logger.info(function_purpose)
+
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 10000000
+        sc_args = args
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "changeVotingPeriodInBlocks", sc_args)
+
+    def set_voting_delay(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[int]: delay in blocks
+        """
+        function_purpose = f"Change voting delay in blocks"
+        logger.info(function_purpose)
+
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 10000000
+        sc_args = args
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "changeVotingDelayInBlocks", sc_args)
+    
+    def set_quorum_percentage(self, user: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[int]: new quorum percentage (10000 = 100%)
+        """
+        function_purpose = f"Change quorum percentage"
+        logger.info(function_purpose)
+
+        if len(args) != 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 10000000
+        sc_args = args
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "changeQuorumPercentage", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
