@@ -338,6 +338,22 @@ def build_token_ticker(owner: Address, prefix: str = ""):
     return prefix, hex
 
 
+def get_account_key(address_bech32: str, key_hex: str, proxy: ProxyNetworkProvider, block_number: int = 0):
+    if block_number == 0:
+        resource_url = f"address/{address_bech32}/key/{key_hex}"
+    else:
+        resource_url = f"address/{address_bech32}/key/{key_hex}?blockNonce={block_number}"
+    
+    try:
+        response = proxy.do_get_generic(resource_url)
+        value = response.get("value", "")
+    except Exception as e:
+        logger.error(f"Error getting account key: {e}")
+        value = ""
+        
+    return value
+
+
 def decode_merged_attributes(attributes_hex: str, decode_struct: dict) -> dict:
     def slide_indexes(j, no_bytes: int):
         index_f = j
