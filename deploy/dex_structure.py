@@ -599,6 +599,18 @@ class DeployStructure:
                 if not network_providers.check_simple_tx_status(tx_hash,
                                                                 "whitelist proxy in locked asset contract"): return
             if version == ProxyContractVersion.V2:
+                tx_hash = deployed_proxy_contract.set_transfer_role_wrapped_lp_token(deployer_account,
+                                                                                     network_providers.proxy,
+                                                                                     deployed_proxy_contract.address)
+                if not network_providers.check_complex_tx_status(tx_hash, "set transfer role for proxy lp token"): 
+                    return
+                
+                tx_hash = deployed_proxy_contract.set_transfer_role_wrapped_farm_token(deployer_account,
+                                                                                       network_providers.proxy,
+                                                                                       deployed_proxy_contract.address)
+                if not network_providers.check_complex_tx_status(tx_hash, "set transfer role for proxy farm token"):
+                    return
+                
                 tx_hash = energy_contract.add_sc_to_token_transfer_whitelist(deployer_account, network_providers.proxy,
                                                                              deployed_proxy_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash,
@@ -1885,12 +1897,6 @@ class DeployStructure:
                     tx_hash = deployed_staking_contract.set_energy_factory_address(deployer_account, network_providers.proxy,
                                                                         locking_contract.address)
                     if not network_providers.check_simple_tx_status(tx_hash, "set energy address in staking"): return
-
-                    # Whitelist staking in locking contract
-                    tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
-                                                                deployed_staking_contract.address)
-                    if not network_providers.check_simple_tx_status(tx_hash, "whitelist staking in locking contract"):
-                        if not get_continue_confirmation(): return
                 else:
                     log_step_fail(f"Failed to set up energy contract in staking. Energy contract not available!")
                     if not get_continue_confirmation(): return
