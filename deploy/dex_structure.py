@@ -93,13 +93,16 @@ class ContractStructure:
 
     def load_deployed_contracts(self):
         contracts_list = self.get_saved_deployed_contracts()
-        if len(self.deploy_structure_list) == len(contracts_list):
-            self.deployed_contracts = contracts_list
-            log_step_pass(f"Loaded {len(contracts_list)} {self.label}.")
-            return
-
-        log_step_fail(f"No contracts fetched for: {self.label}; "
+        if len(self.deploy_structure_list) != len(contracts_list):
+            log_warning(f"Uneven length of {self.label} deployed contracts! Attempt partial load?")
+            if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
+                log_step_fail(f"No contracts fetched for: {self.label}; "
                              f"Either no save available or mismatch between deploy structure and loaded contracts.")
+                return
+
+        self.deployed_contracts = contracts_list
+        log_step_pass(f"Loaded {len(contracts_list)} {self.label} out of expected {len(self.deploy_structure_list)}.")
+        return
 
     def print_deployed_contracts(self):
         log_step_pass(f"{self.label}:")
@@ -336,12 +339,13 @@ class DeployStructure:
                 log_step_pass(f"Starting setup process for {contract_label}:")
 
                 # if aborted deploy & setup, maybe attempt load instead
+                log_step_pass(f"Yes for clean setup; No for load and setup what's missing.")
                 if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
                     log_step_pass(f"Attempting load for {contract_label}:")
+                    log_step_pass(f"Yes for load and setup what's missing; No for abort {contract_label};")
                     if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
                         return
                     contracts.load_deployed_contracts()
-                    return
 
                 contracts.deploy_function(contract_label, deployer_account, network_provider)
                 if len(contracts.deployed_contracts) > 0:

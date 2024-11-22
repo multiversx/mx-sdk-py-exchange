@@ -61,5 +61,14 @@
         "rewards_per_block": 1426000000000000000,
         "unbond_epochs": 10,
         "version": 2
+    },
+    {
+        "farming_token": "FOXSY-5d5f3e",
+        "farm_token": "SFOXSY-e335c1",
+        "address": "erd1qqqqqqqqqqqqqpgq2e4fmlhcv90wrxl2acjpcu3g2l9rpkttx9rs8pppzp",
+        "max_apr": 1500,
+        "rewards_per_block": 1426000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
     }
 ]
