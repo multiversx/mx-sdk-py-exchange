@@ -1457,7 +1457,8 @@ class DeployStructure:
         contract_structure = self.contracts[contracts_index]
         deployed_contracts = []
 
-        for contract_config in contract_structure.deploy_structure_list:
+        num_already_deployed = len(self.contracts[contracts_index].deployed_contracts)
+        for contract_config in contract_structure.deploy_structure_list[num_already_deployed:]:
             # get lock factory
             if 'lock_factory' not in contract_config:
                 log_step_fail("Aborting deploy: Locked factory contract not existing!")
@@ -1654,7 +1655,7 @@ class DeployStructure:
                 if not network_providers.check_simple_tx_status(tx_hash, "whitelist simple lock in farm"): return
 
             deployed_contracts.append(deployed_contract)
-        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+        self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
 
     def farm_community_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]
@@ -1916,7 +1917,9 @@ class DeployStructure:
     def metastaking_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         deployed_contracts = []
         contract_structure = self.contracts[contracts_index]
-        for config_metastaking in contract_structure.deploy_structure_list:
+
+        num_already_deployed = len(self.contracts[contracts_index].deployed_contracts)
+        for config_metastaking in contract_structure.deploy_structure_list[num_already_deployed:]:
             staking_token = self.tokens[config_metastaking['token']]
             metastake_token = config_metastaking['metastake_token']
             metastake_token_name = config_metastaking['metastake_token_name']
@@ -2022,7 +2025,7 @@ class DeployStructure:
                 if not get_continue_confirmation(): return
 
             deployed_contracts.append(deployed_metastaking_contract)
-        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+        self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
 
     def position_creator_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]

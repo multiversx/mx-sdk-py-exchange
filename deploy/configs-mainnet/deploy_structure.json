@@ -547,7 +547,8 @@
             "farm_boosted": 9,
             "staking_v2": 7,
             "metastake_token": "METAFOXSLK",
-            "metastake_token_name": "MetaStakedFOXSYLK"
+            "metastake_token_name": "MetaStakedFOXSYLK",
+            "lock_factory": 0
         }
     ],
 
