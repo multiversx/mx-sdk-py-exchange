@@ -61,5 +61,12 @@
         "lpToken": "BHATWEGLD-f45935",
         "address": "erd1qqqqqqqqqqqqqpgqp32ecg03fyxgt2pf2fsxyg4knvhfvtgz2jps6rx6gf",
         "version": 2
+    },
+    {
+        "firstToken": "FOXSY-5d5f3e",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "FOXSYWEGLD-2a5635",
+        "address": "erd1qqqqqqqqqqqqqpgq5jnjpsukhl295ry3wjrd3gtff0amrgux2jpsz3reum",
+        "version": 2
     }
 ]

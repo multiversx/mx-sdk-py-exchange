@@ -29,8 +29,8 @@ class Context:
             owner = self.network_provider.proxy.get_account(Address(config.SF_DEX_REFERENCE_ADDRESS)).owner_address.to_bech32()
             print(f"Shadowfork detected. Owner: {owner}")
 
-            config.DEX_OWNER_ADDRESS = owner
-            config.DEX_ADMIN_ADDRESS = owner
+            config.DEX_OWNER_ADDRESS = owner if not config.DEX_OWNER_ADDRESS else config.DEX_OWNER_ADDRESS
+            config.DEX_ADMIN_ADDRESS = owner if not config.DEX_ADMIN_ADDRESS else config.DEX_ADMIN_ADDRESS
 
         if config.DEX_OWNER_ADDRESS:    # manual override only for shadowforks
             self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
