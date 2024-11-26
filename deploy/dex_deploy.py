@@ -22,7 +22,8 @@ def main(cli_args: List[str]):
     parser = ArgumentParser()
     parser.add_argument("--deploy-tokens", required=False, default="config", help="command to deploy tokens: clean | config")   # options: clean | config
     parser.add_argument("--deploy-contracts", required=False, default="config", help="command to deploy contracts: clean | config")   # options: clean | config
-    parser.add_argument("--force-start", action='store_true', required=False, default=False, help="force start of the deployed contracts")   # force start all
+    parser.add_argument("--force-start", action='store_true', required=False, default=False, help="force start of all deployed contracts")   # force start all
+    parser.add_argument("--no-start", action='store_true', required=False, default=False, help="no start of the deployed contracts")   # force start all
     DeployStructureArguments.add_clean_contract_deploy_arguments(parser)
     args = parser.parse_args(cli_args)
 

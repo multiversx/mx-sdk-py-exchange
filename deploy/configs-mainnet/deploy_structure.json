@@ -2,7 +2,7 @@
     "token": 
         {
             "token_prefix": "E2ETK7",
-            "number_of_tokens": 10
+            "number_of_tokens": 11
         },
 
     "egld_wraps": [
@@ -197,6 +197,17 @@
             "special_fee": 100,
             "fees_collector": 0,
             "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 10,
+            "accepted_token": 1,
+            "lp_token": "FOXSYWEGLD",
+            "lp_token_name": "FOXSYWEGLD",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
         }
     ],
 
@@ -370,6 +381,40 @@
             "farm_const": 0,
             "min_energy": 1,
             "min_farm": 1
+        },
+        {
+            "farming_pool": 9,
+            "farm_token": "FOXSEGLDFL",
+            "farm_token_name": "FOXSYEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        },
+        {
+            "farming_pool": 0,
+            "farm_token": "EGLDMEXFL",
+            "farm_token_name": "EGLDMEXLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
         }
     ],
 
@@ -444,6 +489,15 @@
             "rpb": 4138000000000000000,
             "unbond_epochs": 10,
             "rewards": 10000000000000000000000000
+        },
+        {
+            "staking_token": 10,
+            "stake_token": "SFOXSY",
+            "stake_token_name": "StakedFOXSY",
+            "apr": 1500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
         }
     ],
 
@@ -483,6 +537,18 @@
             "staking_v2": 5,
             "metastake_token": "METACRTLK",
             "metastake_token_name": "MetaStakedCRTLK"
+        }
+    ],
+
+    "metastakings_boosted": [
+        {
+            "token": 10,
+            "pool_v2": 9,
+            "farm_boosted": 9,
+            "staking_v2": 7,
+            "metastake_token": "METAFOXSLK",
+            "metastake_token_name": "MetaStakedFOXSYLK",
+            "lock_factory": 0
         }
     ],
 

@@ -93,13 +93,16 @@ class ContractStructure:
 
     def load_deployed_contracts(self):
         contracts_list = self.get_saved_deployed_contracts()
-        if len(self.deploy_structure_list) == len(contracts_list):
-            self.deployed_contracts = contracts_list
-            log_step_pass(f"Loaded {len(contracts_list)} {self.label}.")
-            return
-
-        log_step_fail(f"No contracts fetched for: {self.label}; "
+        if len(self.deploy_structure_list) != len(contracts_list):
+            log_warning(f"Uneven length of {self.label} deployed contracts! Attempt partial load?")
+            if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
+                log_step_fail(f"No contracts fetched for: {self.label}; "
                              f"Either no save available or mismatch between deploy structure and loaded contracts.")
+                return
+
+        self.deployed_contracts = contracts_list
+        log_step_pass(f"Loaded {len(contracts_list)} {self.label} out of expected {len(self.deploy_structure_list)}.")
+        return
 
     def print_deployed_contracts(self):
         log_step_pass(f"{self.label}:")
@@ -336,12 +339,13 @@ class DeployStructure:
                 log_step_pass(f"Starting setup process for {contract_label}:")
 
                 # if aborted deploy & setup, maybe attempt load instead
+                log_step_pass(f"Yes for clean setup; No for load and setup what's missing.")
                 if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
                     log_step_pass(f"Attempting load for {contract_label}:")
+                    log_step_pass(f"Yes for load and setup what's missing; No for abort {contract_label};")
                     if not get_continue_confirmation(config.FORCE_CONTINUE_PROMPT):
                         return
                     contracts.load_deployed_contracts()
-                    return
 
                 contracts.deploy_function(contract_label, deployer_account, network_provider)
                 if len(contracts.deployed_contracts) > 0:
@@ -599,6 +603,18 @@ class DeployStructure:
                 if not network_providers.check_simple_tx_status(tx_hash,
                                                                 "whitelist proxy in locked asset contract"): return
             if version == ProxyContractVersion.V2:
+                tx_hash = deployed_proxy_contract.set_transfer_role_wrapped_lp_token(deployer_account,
+                                                                                     network_providers.proxy,
+                                                                                     deployed_proxy_contract.address)
+                if not network_providers.check_complex_tx_status(tx_hash, "set transfer role for proxy lp token"): 
+                    return
+                
+                tx_hash = deployed_proxy_contract.set_transfer_role_wrapped_farm_token(deployer_account,
+                                                                                       network_providers.proxy,
+                                                                                       deployed_proxy_contract.address)
+                if not network_providers.check_complex_tx_status(tx_hash, "set transfer role for proxy farm token"):
+                    return
+                
                 tx_hash = energy_contract.add_sc_to_token_transfer_whitelist(deployer_account, network_providers.proxy,
                                                                              deployed_proxy_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash,
@@ -1441,7 +1457,8 @@ class DeployStructure:
         contract_structure = self.contracts[contracts_index]
         deployed_contracts = []
 
-        for contract_config in contract_structure.deploy_structure_list:
+        num_already_deployed = len(self.contracts[contracts_index].deployed_contracts)
+        for contract_config in contract_structure.deploy_structure_list[num_already_deployed:]:
             # get lock factory
             if 'lock_factory' not in contract_config:
                 log_step_fail("Aborting deploy: Locked factory contract not existing!")
@@ -1638,7 +1655,7 @@ class DeployStructure:
                 if not network_providers.check_simple_tx_status(tx_hash, "whitelist simple lock in farm"): return
 
             deployed_contracts.append(deployed_contract)
-        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+        self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
 
     def farm_community_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]
@@ -1885,12 +1902,6 @@ class DeployStructure:
                     tx_hash = deployed_staking_contract.set_energy_factory_address(deployer_account, network_providers.proxy,
                                                                         locking_contract.address)
                     if not network_providers.check_simple_tx_status(tx_hash, "set energy address in staking"): return
-
-                    # Whitelist staking in locking contract
-                    tx_hash = locking_contract.add_sc_to_whitelist(deployer_account, network_providers.proxy,
-                                                                deployed_staking_contract.address)
-                    if not network_providers.check_simple_tx_status(tx_hash, "whitelist staking in locking contract"):
-                        if not get_continue_confirmation(): return
                 else:
                     log_step_fail(f"Failed to set up energy contract in staking. Energy contract not available!")
                     if not get_continue_confirmation(): return
@@ -1906,7 +1917,9 @@ class DeployStructure:
     def metastaking_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         deployed_contracts = []
         contract_structure = self.contracts[contracts_index]
-        for config_metastaking in contract_structure.deploy_structure_list:
+
+        num_already_deployed = len(self.contracts[contracts_index].deployed_contracts)
+        for config_metastaking in contract_structure.deploy_structure_list[num_already_deployed:]:
             staking_token = self.tokens[config_metastaking['token']]
             metastake_token = config_metastaking['metastake_token']
             metastake_token_name = config_metastaking['metastake_token_name']
@@ -2012,7 +2025,7 @@ class DeployStructure:
                 if not get_continue_confirmation(): return
 
             deployed_contracts.append(deployed_metastaking_contract)
-        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+        self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
 
     def position_creator_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]

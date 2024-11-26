@@ -1,0 +1,14 @@
+[
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqqcgdee7ut4qmx942fpgtk9da53acmserkp2sez9f70",
+        "metastake_token": "METAFOXSLK-2a13e3",
+        "staking_token": "FOXSY-5d5f3e",
+        "lp_token": "FOXSYWEGLD-2a5635",
+        "farm_token": "FOXSEGLDFL-f10836",
+        "stake_token": "SFOXSY-e335c1",
+        "lp_address": "erd1qqqqqqqqqqqqqpgq5jnjpsukhl295ry3wjrd3gtff0amrgux2jpsz3reum",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqu288dj3qgrelujal5wynsv5zrf7u0hwlkp2se383n7",
+        "stake_address": "erd1qqqqqqqqqqqqqpgq2e4fmlhcv90wrxl2acjpcu3g2l9rpkttx9rs8pppzp",
+        "version": 3
+    }
+]

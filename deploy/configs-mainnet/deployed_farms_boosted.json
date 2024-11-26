@@ -61,5 +61,19 @@
         "farmedToken": "MEX-455c57",
         "address": "erd1qqqqqqqqqqqqqpgqcfkmz2j0e8pj0nzuk9j6mzcav0wpthq52jpsg546ch",
         "version": 4
+    },
+    {
+        "farmingToken": "FOXSYWEGLD-2a5635",
+        "farmToken": "FOXSEGLDFL-f10836",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqu288dj3qgrelujal5wynsv5zrf7u0hwlkp2se383n7",
+        "version": 4
+    },
+    {
+        "farmingToken": "EGLDMEX-0be9e5",
+        "farmToken": "EGLDMEXFL-a51a1d",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqtdc0rzjwmp9qs0h0wj9pjwxnp5vjc9hdkp2swd4dxz",
+        "version": 4
     }
 ]

@@ -282,7 +282,6 @@ def setup_boosted_parameters_with_energy_address(staking_addresses: list[str], e
         hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, STAKING_BOOSTED_REWARDS_PERCENTAGE))
         hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, STAKING_BOOSTED_YIELD_FACTORS))
         hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
-        hashes.append(energy_contract.add_sc_to_whitelist(dex_owner, network_providers.proxy, staking_address))
             
         sleep(6)
 

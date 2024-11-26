@@ -423,7 +423,7 @@ class DexProxyContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addPairToIntermediate", [pair_address])
 
     def set_transfer_role_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
-        function_purpose = "Set transfer role on address for lp token"
+        function_purpose = "Set transfer role on address for lp token; legacy endpoint"
         logger.info(function_purpose)
 
         if address == "":
@@ -434,7 +434,7 @@ class DexProxyContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleLockedLpToken", [address])
     
     def set_transfer_role_locked_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
-        function_purpose = "Set transfer role on address for farm token"
+        function_purpose = "Set transfer role on address for farm token; legacy endpoint"
         logger.info(function_purpose)
 
         if address == "":
