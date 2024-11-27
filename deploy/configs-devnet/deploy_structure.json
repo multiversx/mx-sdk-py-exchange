@@ -427,6 +427,23 @@
             "farm_const": 0,
             "min_energy": 1,
             "min_farm": 1000
+        },
+        {
+            "farming_pool": 0,
+            "farm_token": "EGLDMEXFL",
+            "farm_token_name": "EGLDMEXLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
         }
     ],
 
