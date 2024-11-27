@@ -61,5 +61,12 @@
         "farmedToken": "MEX-a659d0",
         "address": "erd1qqqqqqqqqqqqqpgqjxazy2gwxv4m8tat6vsen56hhpsdff2f0n4srjdw3h",
         "version": 4
+    },
+    {
+        "farmingToken": "EGLDMEX-95c6d5",
+        "farmToken": "EGLDMEXFL-449344",
+        "farmedToken": "MEX-a659d0",
+        "address": "erd1qqqqqqqqqqqqqpgqmye3xq9p8x0g3hqawz22txsyw07nnv9e0n4swdrvqc",
+        "version": 4
     }
 ]
