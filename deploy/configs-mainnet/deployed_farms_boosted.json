@@ -75,5 +75,19 @@
         "farmedToken": "MEX-455c57",
         "address": "erd1qqqqqqqqqqqqqpgqtdc0rzjwmp9qs0h0wj9pjwxnp5vjc9hdkp2swd4dxz",
         "version": 4
+    },
+    {
+        "farmingToken": "MEXUSDC-a57860",
+        "farmToken": "MEXUSDCFL-f9379f",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqzfy62c66hjuu9lm2c9mr4gcver9lmnydkp2st70eq5",
+        "version": 4
+    },
+    {
+        "farmingToken": "KWAKWEGLD-014bfc",
+        "farmToken": "KWAKEGLDFL-891492",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqgg42sl557vh7rwt600w76pe48u64qngmkp2sl8mrfx",
+        "version": 4
     }
 ]

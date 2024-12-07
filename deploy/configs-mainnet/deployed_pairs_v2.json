@@ -68,5 +68,19 @@
         "lpToken": "FOXSYWEGLD-2a5635",
         "address": "erd1qqqqqqqqqqqqqpgq5jnjpsukhl295ry3wjrd3gtff0amrgux2jpsz3reum",
         "version": 2
+    },
+    {
+        "firstToken": "MEX-455c57",
+        "secondToken": "USDC-c76f1f",
+        "lpToken": "MEXUSDC-a57860",
+        "address": "erd1qqqqqqqqqqqqqpgqv0c22xku4vd5ugfh0u53tqufmdkqx5nv2jps8vsccx",
+        "version": 2
+    },
+    {
+        "firstToken": "KWAK-469ab0",
+        "secondToken": "WEGLD-bd4d79",
+        "lpToken": "KWAKWEGLD-014bfc",
+        "address": "erd1qqqqqqqqqqqqqpgqthhxe87ulznhhm72jekexj9rwqzu3zsv2jps88erau",
+        "version": 2
     }
 ]
