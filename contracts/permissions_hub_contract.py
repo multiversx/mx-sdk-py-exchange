@@ -1,6 +1,3 @@
-import sys
-import traceback
-
 from contracts.contract_identities import DEXContractInterface
 from utils.contract_data_fetchers import PermissionsHubContractDataFetcher
 from utils.logger import get_logger
@@ -14,7 +11,7 @@ from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 logger = get_logger(__name__)
 
 
-class PermissionHubContract(DEXContractInterface):
+class PermissionsHubContract(DEXContractInterface):
     def __init__(self, address: str = ""):
         self.address = address
 
@@ -26,11 +23,11 @@ class PermissionHubContract(DEXContractInterface):
 
     @classmethod
     def load_config_dict(cls, config_dict: dict):
-        return PermissionHubContract(address=config_dict['address'])
+        return PermissionsHubContract(address=config_dict['address'])
 
     @classmethod
     def load_contract_by_address(cls, address: str):
-        return PermissionHubContract(address)
+        return PermissionsHubContract(address)
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:

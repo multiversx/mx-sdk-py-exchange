@@ -87,6 +87,27 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
 
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
                                         Address(self.address), enterFarmFn, sc_args)
+    
+    def enter_farm_on_behalf(self, network_provider: NetworkProviders, user: Account, event: EnterFarmEvent) -> str:
+        function_purpose = "enter farm on behalf"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        enterFarmFn = "enterFarmOnBehalf"
+
+        logger.info(f"Calling {enterFarmFn} endpoint...")
+
+        gas_limit = 50000000
+
+        tokens = [ESDTToken(event.farming_tk, event.farming_tk_nonce, event.farming_tk_amount)]
+        if event.farm_tk:
+            tokens.append(ESDTToken(event.farm_tk, event.farm_tk_nonce, event.farm_tk_amount))
+
+        sc_args = [tokens,
+                   Address(event.on_behalf)]
+
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), enterFarmFn, sc_args)
 
     def exitFarm(self, network_provider: NetworkProviders, user: Account, event: ExitFarmEvent) -> str:
         function_purpose = f"exit farm"
@@ -124,6 +145,19 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
 
         sc_args = [Address(event.user)] if event.user else []
         return endpoint_call(network_provider.proxy, gas_limit, user, Address(self.address), claim_fn, sc_args)
+    
+    def claim_rewards_on_behalf(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsFarmEvent) -> str:
+        function_purpose = f"claimRewardsOnBehalf"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 50000000
+        tokens = [ESDTToken(self.farmToken, event.nonce, event.amount)]
+        sc_args = [
+            tokens
+        ]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), "claimRewardsOnBehalf", sc_args)
 
 
     def compoundRewards(self, network_provider: NetworkProviders, user: Account, event: CompoundRewardsFarmEvent) -> str:
@@ -385,6 +419,17 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "updateOwnerOrAdmin", sc_args)
 
+    def set_permissions_hub_address(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
+        """Only V3.
+        """
+        function_purpose = "Set permissions hub address"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = [address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPermissionsHubAddress", sc_args)
+    
     def set_transfer_role_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
         """Only V2Boosted.
         """
