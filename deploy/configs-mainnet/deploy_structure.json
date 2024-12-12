@@ -2,7 +2,7 @@
     "token": 
         {
             "token_prefix": "E2ETK7",
-            "number_of_tokens": 11
+            "number_of_tokens": 13
         },
 
     "egld_wraps": [
@@ -230,6 +230,12 @@
             "special_fee": 100,
             "fees_collector": 0,
             "fees_collector_cut": 500
+        }
+    ],
+
+    "pairs_view": [
+        {
+            "empty": 0
         }
     ],
 
@@ -593,6 +599,25 @@
             "staking_v2": 5,
             "metastake_token": "METACRTLK",
             "metastake_token_name": "MetaStakedCRTLK"
+        }
+    ],
+
+    "stakings_boosted": [
+        {
+            "staking_token": 12,
+            "stake_token": "SA1X",
+            "stake_token_name": "StakedAINEXUS",
+            "apr": 10000,
+            "rpb": 666000000000000000,
+            "rewards": 0,
+            "unbond_epochs": 10,
+            "lock_factory": 0,
+            "boosted_rewards": 4000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1000
         }
     ],
 
