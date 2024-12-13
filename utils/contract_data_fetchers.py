@@ -348,6 +348,14 @@ class BaseContractWhitelistDataFetcher(DataFetcher):
             "isSCAddressWhitelisted": self._get_int_view
         }
 
+class PermissionsHubContractDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "isWhitelisted": self._get_int_view,
+            "getBlacklistedAddresses": self._get_hex_list_view,
+        }
+
 
 class LkWrapContractDataFetcher(DataFetcher):
     def __init__(self, contract_address: Address, proxy_url: str):

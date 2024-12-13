@@ -32,6 +32,7 @@ from contracts.staking_contract import StakingContract
 from contracts.dex_proxy_contract import DexProxyContract
 from contracts.governance_contract import GovernanceContract
 from contracts.composable_tasks_contract import ComposableTasksContract
+from contracts.permissions_hub_contract import PermissionsHubContract
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import hex_to_string
 from utils.utils_chain import Account, WrapperAddress as Address
@@ -144,6 +145,7 @@ class DeployStructureArguments:
         parser.add_argument("--escrows", action="store_true", help="Deploy clean escrows")
         parser.add_argument("--lk-wraps", action="store_true", help="Deploy clean lk token wrappers")
         parser.add_argument("--composable-tasks", action="store_true", help="Deploy clean composable tasks")
+        parser.add_argument("--permissions-hubs", action="store_true", help="Deploy clean permissions hubs")
 
 
 class DeployStructure:
@@ -193,6 +195,9 @@ class DeployStructure:
             config.PAIRS_VIEW:
                 ContractStructure(config.PAIRS_VIEW, PairContract, config.PAIR_VIEW_BYTECODE_PATH,
                                   self.pool_view_deploy, False),
+            config.PERMISSIONS_HUBS:
+                ContractStructure(config.PERMISSIONS_HUBS, PermissionsHubContract, config.PERMISSIONS_HUBS_BYTECODE_PATH,
+                                  self.permissions_hub_deploy, False),
             config.FARMS_COMMUNITY:
                 ContractStructure(config.FARMS_COMMUNITY, FarmContract, config.FARM_COMMUNITY_BYTECODE_PATH,
                                   self.farm_community_deploy, False),
@@ -1079,6 +1084,25 @@ class DeployStructure:
             log_step_pass(f"View pair contract address: {contract_address}")
             dummy_pair_contract.address = contract_address
             deployed_contracts.append(dummy_pair_contract)
+        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+
+    def permissions_hub_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        for _ in contract_structure.deploy_structure_list:
+            # deploy permissions hub contract
+            deployed_contract = PermissionsHubContract()
+            tx_hash, contract_address = deployed_contract.contract_deploy(deployer_account,
+                                                                          network_providers.proxy,
+                                                                          contract_structure.bytecode, [])
+            # check for deployment success and save the deployed address
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "permissions hub"): 
+                return
+            
+            deployed_contract.address = contract_address
+            log_step_pass(f"Permissions hub contract address: {contract_address}")
+
+            deployed_contracts.append(deployed_contract)
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
     def farm_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):

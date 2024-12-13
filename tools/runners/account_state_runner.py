@@ -55,6 +55,36 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
     return keys
 
 
+def get_account_data_online(address: str, proxy_url: str, block_number: int = 0, with_save_in: str = "") -> Dict[str, Any]:
+    """Get account data from chain"""
+
+    if block_number == 0:
+        resource_url = f"address/{address}"
+    else:
+        resource_url = f"address/{address}?blockNonce={block_number}"
+
+    proxy = ProxyNetworkProvider(proxy_url)
+    response = {}
+
+    try:
+        response = proxy.do_get_generic(resource_url)
+    except (requests.exceptions.RequestException, errors.GenericError) as e:
+        log_step_fail(f"Exception occurred while retrieving data: {e}")
+    
+    data = response.get("account", {})
+
+    if data and with_save_in:
+        dir_path = os.path.dirname(with_save_in)
+        if not os.path.exists(dir_path):
+            os.mkdir(dir_path)
+
+        with open(with_save_in, 'w', encoding="UTF-8") as state_writer:
+            json.dump(data, state_writer, indent=4)
+            logger.info(f'Dumped the retrieved contact state in: {with_save_in}')
+    
+    return data
+
+
 def compare_keys(left_state: dict, right_state: dict) -> Tuple[bool, dict, dict, dict, dict]:
     """
     Returns:

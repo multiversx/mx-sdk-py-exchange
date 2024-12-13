@@ -9,7 +9,7 @@ from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_padded_hex
 from utils.utils_chain import WrapperAddress, Account
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
-from tools.runners.account_state_runner import get_account_keys_online
+from tools.runners.account_state_runner import get_account_keys_online, get_account_data_online
 from multiversx_sdk import ProxyNetworkProvider
 
 
@@ -49,7 +49,7 @@ def get_contract_retrieval_labels(contracts: str) -> List[str]:
         return contracts.split(",")
 
 
-def fetch_states(context: Context, args) -> json:
+def fetch_contract_states(context: Context, args) -> json:
     proxy = ProxyNetworkProvider(args.gateway)
     contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER)[0].address).get_shard()
     all_keys = list[dict]
@@ -67,15 +67,24 @@ def fetch_states(context: Context, args) -> json:
             index = int(args.contract_index)
             if index >= len(contracts):
                 log_step_fail(f"Contract index {index} is out of bounds for {label} contracts.")
-                return
+                return []
             contracts = [contracts[index]]
 
-        # retrieve state for each contract
+        # retrieve keys and data for each contract
         for i, contract in enumerate(contracts):
-            file = f"{STATES_FOLDER}/{block_number}_{label}_{i}_state.json"
-            keys = get_account_keys_online(contract.address, proxy.url, block_number, file)
-            all_keys.append(keys)
+            keys_file = f"{STATES_FOLDER}/{block_number}_{label}_{i}_state.json"
+            data_file = f"{STATES_FOLDER}/{block_number}_{label}_{i}_data.json"
+            keys = get_account_keys_online(contract.address, proxy.url, block_number, keys_file)
+            data = get_account_data_online(contract.address, proxy.url, block_number, data_file)
 
+            account_state = {}
+            account_state.update(data)
+            account_state['keys'] = keys
+
+            all_keys.append(account_state)
+
+    return all_keys
+    
     # get system account state - done later since it's gigantic
     file = f"{STATES_FOLDER}/{block_number}_system_account_state.json"
     if args.system_account == "offline":
