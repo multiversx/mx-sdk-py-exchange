@@ -7,5 +7,14 @@
         "rewards_per_block": 666000000000000000,
         "unbond_epochs": 10,
         "version": 3
+    },
+    {
+        "farming_token": "DRX-b7f337",
+        "farm_token": "SDRX-54f46e",
+        "address": "erd1qqqqqqqqqqqqqpgqf0tlpqkkg7e6mc76ayap6wynktnfmdzmkp2sc67v5w",
+        "max_apr": 10000,
+        "rewards_per_block": 4946727000,
+        "unbond_epochs": 10,
+        "version": 3
     }
 ]
