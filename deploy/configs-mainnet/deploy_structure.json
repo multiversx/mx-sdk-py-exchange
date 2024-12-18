@@ -624,7 +624,7 @@
             "stake_token": "SDRX",
             "stake_token_name": "StakedDoctorX",
             "apr": 10000,
-            "rpb": 4946727000000000000000,
+            "rpb": 4946727000,
             "rewards": 0,
             "unbond_epochs": 10,
             "lock_factory": 0,
