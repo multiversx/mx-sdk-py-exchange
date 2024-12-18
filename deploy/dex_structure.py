@@ -1800,9 +1800,11 @@ class DeployStructure:
         self.contracts[contracts_index].deployed_contracts = deployed_contracts
 
     def staking_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
-        deployed_contracts = []
         contract_structure = self.contracts[contracts_index]
-        for config_staking in contract_structure.deploy_structure_list:
+        deployed_contracts = []
+
+        num_already_deployed = len(self.contracts[contracts_index].deployed_contracts)
+        for config_staking in contract_structure.deploy_structure_list[num_already_deployed:]:
             staking_token = self.tokens[config_staking['staking_token']]
             stake_token = config_staking['stake_token']
             stake_token_name = config_staking['stake_token_name']
@@ -1912,7 +1914,7 @@ class DeployStructure:
                 _ = network_providers.check_simple_tx_status(tx_hash, "topup rewards in stake contract")
 
             deployed_contracts.append(deployed_staking_contract)
-        self.contracts[contracts_index].deployed_contracts = deployed_contracts
+        self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
 
     def metastaking_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         deployed_contracts = []
