@@ -433,9 +433,8 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         return all_stats
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
-        # _ = self.start_produce_rewards(deployer, proxy)
-        # _ = self.resume(deployer, proxy)
-        pass
+        _ = self.start_produce_rewards(deployer, proxy)
+        _ = self.resume(deployer, proxy)
 
     def print_contract_info(self):
         log_step_pass(f"Deployed staking contract: {self.address}")

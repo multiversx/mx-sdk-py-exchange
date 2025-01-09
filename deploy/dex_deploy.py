@@ -22,8 +22,8 @@ def main(cli_args: List[str]):
     parser = ArgumentParser()
     parser.add_argument("--deploy-tokens", required=False, default="config", help="command to deploy tokens: clean | config")   # options: clean | config
     parser.add_argument("--deploy-contracts", required=False, default="config", help="command to deploy contracts: clean | config")   # options: clean | config
-    parser.add_argument("--force-start", action='store_true', required=False, default=False, help="force start of all deployed contracts")   # force start all
-    parser.add_argument("--no-start", action='store_true', required=False, default=False, help="no start of the deployed contracts")   # force start all
+    parser.add_argument("--allow-start", action='store_true', required=False, default=False, help="allow start of the deployed contracts")   # allow contract start
+    parser.add_argument("--force-start-all", action='store_true', required=False, default=False, help="force start of all deployed contracts")   # force start all; should be used with allow-start
     DeployStructureArguments.add_clean_contract_deploy_arguments(parser)
     args = parser.parse_args(cli_args)
 
@@ -47,10 +47,11 @@ def main(cli_args: List[str]):
 
     # CONTRACTS START
     start_flag = False
-    if args.deploy_contracts != "config" or args.force_start:
+    if args.deploy_contracts != "config" or args.force_start_all:
         start_flag = True
     dex_infra.deploy_structure.start_deployed_contracts(dex_infra.deployer_account, dex_infra.network_provider,
-                                                        start_flag, cli_deployed_contracts_list)
+                                                        start_flag, cli_deployed_contracts_list,
+                                                        args.allow_start)
 
     # program closing
     # dex_infra.save_deployed_structure()
