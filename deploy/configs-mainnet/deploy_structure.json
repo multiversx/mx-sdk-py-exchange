@@ -2,7 +2,7 @@
     "token": 
         {
             "token_prefix": "E2ETK7",
-            "number_of_tokens": 14
+            "number_of_tokens": 15
         },
 
     "egld_wraps": [
@@ -625,6 +625,22 @@
             "stake_token_name": "StakedDoctorX",
             "apr": 10000,
             "rpb": 4946727000,
+            "rewards": 0,
+            "unbond_epochs": 10,
+            "lock_factory": 0,
+            "boosted_rewards": 4000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1000
+        },
+        {
+            "staking_token": 14,
+            "stake_token": "SBOD",
+            "stake_token_name": "StakedBodcoin",
+            "apr": 10000,
+            "rpb": 220000000000000000000,
             "rewards": 0,
             "unbond_epochs": 10,
             "lock_factory": 0,
