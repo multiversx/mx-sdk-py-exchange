@@ -451,9 +451,8 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         return all_stats
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
-        # _ = self.start_produce_rewards(deployer, proxy)
-        # _ = self.resume(deployer, proxy)
-        pass
+        _ = self.start_produce_rewards(deployer, proxy)
+        _ = self.resume(deployer, proxy)
 
     def print_contract_info(self):
         log_step_pass(f"Deployed farm contract: {self.address}")

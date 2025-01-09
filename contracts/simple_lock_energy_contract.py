@@ -519,7 +519,6 @@ class SimpleLockEnergyContract(DEXContractInterface):
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "adjustUserEnergy", args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
-        self.set_transfer_role_locked_token(deployer, proxy, [])
         self.resume(deployer, proxy)
 
     def print_contract_info(self):

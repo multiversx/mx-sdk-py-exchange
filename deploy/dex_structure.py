@@ -357,11 +357,13 @@ class DeployStructure:
 
     # should be run for fresh deployed contracts
     def start_deployed_contracts(self, deployer_account: Account, network_provider: NetworkProviders,
-                                 clean_deploy_override: bool, clean_deploy_list: List[str] = None):
+                                 clean_deploy_override: bool, clean_deploy_list: List[str] = None, 
+                                 allow_contract_start: bool = False):
         deployer_account.sync_nonce(network_provider.proxy)
         for contracts in self.contracts.values():
-            if contracts.deploy_clean or clean_deploy_override or \
-                (clean_deploy_list and contracts.label in clean_deploy_list):
+            if allow_contract_start and \
+                (contracts.deploy_clean or clean_deploy_override or \
+                    (clean_deploy_list and contracts.label in clean_deploy_list)):
                 for contract in contracts.deployed_contracts:
                     contract.contract_start(deployer_account, network_provider.proxy)
 
