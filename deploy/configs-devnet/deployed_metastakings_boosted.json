@@ -1,0 +1,14 @@
+[
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqgacglcgyj5yxe76vcdpff7r0ch6tppej0n4sxe6m6u",
+        "metastake_token": "METAHTMLK-d5dcc9",
+        "staking_token": "HTM-23a1da",
+        "lp_token": "HTMWEGLD-acd22a",
+        "farm_token": "HTMWEGLDFL-f9ec2b",
+        "stake_token": "SHTM-f9301a",
+        "lp_address": "erd1qqqqqqqqqqqqqpgqnp4wf8nsd0pfz957fe2n8gzpksycxc790n4sqvv74v",
+        "farm_address": "erd1qqqqqqqqqqqqqpgqrrghrmzzq3vczqpx2quaza4yyke5fudh0n4sxdhv67",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqvyhjh8623r3v7n267fa3g3f62vlekhqe0n4s6fp752",
+        "version": 3
+    }
+]
