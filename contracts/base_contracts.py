@@ -290,3 +290,17 @@ class BaseSCWhitelistContract(DEXContractInterface, ABC):
             return False
         return bool(raw_results)
     
+
+class BasePermissionsHubContract(DEXContractInterface, ABC):
+
+    def set_permissions_hub_address(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
+        """Only V3.
+        """
+        function_purpose = "Set permissions hub address"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = [address]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPermissionsHubAddress", sc_args)
+    

@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Tuple, override
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractVersion
-from contracts.base_contracts import BaseSCWhitelistContract
+from contracts.base_contracts import BaseSCWhitelistContract, BasePermissionsHubContract
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
@@ -16,7 +16,7 @@ from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 logger = get_logger(__name__)
 
 
-class MetaStakingContract(BaseSCWhitelistContract):
+class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
     def __init__(self, staking_token: str, lp_token: str, farm_token: str, stake_token: str,
                  lp_address: str, farm_address: str, stake_address: str,
                  version: MetaStakingContractVersion, metastake_token: str = "", address: str = ""):

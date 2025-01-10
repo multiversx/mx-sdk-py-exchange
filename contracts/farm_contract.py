@@ -1,6 +1,7 @@
 import config
 from contracts.contract_identities import FarmContractVersion, DEXContractInterface
-from contracts.base_contracts import BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract
+from contracts.base_contracts import (BaseFarmContract, BaseBoostedContract, 
+                                      BaseSCWhitelistContract, BasePermissionsHubContract)
 from utils import decoding_structures
 from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
@@ -16,7 +17,7 @@ from typing import Dict, Any
 logger = get_logger(__name__)
 
 
-class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract):
+class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract, BasePermissionsHubContract):
     def __init__(self, farming_token, farm_token, farmed_token, address, version: FarmContractVersion,
                  proxy_contract=None):
         self.farmingToken = farming_token
@@ -418,17 +419,6 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         sc_args = [old_address]
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "updateOwnerOrAdmin", sc_args)
-
-    def set_permissions_hub_address(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
-        """Only V3.
-        """
-        function_purpose = "Set permissions hub address"
-        logger.info(function_purpose)
-
-        gas_limit = 10000000
-        sc_args = [address]
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPermissionsHubAddress", sc_args)
     
     def set_transfer_role_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
         """Only V2Boosted.
