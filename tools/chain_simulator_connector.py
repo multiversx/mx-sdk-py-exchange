@@ -8,9 +8,13 @@ from context import Context
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_padded_hex
 from utils.utils_chain import WrapperAddress, Account
+from utils.logger import get_logger
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 from tools.runners.account_state_runner import get_account_keys_online, get_account_data_online
 from multiversx_sdk import ProxyNetworkProvider
+
+
+logger = get_logger(__name__)
 
 
 SIMULATOR_URL = "http://localhost:8085"
@@ -51,8 +55,8 @@ def get_contract_retrieval_labels(contracts: str) -> List[str]:
 
 def fetch_contract_states(context: Context, args) -> json:
     proxy = ProxyNetworkProvider(args.gateway)
-    contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER)[0].address).get_shard()
-    all_keys = list[dict]
+    contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER_V2)[0].address).get_shard()
+    all_keys: list[dict] = []
 
     # if block is not empty, use it to retrieve all state from that specific block
     block_number = get_retrieve_block(proxy, contracts_shard, int(args.block)) if args.block else 0
@@ -60,6 +64,7 @@ def fetch_contract_states(context: Context, args) -> json:
     # get contracts state
     contract_labels = get_contract_retrieval_labels(args.contracts)
     for label in contract_labels:
+        logger.info(f"Retrieving {label} contracts state.")
         contracts = context.get_contracts(label)
 
         # if contract index is provided, retrieve only that contract state
@@ -82,6 +87,12 @@ def fetch_contract_states(context: Context, args) -> json:
             account_state['keys'] = keys
 
             all_keys.append(account_state)
+
+        # dump all keys to a file
+        all_keys_file = f"{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"
+        with open(all_keys_file, 'w', encoding="UTF-8") as state_writer:
+            json.dump(all_keys, state_writer, indent=4)
+        logger.info(f"State for {args.contracts} contracts has been retrieved and saved to {all_keys_file}.")
 
     return all_keys
     
@@ -124,7 +135,7 @@ def main(cli_args: List[str]):
     
     context = Context()
 
-    fetch_states(context, args)
+    fetch_contract_states(context, args)
         
 
 if __name__ == "__main__":
