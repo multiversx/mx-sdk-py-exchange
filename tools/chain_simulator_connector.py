@@ -34,6 +34,18 @@ def get_retrieve_block(proxy: ProxyNetworkProvider, shard: int, block: int) -> i
     return block_number
 
 
+def get_current_shard_chronology(proxy: ProxyNetworkProvider, shard: int) -> dict:
+    # returns current epoch, round, block 
+    response = proxy.get_network_status()
+    response_dict = {
+        "epoch": response.epoch_number,
+        "round": response.current_round,
+        "block": response.highest_final_nonce
+    }
+
+    return response_dict
+
+
 def get_contract_retrieval_labels(contracts: str) -> List[str]:
     labels = []
     base_labels = [config.EGLD_WRAPS, config.LOCKED_ASSETS, config.SIMPLE_LOCKS_ENERGY, 
@@ -42,12 +54,12 @@ def get_contract_retrieval_labels(contracts: str) -> List[str]:
         return base_labels
     if contracts == "all":
         labels.extend(base_labels)
-        labels.append(config.PROXIES, config.PROXIES_V2, config.PAIRS_V2, config.FARMS_V2, 
+        labels.extend([config.PROXIES, config.PROXIES_V2, config.PAIRS_V2, config.FARMS_V2, 
                       config.STAKINGS_V2, config.METASTAKINGS_V2,
                       config.STAKINGS_BOOSTED, config.METASTAKINGS_BOOSTED,
                       config.ESCROWS, config.LK_WRAPS,
                       config.POSITION_CREATOR, config.GOVERNANCES, 
-                      config.PRICE_DISCOVERIES, config.SIMPLE_LOCKS)
+                      config.PRICE_DISCOVERIES, config.SIMPLE_LOCKS])
         return labels
     else:
         return contracts.split(",")
@@ -77,6 +89,7 @@ def fetch_contract_states(context: Context, args) -> json:
 
         # retrieve keys and data for each contract
         for i, contract in enumerate(contracts):
+            logger.info(f"Retrieving state for {label} contract {i + 1}/{len(contracts)}.")
             keys_file = f"{STATES_FOLDER}/{block_number}_{label}_{i}_state.json"
             data_file = f"{STATES_FOLDER}/{block_number}_{label}_{i}_data.json"
             keys = get_account_keys_online(contract.address, proxy.url, block_number, keys_file)
@@ -88,11 +101,19 @@ def fetch_contract_states(context: Context, args) -> json:
 
             all_keys.append(account_state)
 
-        # dump all keys to a file
-        all_keys_file = f"{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"
-        with open(all_keys_file, 'w', encoding="UTF-8") as state_writer:
-            json.dump(all_keys, state_writer, indent=4)
-        logger.info(f"State for {args.contracts} contracts has been retrieved and saved to {all_keys_file}.")
+    # dump all keys to a file
+    all_keys_file = f"{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"
+    with open(all_keys_file, 'w', encoding="UTF-8") as state_writer:
+        json.dump(all_keys, state_writer, indent=4)
+    logger.info(f"State for {args.contracts} contracts has been retrieved and saved to {all_keys_file}.")
+
+    chronology = get_current_shard_chronology(proxy, contracts_shard)
+    logger.info(f"Current shard chronology: {chronology}")
+    # save chronology to file
+    chronology_file = f"{STATES_FOLDER}/{block_number}_shard_chronology.json"
+    with open(chronology_file, 'w', encoding="UTF-8") as chronology_writer:
+        json.dump(chronology, chronology_writer, indent=4)
+    logger.info(f"Shard chronology has been saved to {chronology_file}.")
 
     return all_keys
     
