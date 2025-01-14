@@ -45,6 +45,13 @@ class ESDTToken:
 
     def get_token_data(self) -> tuple:
         return self.token_id, self.token_nonce, self.token_amount
+    
+    def get_token_nonce_hex(self) -> str:
+        if not self.token_nonce:
+            return ""
+        
+        nonce_str = "0" + f"{self.token_nonce:x}" if len(f"{self.token_nonce:x}") % 2 else f"{self.token_nonce:x}"
+        return nonce_str
 
     def get_full_token_name(self) -> str:
         if self.token_nonce != 0:
@@ -63,7 +70,7 @@ class ESDTToken:
 
     @classmethod
     def from_non_fungible_on_network(cls, token: NonFungibleTokenOfAccountOnNetwork):
-        return cls(token.identifier, token.nonce, token.balance)
+        return cls(token.collection, token.nonce, token.balance)
 
     def to_token_payment(self) -> TokenPayment:
         return TokenPayment(self.token_id, self.token_nonce, self.token_amount, 18)
