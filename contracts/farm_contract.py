@@ -45,6 +45,9 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
                             farmed_token=config_dict['farmedToken'],
                             address=config_dict['address'],
                             version=FarmContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.farmToken]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

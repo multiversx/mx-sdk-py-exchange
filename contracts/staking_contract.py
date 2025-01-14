@@ -51,6 +51,9 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
                                rewards_per_block=config_dict['rewards_per_block'],
                                unbond_epochs=config_dict['unbond_epochs'],
                                version=StakingContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.farm_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=StakingContractVersion.V3Boosted):

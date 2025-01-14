@@ -41,6 +41,9 @@ class SimpleLockEnergyContract(DEXContractInterface):
                                         locked_token=config_dict['locked_token'],
                                         lp_proxy_token=config_dict['lp_proxy_token'],
                                         farm_proxy_token=config_dict['farm_proxy_token'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.locked_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

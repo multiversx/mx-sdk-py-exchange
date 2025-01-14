@@ -58,6 +58,9 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
                                    farm_address=config_dict['farm_address'],
                                    stake_address=config_dict['stake_address'],
                                    version=MetaStakingContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.metastake_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=MetaStakingContractVersion.V3Boosted):
