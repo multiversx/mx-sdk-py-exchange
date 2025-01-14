@@ -50,7 +50,7 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
 
         with open(with_save_in, 'w', encoding="UTF-8") as state_writer:
             json.dump(keys, state_writer, indent=4)
-            logger.info(f'Dumped the retrieved contact state in: {with_save_in}')
+            logger.info(f'Dumped the retrieved account state in: {with_save_in}')
 
     return keys
 
@@ -80,7 +80,7 @@ def get_account_data_online(address: str, proxy_url: str, block_number: int = 0,
 
         with open(with_save_in, 'w', encoding="UTF-8") as state_writer:
             json.dump(data, state_writer, indent=4)
-            logger.info(f'Dumped the retrieved contact state in: {with_save_in}')
+            logger.info(f'Dumped the retrieved account data in: {with_save_in}')
     
     return data
 
