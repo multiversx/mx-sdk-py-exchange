@@ -83,14 +83,15 @@ def fetch_account_state(address: str, proxy: ProxyNetworkProvider, block_number:
     chain_config_file = f"{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_chain_config_state.json"
     keys = get_account_keys_online(address, proxy.url, block_number, keys_file)
     data = get_account_data_online(address, proxy.url, block_number, data_file)
-
+    data.pop("rootHash", None) # remove rootHash from data
+    
     account_state = {}
     account_state.update(data)
-    account_state['keys'] = keys 
+    account_state['pairs'] = keys 
 
     # save account chain config state to file
     with open(chain_config_file, 'w', encoding="UTF-8") as state_writer:
-        json.dump(account_state, state_writer, indent=4)
+        json.dump([account_state], state_writer, indent=4)
     logger.info(f"Chain config account state for {address} has been saved to {chain_config_file}.")
 
     return account_state
@@ -121,14 +122,36 @@ def fetch_context_system_account_keys_from_account(proxy: ProxyNetworkProvider, 
 
     sys_account_state = {
         "address": "erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t",
-        "keys": sys_account_keys
+        "pairs": sys_account_keys
     }
 
     # save system account state to file
     sys_account_state_file = f"{STATES_FOLDER}/{block_number}_system_account_state_{address}.json"
     with open(sys_account_state_file, 'w', encoding="UTF-8") as state_writer:
-        json.dump(sys_account_state, state_writer, indent=4)
+        json.dump([sys_account_state], state_writer, indent=4)
     logger.info(f"System account state for tokens in {address} has been saved to {sys_account_state_file}.")
+
+    return sys_account_state
+
+
+def fetch_system_account_state_from_token(token: str, context: Context, args) -> dict[str, Any]:
+    proxy = ProxyNetworkProvider(args.gateway)
+    contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER_V2)[0].address).get_shard()
+
+    # if block is not empty, use it to retrieve all state from that specific block
+    block_number = get_retrieve_block(proxy, contracts_shard, int(args.block)) if args.block else 0
+    
+    sys_account_keys = fetch_token_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number)
+    sys_account_state = {
+        "address": "erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t",
+        "pairs": sys_account_keys
+    }
+
+    # save system account state to file
+    sys_account_state_file = f"{STATES_FOLDER}/{block_number}_system_account_state_{token}.json"
+    with open(sys_account_state_file, 'w', encoding="UTF-8") as state_writer:
+        json.dump([sys_account_state], state_writer, indent=4)
+    logger.info(f"System account state for {token} has been saved to {sys_account_state_file}.")
 
     return sys_account_state
 
@@ -212,6 +235,7 @@ def main(cli_args: List[str]):
     parser.add_argument("--contracts", required=False, default="") # all | base | comma separated labels of contracts 
     parser.add_argument("--contract-index", required=False, default="") # index of contract to retrieve state from; should only be used in conjunction with one specific type of --contracts
     parser.add_argument("--account", required=False, default="") # explicit account address to retrieve state from 
+    parser.add_argument("--token", required=False, default="") # explicit token to retrieve sys account state for
     args = parser.parse_args(cli_args)
 
     if not args.gateway:
@@ -236,6 +260,9 @@ def main(cli_args: List[str]):
     
     if args.account:
         fetch_user_state_with_tokens(args.account, context, args)
+
+    if args.token:
+        fetch_system_account_state_from_token(args.token, context, args)
         
 
 if __name__ == "__main__":

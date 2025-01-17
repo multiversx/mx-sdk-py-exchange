@@ -71,6 +71,12 @@ class ESDTToken:
     @classmethod
     def from_non_fungible_on_network(cls, token: NonFungibleTokenOfAccountOnNetwork):
         return cls(token.collection, token.nonce, token.balance)
+    
+    @classmethod
+    def from_full_token_name(cls, token_name: str):
+        # token id is everything before the last dash while nonce is everything after
+        token_id, token_nonce = token_name.rsplit("-", 1)
+        return cls(token_id, int(token_nonce, 16), 0)
 
     def to_token_payment(self) -> TokenPayment:
         return TokenPayment(self.token_id, self.token_nonce, self.token_amount, 18)
