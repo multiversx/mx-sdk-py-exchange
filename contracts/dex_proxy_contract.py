@@ -106,6 +106,12 @@ class DexProxyContract(DEXContractInterface):
                                 proxy_lp_token=config_dict['proxy_lp_token'],
                                 address=config_dict['address'],
                                 version=ProxyContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [
+            self.proxy_lp_token,
+            self.proxy_farm_token
+        ]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

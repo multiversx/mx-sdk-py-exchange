@@ -1,7 +1,8 @@
 from typing import Any, Dict
 import config
 from contracts.contract_identities import StakingContractVersion
-from contracts.base_contracts import BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract
+from contracts.base_contracts import (BaseFarmContract, BaseBoostedContract, 
+                                      BaseSCWhitelistContract, BasePermissionsHubContract)
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
@@ -17,7 +18,7 @@ from utils import decoding_structures
 logger = get_logger(__name__)
 
 
-class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract):
+class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract, BasePermissionsHubContract):
     def __init__(self, farming_token: str, max_apr: int, rewards_per_block: int, unbond_epochs: int,
                  version: StakingContractVersion, farm_token: str = "", address: str = ""):
         self.farming_token = farming_token
@@ -50,6 +51,9 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
                                rewards_per_block=config_dict['rewards_per_block'],
                                unbond_epochs=config_dict['unbond_epochs'],
                                version=StakingContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.farm_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=StakingContractVersion.V3Boosted):

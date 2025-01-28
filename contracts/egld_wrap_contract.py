@@ -25,6 +25,9 @@ class EgldWrapContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return EgldWrapContract(address=config_dict['address'],
                                 wrapped_token=config_dict['wrapped_token'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.wrapped_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

@@ -1,0 +1,11 @@
+[
+    {
+        "farming_token": "HTM-23a1da",
+        "farm_token": "SHTM-f9301a",
+        "address": "erd1qqqqqqqqqqqqqpgqvyhjh8623r3v7n267fa3g3f62vlekhqe0n4s6fp752",
+        "max_apr": 10000,
+        "rewards_per_block": 666000000000000000,
+        "unbond_epochs": 10,
+        "version": 3
+    }
+]

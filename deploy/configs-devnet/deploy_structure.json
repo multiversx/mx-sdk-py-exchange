@@ -2,7 +2,7 @@
     "token": 
         {
             "token_prefix": "E2ETK7",
-            "number_of_tokens": 14
+            "number_of_tokens": 16
         },
 
     "egld_wraps": [
@@ -252,6 +252,12 @@
     ],
 
     "pairs_view": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "permissions_hubs": [
         {
             "empty": 0
         }
@@ -557,6 +563,37 @@
             "staking_v2": 5,
             "metastake_token": "METACRTLK",
             "metastake_token_name": "MetaStakedCRTLK"
+        }
+    ],
+
+    "stakings_boosted": [
+        {
+            "staking_token": 14,
+            "stake_token": "SHTM",
+            "stake_token_name": "StakedHTM",
+            "apr": 10000,
+            "rpb": 220000000000000000000,
+            "rewards": 0,
+            "unbond_epochs": 10,
+            "lock_factory": 0,
+            "boosted_rewards": 4000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1000
+        }
+    ],
+
+    "metastakings_boosted": [
+        {
+            "token": 14,
+            "pool_v2": 11,
+            "farm_boosted": 7,
+            "staking_boosted": 0,
+            "metastake_token": "METAHTMLK",
+            "metastake_token_name": "MetaStakedHTMLK",
+            "lock_factory": 0
         }
     ],
 

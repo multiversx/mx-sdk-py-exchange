@@ -2,14 +2,16 @@
 
 class EnterFarmEvent:
     def __init__(self,
-                 farming_token: str, farming_nonce: int, farming_amount,
-                 farm_token: str, farm_nonce: int, farm_amount):
+                 farming_token: str, farming_nonce: int, farming_amount: int,
+                 farm_token: str, farm_nonce: int, farm_amount: int,
+                 on_behalf: str = ""):
         self.farming_tk = farming_token
         self.farming_tk_nonce = farming_nonce
         self.farming_tk_amount = farming_amount
         self.farm_tk = farm_token
         self.farm_tk_nonce = farm_nonce
         self.farm_tk_amount = farm_amount
+        self.on_behalf = on_behalf  # address of the user on behalf of whom the operation is executed
 
 
 class ExitFarmEvent:
