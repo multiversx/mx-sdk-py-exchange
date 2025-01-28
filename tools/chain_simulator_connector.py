@@ -5,6 +5,7 @@ import config
 from argparse import ArgumentParser
 from typing import Any, List
 from context import Context
+from contracts.contract_identities import DEXContractInterface
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import decode_merged_attributes, get_current_tokens_for_address, string_to_hex, dec_to_padded_hex
 from utils.utils_chain import WrapperAddress, Account
@@ -134,13 +135,7 @@ def fetch_context_system_account_keys_from_account(proxy: ProxyNetworkProvider, 
     return sys_account_state
 
 
-def fetch_system_account_state_from_token(token: str, context: Context, args) -> dict[str, Any]:
-    proxy = ProxyNetworkProvider(args.gateway)
-    contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER_V2)[0].address).get_shard()
-
-    # if block is not empty, use it to retrieve all state from that specific block
-    block_number = get_retrieve_block(proxy, contracts_shard, int(args.block)) if args.block else 0
-    
+def fetch_system_account_state_from_token(token: str, proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
     sys_account_keys = fetch_token_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number)
     sys_account_state = {
         "address": "erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t",
@@ -156,13 +151,38 @@ def fetch_system_account_state_from_token(token: str, context: Context, args) ->
     return sys_account_state
 
 
-def fetch_contract_states(context: Context, args) -> dict[str, Any]:
-    proxy = ProxyNetworkProvider(args.gateway)
+def compose_system_account_state_from_contract_state(contract: DEXContractInterface, contract_state: dict[str, Any], proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
+    """
+    Compose system account state from contract state by searching for meta esdts owned by the contract. 
+    It looks for the existence of the last nonce of each token and fetches the system account state for that nonce.
+    """
+    system_account_state = {}
+    tokens = contract.get_contract_tokens()
+    
+    for token in tokens:
+        # Convert 'ELRONDnonce' and token name to hex
+        elrond_nonce_hex = string_to_hex('ELRONDnonce')
+        token_hex = string_to_hex(token)
+        search_key = f"{elrond_nonce_hex}{token_hex}"
+
+        # Search through contract state keys
+        if search_key in contract_state['pairs'].keys():
+            # Found matching key, get nonce value and fetch system account state
+            nonce = contract_state['pairs'][search_key]
+
+            token_with_nonce = f"{token}-{nonce}"
+            token_system_account_state = fetch_system_account_state_from_token(token_with_nonce, proxy, block_number)
+            # Merge the pairs from token_system_account_state into system_account_state
+            if not system_account_state:
+                system_account_state = token_system_account_state
+            else:
+                system_account_state["pairs"].update(token_system_account_state["pairs"])
+
+    return system_account_state
+
+def fetch_contract_states(context: Context, args, proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
     contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER_V2)[0].address).get_shard()
     all_keys: list[dict] = []
-
-    # if block is not empty, use it to retrieve all state from that specific block
-    block_number = get_retrieve_block(proxy, contracts_shard, int(args.block)) if args.block else 0
     
     # get contracts state
     contract_labels = get_contract_retrieval_labels(args.contracts)
@@ -183,6 +203,10 @@ def fetch_contract_states(context: Context, args) -> dict[str, Any]:
             logger.info(f"Retrieving state for {label} contract {i + 1}/{len(contracts)}.")
             account_state = fetch_account_state(contract.address, proxy, block_number, label, i)
             all_keys.append(account_state)
+
+            # search for meta esdts owned by the contract and fetch the system account state for their last nonce
+            system_account_state = compose_system_account_state_from_contract_state(contract, account_state, proxy, block_number)
+            all_keys.append(system_account_state)
 
     # dump all keys to a file
     all_keys_file = f"{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"
@@ -213,12 +237,8 @@ def fetch_contract_states(context: Context, args) -> dict[str, Any]:
     all_keys.append(keys)
 
 
-def fetch_user_state_with_tokens(user_address: str, context: Context, args) -> dict[str, Any]:
-    proxy = ProxyNetworkProvider(args.gateway)
+def fetch_user_state_with_tokens(user_address: str, context: Context, proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
     address = WrapperAddress(user_address)
-    account_shard = address.get_shard()
-    # if block is not empty, use it to retrieve all state from that specific block
-    block_number = get_retrieve_block(proxy, account_shard, int(args.block)) if args.block else 0
 
     # get user account state
     _ = fetch_account_state(address.bech32(), proxy, block_number, user_address, 0)
@@ -243,7 +263,11 @@ def main(cli_args: List[str]):
         return
     
     context = Context()
-    
+    proxy = ProxyNetworkProvider(args.gateway)
+    # if block is not empty, use it to retrieve all state from that specific block
+    contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER_V2)[0].address).get_shard()
+    block_number = get_retrieve_block(proxy, contracts_shard, int(args.block)) if args.block else 0
+
     if args.contracts:
         if args.contract_index:
             if not args.contracts:
@@ -256,13 +280,13 @@ def main(cli_args: List[str]):
                 log_step_fail("Contract index provided but multiple contracts to retrieve from. Please provide a single contract label.")
                 return
             
-        fetch_contract_states(context, args)
+        fetch_contract_states(context, args, proxy, block_number)
     
     if args.account:
-        fetch_user_state_with_tokens(args.account, context, args)
+        fetch_user_state_with_tokens(args.account, context, proxy, block_number)
 
     if args.token:
-        fetch_system_account_state_from_token(args.token, context, args)
+        fetch_system_account_state_from_token(args.token, proxy, block_number)
         
 
 if __name__ == "__main__":
