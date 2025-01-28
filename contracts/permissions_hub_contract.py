@@ -45,7 +45,7 @@ class PermissionsHubContract(DEXContractInterface):
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def add_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list) -> str:
+    def add_to_whitelist(self, user: Account, proxy: ProxyNetworkProvider, args: list) -> str:
         """Expecting as args:
         - whitelisted_sc_addresses: list[address]
         """
@@ -59,9 +59,9 @@ class PermissionsHubContract(DEXContractInterface):
         gas_limit = 30000000
         sc_args = args
         logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "whitelist", sc_args)
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "whitelist", sc_args)
     
-    def remove_from_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list) -> str:
+    def remove_from_whitelist(self, user: Account, proxy: ProxyNetworkProvider, args: list) -> str:
         """Expecting as args:
         - whitelisted_sc_addresses: list[address]
         """
@@ -75,7 +75,7 @@ class PermissionsHubContract(DEXContractInterface):
         gas_limit = 30000000
         sc_args = args
         logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeWhitelist", sc_args)
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "removeWhitelist", sc_args)
     
     def add_to_blacklist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list) -> str:
         """Expecting as args:
