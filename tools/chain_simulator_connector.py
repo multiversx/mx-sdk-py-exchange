@@ -37,10 +37,10 @@ def get_retrieve_block(proxy: ProxyNetworkProvider, shard: int, block: int) -> i
     return block_number
 
 
-def get_current_shard_chronology(proxy: ProxyNetworkProvider, shard: int) -> dict:
+def get_current_shard_chronology(proxy: ProxyNetworkProvider, shard: int = None) -> dict:
     # returns current epoch, round, block 
     # TODO: not sure if timestamp is necessary as well
-    response = proxy.get_network_status()
+    response = proxy.get_network_status(shard)
     response_dict = {
         "epoch": response.epoch_number,
         "round": response.current_round,
