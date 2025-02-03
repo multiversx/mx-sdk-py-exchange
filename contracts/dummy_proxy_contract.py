@@ -88,6 +88,24 @@ class DummyProxyContract(DEXContractInterface):
         gas_limit = 100000000
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
                                         Address(self.address), "callTransferEndpoint", args)
+    
+    def call_hybrid_transfer_endpoint(self, user: Account, proxy: ProxyNetworkProvider, args: list = None):
+        """ Expected as args:
+        type[list[ESDTToken]]: tokens list
+        type[int]: call type - 0 sync; 1 async; 2 promise; 3 transfer execute
+        type[str]: internal token id
+        type[int]: internal token nonce
+        type[int]: internal token amount
+        type[address]: contract address
+        type[string]: function name
+        type[any..]: function args
+        """
+        function_purpose = f"Call hybrid transfer endpoint"
+        logger.info(function_purpose)
+
+        gas_limit = 100000000
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
+                                        Address(self.address), "callHybridTransferEndpoint", args)
 
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
