@@ -206,7 +206,8 @@ def fetch_contract_states(context: Context, args, proxy: ProxyNetworkProvider, b
 
             # search for meta esdts owned by the contract and fetch the system account state for their last nonce
             system_account_state = compose_system_account_state_from_contract_state(contract, account_state, proxy, block_number)
-            all_keys.append(system_account_state)
+            if system_account_state:
+                all_keys.append(system_account_state)
 
     # dump all keys to a file
     all_keys_file = f"{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"

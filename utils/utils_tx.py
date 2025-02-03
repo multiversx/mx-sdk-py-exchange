@@ -178,8 +178,8 @@ class NetworkProviders:
         logger.debug(f"Transaction {tx_hash} status: {results.status}")
         return True
 
-    def get_tx_operations(self, tx_hash: str) -> list:
-        if tx_hash not in TX_CACHE:
+    def get_tx_operations(self, tx_hash: str, no_cache: bool = False) -> list:
+        if no_cache or tx_hash not in TX_CACHE:
             # TODO replace with get_transaction after operations are added to the transaction object
             transaction = self.api.do_get_generic(f'transactions/{tx_hash}')
             TX_CACHE[tx_hash] = transaction     # add it into the hash cache to avoid fetching it again
@@ -559,6 +559,8 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
 
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
+    if "localhost" in proxy.url:
+        proxy.do_post(f"{proxy.url}/simulator/generate-blocks/1", {})
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""
