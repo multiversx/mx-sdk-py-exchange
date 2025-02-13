@@ -110,16 +110,24 @@ def fetch_token_system_account_attributes(proxy: ProxyNetworkProvider, token: ES
     return {key: response.get("value", "")}
 
 
-def fetch_context_system_account_keys_from_account(proxy: ProxyNetworkProvider, context: Context, address: str, block_number: int = 0) -> dict[str, Any]:
+def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider, context: Context, address: str, block_number: int = 0) -> dict[str, Any]:
+    """
+    Fetch system account keys for all the context related meta esdts the account owns.
+    """
     sys_account_keys = {}
 
     context_tokens = get_context_used_tokens(context)
     user_tokens = proxy.get_nonfungible_tokens_of_account(WrapperAddress(address))
+    logger.debug(f"Starting retrieval of system account keys for context relatedmeta esdts owned by {address}.")
+    logger.debug(f"Number of meta esdt tokens found in account: {len(user_tokens)}")
     for token in user_tokens:
+        print(f"\rProcessing token {user_tokens.index(token) + 1}/{len(user_tokens)}", end="", flush=True) # this can take a while depending on the number of tokens
+
         if not token.collection in context_tokens:
             continue
         sys_account_token_attributes = fetch_token_system_account_attributes(proxy, ESDTToken.from_non_fungible_on_network(token), block_number)
         sys_account_keys.update(sys_account_token_attributes)
+    print() # new line after progress bar
 
     sys_account_state = {
         "address": "erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t",
@@ -153,7 +161,7 @@ def fetch_system_account_state_from_token(token: str, proxy: ProxyNetworkProvide
 
 def compose_system_account_state_from_contract_state(contract: DEXContractInterface, contract_state: dict[str, Any], proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
     """
-    Compose system account state from contract state by searching for meta esdts owned by the contract. 
+    Compose system account state from contract state by searching for meta esdts for which the contract is the creator (not owner). 
     It looks for the existence of the last nonce of each token and fetches the system account state for that nonce.
     """
     system_account_state = {}
@@ -204,8 +212,13 @@ def fetch_contract_states(context: Context, args, proxy: ProxyNetworkProvider, b
             account_state = fetch_account_state(contract.address, proxy, block_number, label, i)
             all_keys.append(account_state)
 
-            # search for meta esdts owned by the contract and fetch the system account state for their last nonce
+            # search for meta esdts created by the contract and fetch the system account state for their last nonce
             system_account_state = compose_system_account_state_from_contract_state(contract, account_state, proxy, block_number)
+            if system_account_state:
+                all_keys.append(system_account_state)
+
+            # get system account state for all the context related meta esdts the contract owns
+            system_account_state = fetch_context_system_account_state_from_account(proxy, context, contract.address, block_number)
             if system_account_state:
                 all_keys.append(system_account_state)
 
@@ -224,18 +237,6 @@ def fetch_contract_states(context: Context, args, proxy: ProxyNetworkProvider, b
     logger.info(f"Shard chronology has been saved to {chronology_file}.")
 
     return all_keys
-    
-    # get system account state - done later since it's gigantic
-    file = f"{STATES_FOLDER}/{block_number}_system_account_state.json"
-    if args.system_account == "offline":
-        with open(file, 'r', encoding="UTF-8") as state_reader:
-            keys = json.load(state_reader)
-    else:
-        system_account_address = "erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t"
-        keys = get_account_keys_online(system_account_address, proxy.url, block_number,
-                                        file)
-        
-    all_keys.append(keys)
 
 
 def fetch_user_state_with_tokens(user_address: str, context: Context, proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
@@ -245,7 +246,7 @@ def fetch_user_state_with_tokens(user_address: str, context: Context, proxy: Pro
     _ = fetch_account_state(address.bech32(), proxy, block_number, user_address, 0)
 
     # compose system account token attributes
-    _ = fetch_context_system_account_keys_from_account(proxy, context, address.bech32(), block_number)
+    _ = fetch_context_system_account_state_from_account(proxy, context, address.bech32(), block_number)
 
 
 def main(cli_args: List[str]):
@@ -292,3 +293,11 @@ def main(cli_args: List[str]):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
+
+"""
+Example usage:
+$ python3 tools/chain_simulator_connector.py --gateway=https://proxy-shadowfork-four.elrond.ro --contracts=all
+$ python3 tools/chain_simulator_connector.py --gateway=https://proxy-shadowfork-four.elrond.ro --account=erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97
+$ python3 tools/chain_simulator_connector.py --gateway=https://proxy-shadowfork-four.elrond.ro --token=METAUTKLK-112f52-0196c6
+"""
