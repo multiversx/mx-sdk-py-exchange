@@ -118,7 +118,7 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
 
     context_tokens = get_context_used_tokens(context)
     user_tokens = proxy.get_nonfungible_tokens_of_account(WrapperAddress(address))
-    logger.debug(f"Starting retrieval of system account keys for context relatedmeta esdts owned by {address}.")
+    logger.debug(f"Starting retrieval of system account keys for context related meta esdts owned by {address}.")
     logger.debug(f"Number of meta esdt tokens found in account: {len(user_tokens)}")
     for token in user_tokens:
         print(f"\rProcessing token {user_tokens.index(token) + 1}/{len(user_tokens)}", end="", flush=True) # this can take a while depending on the number of tokens
