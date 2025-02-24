@@ -99,12 +99,24 @@ def fetch_account_state(address: str, proxy: ProxyNetworkProvider, block_number:
 
 
 def get_token_key_hex(token: ESDTToken) -> str:
-    return f"{string_to_hex('ELRONDesdt')}{string_to_hex(token.token_id)}{token.get_token_nonce_hex()}"
+    return f"{string_to_hex('ELRONDesdt')}{string_to_hex(token.token_id)}"
+
+
+def get_token_nonce_key_hex(token: ESDTToken) -> str:
+    return f"{get_token_key_hex(token)}{token.get_token_nonce_hex()}"
 
 
 def fetch_token_system_account_attributes(proxy: ProxyNetworkProvider, token: ESDTToken, block_number: int = 0) -> dict[str, str]:
     block_param = f"?blockNonce={block_number}" if block_number else ""
     key = get_token_key_hex(token)
+    resource_url = f"address/erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t/key/{key}{block_param}"
+    response = proxy.do_get_generic(resource_url)
+    return {key: response.get("value", "")}
+
+
+def fetch_token_nonce_system_account_attributes(proxy: ProxyNetworkProvider, token: ESDTToken, block_number: int = 0) -> dict[str, str]:
+    block_param = f"?blockNonce={block_number}" if block_number else ""
+    key = get_token_nonce_key_hex(token)
     resource_url = f"address/erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t/key/{key}{block_param}"
     response = proxy.do_get_generic(resource_url)
     return {key: response.get("value", "")}
@@ -117,7 +129,14 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
     sys_account_keys = {}
 
     context_tokens = get_context_used_tokens(context)
-    user_tokens = proxy.get_nonfungible_tokens_of_account(WrapperAddress(address))
+
+    try:
+        user_tokens = proxy.get_nonfungible_tokens_of_account(WrapperAddress(address))
+    except Exception as e:
+        logger.error(f"Error fetching non-fungible tokens of account {address}: {e}")
+        logger.error("System account state for this account will not be retrieved.")
+        return {}
+    
     logger.debug(f"Starting retrieval of system account keys for context related meta esdts owned by {address}.")
     logger.debug(f"Number of meta esdt tokens found in account: {len(user_tokens)}")
     for token in user_tokens:
@@ -125,7 +144,7 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
 
         if not token.collection in context_tokens:
             continue
-        sys_account_token_attributes = fetch_token_system_account_attributes(proxy, ESDTToken.from_non_fungible_on_network(token), block_number)
+        sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_non_fungible_on_network(token), block_number)
         sys_account_keys.update(sys_account_token_attributes)
     print() # new line after progress bar
 
@@ -144,7 +163,8 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
 
 
 def fetch_system_account_state_from_token(token: str, proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
-    sys_account_keys = fetch_token_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number)
+    sys_account_keys = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number)
+    sys_account_keys.update(fetch_token_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number))
     sys_account_state = {
         "address": "erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t",
         "pairs": sys_account_keys
@@ -221,6 +241,12 @@ def fetch_contract_states(context: Context, args, proxy: ProxyNetworkProvider, b
             system_account_state = fetch_context_system_account_state_from_account(proxy, context, contract.address, block_number)
             if system_account_state:
                 all_keys.append(system_account_state)
+
+    # get ESDT issue account state
+    logger.info(f"Retrieving state for ESDT issue account.")
+    account_state = fetch_account_state(config.TOKENS_CONTRACT_ADDRESS, proxy, block_number, "esdt_issue", 0)
+    if account_state:
+        all_keys.append(account_state)
 
     # dump all keys to a file
     all_keys_file = f"{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"
