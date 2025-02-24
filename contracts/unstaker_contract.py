@@ -67,7 +67,7 @@ class UnstakerContract(DEXContractInterface):
             return ""
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setEnergyFactoryAddress", args)
 
-    def claim_unlocked_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+    def claim_unlocked_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ Expected as args:
             empty
         """
@@ -75,7 +75,7 @@ class UnstakerContract(DEXContractInterface):
         logger.info(function_purpose)
         return endpoint_call(proxy, 20000000, deployer, Address(self.address), "claimUnlockedTokens", [])
 
-    def cancel_unbond(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+    def cancel_unbond(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ Expected as args:
             empty
         """

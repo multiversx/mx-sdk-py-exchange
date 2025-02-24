@@ -284,7 +284,7 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
         metastake_token_on_network = proxy.get_nonfungible_token_of_account(Address(holder_address), self.metastake_token, token_nonce)
          
         decoded_attributes = decode_merged_attributes(base64_to_hex(metastake_token_on_network.attributes), METASTAKE_TOKEN_ATTRIBUTES)
-        logger.debug(f'Metatake Tokens: {decoded_attributes}')
+        logger.debug(f'Metastake Tokens: {decoded_attributes}')
 
         return decoded_attributes
 

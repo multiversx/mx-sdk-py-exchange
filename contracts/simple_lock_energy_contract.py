@@ -382,7 +382,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         if len(args) != 1:
             log_unexpected_args(function_purpose, args)
             return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
+        return multi_esdt_endpoint_call(function_purpose, proxy, 50000000,
                                         user, Address(self.address), "unlockEarly", args)
 
     def reduce_lock(self, user: Account, proxy: ProxyNetworkProvider, args: list):
