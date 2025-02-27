@@ -1,0 +1,29 @@
+[
+    {
+        "farming_token": "A1X-0d446d",
+        "farm_token": "SA1X-3df83f",
+        "address": "erd1qqqqqqqqqqqqqpgqv9h8yej6gdddmpdcad96fukxgutvr2sfkp2s7pe5gg",
+        "max_apr": 10000,
+        "rewards_per_block": 666000000000000000,
+        "unbond_epochs": 10,
+        "version": 3
+    },
+    {
+        "farming_token": "DRX-b7f337",
+        "farm_token": "SDRX-54f46e",
+        "address": "erd1qqqqqqqqqqqqqpgqf0tlpqkkg7e6mc76ayap6wynktnfmdzmkp2sc67v5w",
+        "max_apr": 10000,
+        "rewards_per_block": 4946727000,
+        "unbond_epochs": 10,
+        "version": 3
+    },
+    {
+        "farming_token": "BOD-204877",
+        "farm_token": "SBOD-0bcb5c",
+        "address": "erd1qqqqqqqqqqqqqpgqazrruw6kh5cr3xdumyqx49ac09gr5sj7kp2s30u6hl",
+        "max_apr": 10000,
+        "rewards_per_block": 220000000000000000000,
+        "unbond_epochs": 10,
+        "version": 3
+    }
+]

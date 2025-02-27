@@ -96,6 +96,9 @@ class PriceDiscoveryContract(DEXContractInterface):
                                       min_penalty_percentage=config_dict['min_penalty_percentage'],
                                       max_penalty_percentage=config_dict['max_penalty_percentage'],
                                       fixed_penalty_percentage=config_dict['fixed_penalty_percentage'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.redeem_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

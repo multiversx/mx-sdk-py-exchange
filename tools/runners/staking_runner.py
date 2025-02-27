@@ -17,13 +17,20 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
 from tools.runners.common_runner import add_generate_transaction_command, \
     add_upgrade_command, fund_shadowfork_accounts, \
     get_acounts_with_token, get_default_signature, read_accounts_from_json, \
-    sync_account_nonce
+    sync_account_nonce, verify_contracts, add_verify_command
 from tools.runners.metastaking_runner import get_metastaking_addresses_from_chain
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.utils_chain import Account, WrapperAddress
-from utils.utils_generic import split_to_chunks
+from utils.utils_generic import split_to_chunks, get_file_from_url_or_path
 from utils.utils_tx import ESDTToken, NetworkProviders
 import config
+
+from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
+
+from context import Context
+
+from utils.utils_chain import get_bytecode_codehash, log_explorer_transaction
+from tools.runners.common_config import STAKING_BOOSTED_REWARDS_PERCENTAGE, STAKING_BOOSTED_YIELD_FACTORS
 
 
 STAKINGS_LABEL = "stakings"
@@ -39,15 +46,21 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_staking_contracts)
+    add_verify_command(contract_group, verify_staking_contracts)
 
     command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
     command_parser.set_defaults(func=fetch_and_save_stakings_from_chain)
 
     command_parser = contract_group.add_parser('pause-all', help='pause all contracts command')
-    command_parser.set_defaults(func=pause_staking_contracts)
+    command_parser.set_defaults(func=pause_all_staking_contracts)
 
     command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
-    command_parser.set_defaults(func=resume_staking_contracts)
+    command_parser.set_defaults(func=resume_all_staking_contracts)
+
+    command_parser = contract_group.add_parser('setup-boost-all', help='setup boost for all contracts command')
+    command_parser.add_argument('--compare-states', action='store_true',
+                        help='compare states before and after the setup')
+    command_parser.set_defaults(func=setup_boosted_parameters_for_all_stakings)
 
     command_parser = contract_group.add_parser('pause', help='pause contract command')
     command_parser.add_argument('--address', type=str, help='contract address')
@@ -56,6 +69,12 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume', help='resume contract command')
     command_parser.add_argument('--address', type=str, help='contract address')
     command_parser.set_defaults(func=resume_staking_contract)
+
+    command_parser = contract_group.add_parser('setup-boost', help='setup boost for specific contract command')
+    command_parser.add_argument('--compare-states', action='store_true',
+                        help='compare states before and after the setup')
+    command_parser.add_argument('--address', type=str, help='contract address')
+    command_parser.set_defaults(func=setup_boosted_parameters_for_staking)
 
     command_parser = contract_group.add_parser('produce-rewards', help='toggle rewards distribution command')
     command_parser.add_argument('--state', action='store_true', help='rewards distribution state')
@@ -80,18 +99,17 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def fetch_and_save_stakings_from_chain():
+def fetch_and_save_stakings_from_chain(_):
     """Fetch staking contracts from chain"""
 
     print("Fetch staking contracts from chain")
 
-    network_providers = NetworkProviders(API, PROXY)
-
     stakings = get_staking_addresses_from_chain()
-    fetch_and_save_contracts(stakings, STAKINGS_LABEL, OUTPUT_STAKING_CONTRACTS_FILE, network_providers.proxy)
+    print(f"Retrieved {len(stakings)} staking contracts.")
+    fetch_and_save_contracts(stakings, STAKINGS_LABEL, OUTPUT_STAKING_CONTRACTS_FILE)
 
 
-def pause_staking_contracts():
+def pause_staking_contracts(staking_addresses: list[str]):
     """Pause staking contracts"""
 
     print("Pause staking contracts")
@@ -99,13 +117,11 @@ def pause_staking_contracts():
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    staking_addresses = get_all_staking_addresses()
-
     # pause all the stakings
     count = 1
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        data_fetcher = StakingContractDataFetcher(Address(staking_address, "erd"), network_providers.proxy.url)
+        data_fetcher = StakingContractDataFetcher(Address.new_from_bech32(staking_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
         if contract_state != 0:
@@ -119,33 +135,17 @@ def pause_staking_contracts():
         count += 1
 
 
+def pause_all_staking_contracts(_):
+    staking_addresses = get_all_staking_addresses()
+    pause_staking_contracts(staking_addresses)
+
+
 def pause_staking_contract(args: Any):
-    """Pause staking contract"""
-
     staking_address = args.address
-
-    if not staking_address:
-        print("Staking address is required!")
-        return
-
-    print("Pause staking contract")
-
-    network_providers = NetworkProviders(API, PROXY)
-    dex_owner = get_owner(network_providers.proxy)
-
-    data_fetcher = StakingContractDataFetcher(Address.new_from_bech32(staking_address), network_providers.proxy.url)
-    contract_state = data_fetcher.get_data("getState")
-    contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
-    if contract_state != 0:
-        tx_hash = contract.pause(dex_owner, network_providers.proxy)
-        if not network_providers.check_simple_tx_status(tx_hash, f"pause staking contract: {staking_address}"):
-            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                return
-    else:
-        print(f"Contract {staking_address} already inactive. Current state: {contract_state}")
+    pause_staking_contracts([staking_address])
 
 
-def resume_staking_contracts():
+def resume_staking_contracts(staking_addresses: list[str]):
     """Resume staking contracts"""
 
     print("Resume staking contracts")
@@ -157,10 +157,8 @@ def resume_staking_contracts():
         print("Contract initial states not found!"
               "Cannot proceed safely without altering initial state.")
 
-    with open(OUTPUT_PAUSE_STATES, encoding="URF-8") as reader:
+    with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
         contract_states = json.load(reader)
-
-    staking_addresses = get_all_staking_addresses()
 
     # pause all the staking contracts
     count = 1
@@ -183,41 +181,14 @@ def resume_staking_contracts():
         count += 1
 
 
+def resume_all_staking_contracts(_):
+    staking_addresses = get_all_staking_addresses()
+    resume_staking_contracts(staking_addresses)
+
+
 def resume_staking_contract(args: Any):
-    """Resume staking contract"""
-
     staking_address = args.address
-
-    if not staking_address:
-        print("Staking address is required!")
-        return
-
-    print("Resume staking contract")
-
-    network_providers = NetworkProviders(API, PROXY)
-    dex_owner = get_owner(network_providers.proxy)
-
-    if not os.path.exists(OUTPUT_PAUSE_STATES):
-        print("Contract initial states not found!"
-              "Cannot proceed safely without altering initial state.")
-
-    with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
-        contract_states = json.load(reader)
-
-    if staking_address not in contract_states:
-        print(f"Contract {staking_address} wasn't touched for no available initial state!")
-        return
-
-    # resume only if the staking contract was active
-    if contract_states[staking_address] == 1:
-        contract = StakingContract("", 0, 0, 0, StakingContractVersion.V1, "", staking_address)
-        tx_hash = contract.resume(dex_owner, network_providers.proxy)
-        if not network_providers.check_simple_tx_status(tx_hash, f"resume staking contract: {staking_address}"):
-            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                return
-    else:
-        print(f"Contract {staking_address} wasn't touched because of initial state: "
-              f"{contract_states[staking_address]}")
+    resume_staking_contracts([staking_address])
 
 
 def upgrade_staking_contracts(args: Any):
@@ -225,14 +196,27 @@ def upgrade_staking_contracts(args: Any):
 
     compare_states = args.compare_states
 
-    print("Upgrade staking contracts")
-
     staking_addresses = get_staking_addresses_from_chain()
     if not args.all:
         staking_addresses = [args.address]
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
+
+    if not staking_addresses:
+        print("No staking contracts available!")
+        return
+    
+    print(f"Processing {len(staking_addresses)} staking contracts.")
+    
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = get_file_from_url_or_path(config.STAKING_V3_BYTECODE_PATH)
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     if compare_states:
         print("Fetching contracts states before upgrade...")
@@ -244,15 +228,14 @@ def upgrade_staking_contracts(args: Any):
     count = 1
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-        if not get_user_continue():
-            return
 
         staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
 
-        tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, config.STAKING_V3_BYTECODE_PATH,
+        staking_contract.version = StakingContractVersion.V3Boosted
+        tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, 
                                                     [], True)
 
-        if not network_providers.check_complex_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
+        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
             if not get_user_continue():
                 return
 
@@ -263,6 +246,84 @@ def upgrade_staking_contracts(args: Any):
             return
 
         count += 1
+
+
+def verify_staking_contracts(args: Any):
+    print("Verifying staking contracts...")
+
+    all_addresses = get_staking_addresses_from_chain()
+    verify_contracts(args, all_addresses)
+    
+    print("All contracts have been verified.")
+    
+
+def setup_boosted_parameters_with_energy_address(staking_addresses: list[str], energy_address: str, compare_states: bool = False):
+    """Setup boosted parameters for staking contract with provided energy address"""
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    energy_contract = SimpleLockEnergyContract("", "", "", "", energy_address)
+    count = 1
+
+    for staking_address in staking_addresses:
+        print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
+
+        if compare_states:
+            print("Fetching contracts states before setup...")
+            fetch_contracts_states("pre", network_providers, [staking_address], STAKINGS_LABEL)
+
+            if not get_user_continue():
+                return
+
+        staking_contract = StakingContract("", 0, 0, 0, StakingContractVersion.V3Boosted, "", staking_address)
+
+        hashes = []
+        hashes.append(staking_contract.set_boosted_yields_rewards_percentage(dex_owner, network_providers.proxy, STAKING_BOOSTED_REWARDS_PERCENTAGE))
+        hashes.append(staking_contract.set_boosted_yields_factors(dex_owner, network_providers.proxy, STAKING_BOOSTED_YIELD_FACTORS))
+        hashes.append(staking_contract.set_energy_factory_address(dex_owner, network_providers.proxy, energy_address))
+            
+        sleep(6)
+
+        for tx_hash in hashes:
+            if not network_providers.check_simple_tx_status(tx_hash, f"boosted parameters for: {staking_address}"):
+                if not get_user_continue():
+                    return
+
+        if compare_states:
+            fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
+
+            if not get_user_continue():
+                return
+        
+        count += 1
+    
+
+def setup_boosted_parameters_for_staking(args: Any):
+    """Setup boosted parameters for staking contract"""
+    print("Setup boosted parameters for staking contract")
+    staking_address = args.address
+    compare_states = args.compare_states
+    if not staking_address:
+        print("Staking address is required!")
+        return
+
+    context = Context()
+    energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
+
+    setup_boosted_parameters_with_energy_address([staking_address], energy_contract.address, compare_states)
+
+
+def setup_boosted_parameters_for_all_stakings(args: Any):
+    """Setup boosted parameters for all staking contracts"""
+    print("Setup boosted parameters for all staking contracts")
+    compare_states = args.compare_states
+
+    context = Context()
+    energy_contract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
+    staking_addresses = get_all_staking_addresses()
+
+    setup_boosted_parameters_with_energy_address(staking_addresses, energy_contract.address, compare_states)
 
 
 def produce_staking_rewards(args: Any):

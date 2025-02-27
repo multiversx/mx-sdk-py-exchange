@@ -21,6 +21,9 @@ class ComposableTasksContract(DEXContractInterface):
     @classmethod
     def load_config_dict(cls, config_dict: dict):
         return ComposableTasksContract(address=config_dict['address'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):
@@ -29,7 +32,7 @@ class ComposableTasksContract(DEXContractInterface):
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None):
         """Expecting as args:
         """
-        function_purpose = "Deploy escrow contract"
+        function_purpose = "Deploy composable tasks contract"
         logger.info(function_purpose)
 
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
@@ -55,7 +58,7 @@ class ComposableTasksContract(DEXContractInterface):
         pass
 
     def print_contract_info(self):
-        log_step_pass(f"Deployed escrow contract: {self.address}")
+        log_step_pass(f"Deployed composable tasks contract: {self.address}")
 
     def set_wrap_egld_address(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -77,15 +80,4 @@ class ComposableTasksContract(DEXContractInterface):
 
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setRouterAddr", args)
 
-    def set_pair_address_for_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
-        """ Expected as args:
-            Type[str]: first token id
-            Type[str]: second token id
-            Type[str]: pair address
-        """
-
-        function_purpose = "Set pair address for tokens"
-        logger.info(function_purpose)
-
-        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setPairAddrForTokens", args)
 

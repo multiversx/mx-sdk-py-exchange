@@ -2,6 +2,7 @@ import random
 from datetime import datetime
 
 import config
+from contracts.contract_identities import DEXContractInterface
 from contracts.farm_contract import FarmContract
 from contracts.metastaking_contract import MetaStakingContract
 from contracts.pair_contract import PairContract
@@ -20,17 +21,32 @@ class Context:
     def __init__(self):
 
         self.deploy_structure = DeployStructure()
-        self.deployer_account = Account(pem_file=config.DEFAULT_OWNER)
+        self.network_provider = NetworkProviders(config.DEFAULT_API, config.DEFAULT_PROXY)
+
+        self.deployer_account = Account.from_file(config.DEFAULT_OWNER)
+
+        if "shadowfork" in config.DEFAULT_PROXY and config.SF_DEX_REFERENCE_ADDRESS:
+            # get owner of the SF reference contract
+            owner = self.network_provider.proxy.get_account(Address(config.SF_DEX_REFERENCE_ADDRESS)).owner_address.to_bech32()
+            print(f"Shadowfork detected. Owner: {owner}")
+
+            config.DEX_OWNER_ADDRESS = owner if not config.DEX_OWNER_ADDRESS else config.DEX_OWNER_ADDRESS
+            config.DEX_ADMIN_ADDRESS = owner if not config.DEX_ADMIN_ADDRESS else config.DEX_ADMIN_ADDRESS
+
         if config.DEX_OWNER_ADDRESS:    # manual override only for shadowforks
             self.deployer_account.address = Address(config.DEX_OWNER_ADDRESS)
-        self.admin_account = Account(pem_file=config.DEFAULT_ADMIN)
+
+        if config.DEFAULT_ADMIN == config.DEFAULT_OWNER:
+            self.admin_account = self.deployer_account
+        else:
+            self.admin_account = Account.from_file(config.DEFAULT_ADMIN)
+            
         if config.DEX_ADMIN_ADDRESS:  # manual override only for shadowforks
             self.admin_account.address = Address(config.DEX_ADMIN_ADDRESS)
+
         self.accounts = BunchOfAccounts.load_accounts_from_files([config.DEFAULT_ACCOUNTS])
         self.nonces_file = config.DEFAULT_WORKSPACE / "_nonces.json"
         self.debug_level = 1
-
-        self.network_provider = NetworkProviders(config.DEFAULT_API, config.DEFAULT_PROXY)
 
         # logger
         self.start_time = datetime.now()
@@ -148,7 +164,7 @@ class Context:
     def get_price_discovery_contract(self, index: int):
         return self.deploy_structure.get_deployed_contract_by_index(config.PRICE_DISCOVERIES, index)
 
-    def get_contracts(self, contract_label: str):
+    def get_contracts(self, contract_label: str) -> list[DEXContractInterface]:
         return self.deploy_structure.get_deployed_contracts(contract_label)
 
     def get_farm_contract_by_address(self, address: str) -> FarmContract:

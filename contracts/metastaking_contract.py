@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Tuple, override
 from contracts.contract_identities import DEXContractInterface, MetaStakingContractVersion
+from contracts.base_contracts import BaseSCWhitelistContract, BasePermissionsHubContract
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
@@ -10,10 +11,12 @@ from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 import config
 
+from utils.contract_data_fetchers import MetaStakingContractDataFetcher
+
 logger = get_logger(__name__)
 
 
-class MetaStakingContract(DEXContractInterface):
+class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
     def __init__(self, staking_token: str, lp_token: str, farm_token: str, stake_token: str,
                  lp_address: str, farm_address: str, stake_address: str,
                  version: MetaStakingContractVersion, metastake_token: str = "", address: str = ""):
@@ -55,6 +58,9 @@ class MetaStakingContract(DEXContractInterface):
                                    farm_address=config_dict['farm_address'],
                                    stake_address=config_dict['stake_address'],
                                    version=MetaStakingContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.metastake_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=MetaStakingContractVersion.V3Boosted):
@@ -183,10 +189,26 @@ class MetaStakingContract(DEXContractInterface):
         logger.debug(f"Account: {user.address}")
 
         metastake_fn = 'stakeFarmTokens'
-        gas_limit = 50000000
+        gas_limit = 70000000
 
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
                                         user, Address(self.address), metastake_fn, args)
+    
+    def enter_metastake_on_behalf(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
+        """Expected as args:
+            type[List[ESDTToken]]: tokens to use
+            type[str]: original caller
+        """
+        function_purpose = f"enterMetastakingOnBehalf"  
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        metastake_fn = 'stakeFarmOnBehalf'
+        gas_limit = 70000000    
+        
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
+                                        user, Address(self.address), metastake_fn, args)
+    
 
     def exit_metastake(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
         """Expected as args:
@@ -220,6 +242,20 @@ class MetaStakingContract(DEXContractInterface):
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
                                         user, Address(self.address), claim_fn, args)
     
+    def claim_rewards_on_behalf_metastaking(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
+        """Expected as args:
+            type[List[ESDTToken]]: tokens to use
+        """
+        function_purpose = f"claimDualYieldOnBehalf"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 70000000
+        claim_fn = 'claimDualYieldOnBehalf'
+
+        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
+                                        user, Address(self.address), claim_fn, args)
+    
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
         function_purpose = "Set energy factory address in proxy staking contract"
         logger.info(function_purpose)
@@ -231,15 +267,32 @@ class MetaStakingContract(DEXContractInterface):
         gas_limit = 50000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
                              [energy_address])
+    
+    def get_energy_factory_address(self, proxy: ProxyNetworkProvider) -> str:
+        data_fetcher = MetaStakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getEnergyFactoryAddress')
+        if not raw_results:
+            return ""
+        address = Address.from_hex(raw_results).bech32()
+
+        return address
+    
+    def get_decoded_metastake_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
+                                                              holder_address: str, token_nonce: int) -> Dict[str, Any]:
+        """ Get decoded attributes of the metastake token from the proxy without underlying farm and stake tokens.
+        Proxy usage requires to know the holder address."""
+        metastake_token_on_network = proxy.get_nonfungible_token_of_account(Address(holder_address), self.metastake_token, token_nonce)
+         
+        decoded_attributes = decode_merged_attributes(base64_to_hex(metastake_token_on_network.attributes), METASTAKE_TOKEN_ATTRIBUTES)
+        logger.debug(f'Metastake Tokens: {decoded_attributes}')
+
+        return decoded_attributes
 
     def get_all_decoded_metastake_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
                                                               holder_address: str, token_nonce: int) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
         """ Get all decoded attributes of the metastake token and its underlying farm and stake tokens from the proxy. 
         Proxy usage requires to know the holder address."""
-        metastake_token_on_network = proxy.get_nonfungible_token_of_account(Address(holder_address), self.metastake_token, token_nonce)
-         
-        decoded_attributes = decode_merged_attributes(base64_to_hex(metastake_token_on_network.attributes), METASTAKE_TOKEN_ATTRIBUTES)
-        logger.debug(f'Metatake Tokens: {decoded_attributes}')
+        decoded_attributes = self.get_decoded_metastake_token_attributes_from_proxy(proxy, holder_address, token_nonce)
 
         farm_token_on_network = proxy.get_nonfungible_token_of_account(Address(self.address), self.farm_token, decoded_attributes.get('lp_farm_token_nonce'))
         farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), FARM_TOKEN_ATTRIBUTES)

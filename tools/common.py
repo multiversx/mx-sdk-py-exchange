@@ -9,6 +9,7 @@ from tools.runners.account_state_runner import get_account_keys_online, report_k
 from utils.utils_chain import Account, base64_to_hex
 import config
 from utils.utils_tx import NetworkProviders
+from utils.utils_generic import ensure_folder
 
 
 PROXY = config.DEFAULT_PROXY
@@ -27,8 +28,11 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
     pairs_data = {}
 
     for address in contract_addresses:
-        contract_addr = Address.new_from_hex(address, "erd")
+        contract_addr = Address.new_from_bech32(address)
         account_data = proxy.get_account(contract_addr)
+        if not account_data.code_hash:
+            print(f"Account data not found for {contract_label} {address}")
+            continue
         code_hash = base64_to_hex(account_data.code_hash)
 
         if code_hash not in pairs_data:
@@ -38,6 +42,8 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
             }
             save_wasm(account_data.code.hex(), code_hash)
         pairs_data[code_hash][contract_label].append(contract_addr.bech32())
+
+    ensure_folder(save_path.parent)
 
     with open(save_path, "w", encoding="UTF-8") as writer:
         json.dump(pairs_data, writer, indent=4)
@@ -117,7 +123,7 @@ def get_saved_contract_addresses(contract_label: str, saved_file: Path, searched
 def get_owner(proxy) -> Account:
     """Get owner account"""
 
-    owner = Account(pem_file=config.DEFAULT_OWNER)
+    owner = Account.from_file(config.DEFAULT_OWNER)
     if SHADOWFORK:
         owner.address = Address.new_from_bech32(config.DEX_OWNER_ADDRESS)      # ONLY FOR SHADOWFORK
     owner.sync_nonce(proxy)

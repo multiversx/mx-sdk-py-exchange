@@ -41,6 +41,9 @@ class SimpleLockEnergyContract(DEXContractInterface):
                                         locked_token=config_dict['locked_token'],
                                         lp_proxy_token=config_dict['lp_proxy_token'],
                                         farm_proxy_token=config_dict['farm_proxy_token'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.locked_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):
@@ -48,7 +51,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         base_token = hex_to_string(data_fetcher.get_data("getBaseAssetTokenId"))
         locked_token = hex_to_string(data_fetcher.get_data("getLockedTokenId"))
 
-        return SimpleLockEnergyContract(base_token, locked_token, address)
+        return SimpleLockEnergyContract(base_token, locked_token, "", "", address)
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
@@ -379,7 +382,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
         if len(args) != 1:
             log_unexpected_args(function_purpose, args)
             return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
+        return multi_esdt_endpoint_call(function_purpose, proxy, 50000000,
                                         user, Address(self.address), "unlockEarly", args)
 
     def reduce_lock(self, user: Account, proxy: ProxyNetworkProvider, args: list):
@@ -506,9 +509,19 @@ class SimpleLockEnergyContract(DEXContractInterface):
         logger.info(function_purpose)
 
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setEnergyForOldTokens", args)
+    
+    def adjust_user_energy(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: user address
+            type[str]: energy
+            type[str]: amount
+        """
+        function_purpose = "adjust delta difference for user energy"
+        logger.info(function_purpose)
+
+        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "adjustUserEnergy", args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
-        self.set_transfer_role_locked_token(deployer, proxy, [])
         self.resume(deployer, proxy)
 
     def print_contract_info(self):

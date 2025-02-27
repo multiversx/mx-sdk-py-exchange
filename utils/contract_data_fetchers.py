@@ -177,7 +177,7 @@ class FarmContractDataFetcher(DataFetcher):
             "getRewardTokenId": self._get_hex_view,
             "getState": self._get_int_view,
             "getPairContractManagedAddress": self._get_hex_view,
-            "getUserTotalFarmPosition": self._get_hex_view,
+            "getUserTotalFarmPosition": self._get_int_view,
             "getCurrentWeek": self._get_int_view,            
             "getFirstWeekStartEpoch": self._get_int_view,
             "getLastGlobalUpdateWeek": self._get_int_view,
@@ -259,7 +259,7 @@ class StakingContractDataFetcher(DataFetcher):
             "getFarmTokenId": self._get_hex_view,
             "getFarmingTokenId": self._get_hex_view,
             "getState": self._get_int_view,
-            "getUserTotalFarmPosition": self._get_hex_view,
+            "getUserTotalFarmPosition": self._get_int_view,
             "getCurrentWeek": self._get_int_view,            
             "getFirstWeekStartEpoch": self._get_int_view,
             "getLastGlobalUpdateWeek": self._get_int_view,
@@ -288,6 +288,7 @@ class MetaStakingContractDataFetcher(DataFetcher):
             "getPairAddress": self._get_hex_view,
             "getLpFarmAddress": self._get_hex_view,
             "getStakingFarmAddress": self._get_hex_view,
+            "getEnergyFactoryAddress": self._get_hex_view,
         }
 
 
@@ -327,7 +328,7 @@ class BaseBoostedContractDataFetcher(DataFetcher):
             "getCurrentWeek": self._get_int_view,            
             "getFirstWeekStartEpoch": self._get_int_view,
             "getLastGlobalUpdateWeek": self._get_int_view,
-            "getUserTotalFarmPosition": self._get_hex_view,
+            "getUserTotalFarmPosition": self._get_int_view,
             "getUserEnergyForWeek": self._get_hex_view,
             "getLastActiveWeekForUser": self._get_int_view,
             "getCurrentClaimProgress": self._get_hex_view,
@@ -337,6 +338,22 @@ class BaseBoostedContractDataFetcher(DataFetcher):
             "getTotalRewardsForWeek": self._get_int_view,
             "getRemainingBoostedRewardsToDistribute": self._get_int_view,
             "getUndistributedBoostedRewards": self._get_int_view,
+        }
+
+
+class BaseContractWhitelistDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "isSCAddressWhitelisted": self._get_int_view
+        }
+
+class PermissionsHubContractDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "isWhitelisted": self._get_int_view,
+            "getBlacklistedAddresses": self._get_hex_list_view,
         }
 
 

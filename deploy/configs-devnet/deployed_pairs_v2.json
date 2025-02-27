@@ -82,5 +82,12 @@
         "lpToken": "HTMWEGLD-acd22a",
         "address": "erd1qqqqqqqqqqqqqpgqnp4wf8nsd0pfz957fe2n8gzpksycxc790n4sqvv74v",
         "version": 2
+    },
+    {
+        "firstToken": "USH-dda7c6",
+        "secondToken": "WEGLD-a28c59",
+        "lpToken": "USHWEGLD-0b8b66",
+        "address": "erd1qqqqqqqqqqqqqpgq2uxpprk08dn6523s0cre2v86h9cd57vf0n4ss7r54t",
+        "version": 2
     }
 ]

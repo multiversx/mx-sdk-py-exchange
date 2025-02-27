@@ -1,31 +1,23 @@
 from argparse import ArgumentParser
-from concurrent.futures import ThreadPoolExecutor
 import json
 import os
-from time import sleep
 from typing import Any
 
-from events.event_generators import get_lp_from_metastake_token_attributes
-from multiversx_sdk import Address, ContractCallBuilder, \
-    DefaultTransactionBuildersConfiguration
+from multiversx_sdk import Address
 from config import GRAPHQL
-from context import Context
 from contracts.contract_identities import FarmContractVersion
 from contracts.farm_contract import FarmContract
-from contracts.simple_lock_contract import SimpleLockContract
-from events.farm_events import EnterFarmEvent, ExitFarmEvent
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
-    get_owner, get_saved_contract_addresses, get_user_continue, rule_of_three, run_graphql_query, fetch_contracts_states
-from tools.runners import metastaking_runner
-from tools.runners.common_runner import add_generate_transaction_command, add_upgrade_all_command, add_upgrade_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce
-from tools.runners.metastaking_runner import generate_unstake_farm_tokens_transaction
-from utils.contract_data_fetchers import FarmContractDataFetcher, SimpleLockContractDataFetcher
-from utils.contract_retrievers import retrieve_farm_by_address
-from utils.utils_chain import Account, WrapperAddress, base64_to_hex, get_all_token_nonces_details_for_account, hex_to_string
-from utils.utils_generic import split_to_chunks
-from utils.utils_tx import ESDTToken, NetworkProviders
+    get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
+from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command, add_verify_command, verify_contracts
+from utils.contract_data_fetchers import FarmContractDataFetcher
+from utils.utils_tx import NetworkProviders
+from utils.utils_chain import get_bytecode_codehash
+from utils.utils_generic import get_file_from_url_or_path
+from tools.runners.common_config import FARM_BOOSTED_YIELD_FACTORS
 import config
+
 
 FARMSV13_LABEL = "farmsv13"
 FARMSV12_LABEL = "farmsv12"
@@ -46,6 +38,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     contract_group = contract_parser.add_subparsers()
     add_upgrade_command(contract_group, upgrade_farmv2_contract)
     add_upgrade_all_command(contract_group, upgrade_farmv2_contracts)
+    add_verify_command(contract_group, verify_farmv2_contracts)
 
     command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
     command_parser.set_defaults(func=fetch_and_save_farms_from_chain)
@@ -56,34 +49,41 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser = contract_group.add_parser('resume-all', help='resume all contracts command')
     command_parser.set_defaults(func=resume_farm_contracts)
 
+    command_parser = contract_group.add_parser('replace-v2-ownership', help='overwrite ownership address for all contracts command')
+    command_parser.add_argument('--compare-states', action='store_true',
+                        help='compare states before and after change')
+    command_parser.add_argument('--old-owner', type=str, help='old owner address to replace')
+    command_parser.set_defaults(func=replace_v2_ownership)
 
-    transactions_parser = subgroup_parser.add_parser('generate-transactions', help='farms transactions commands')
-
-    transactions_group = transactions_parser.add_subparsers()
-    add_generate_transaction_command(transactions_group, generate_unstake_farm_tokens_transaction, 'unstakeFarmTokens', 'exit farm tokens command')
-    add_generate_transaction_command(transactions_group, generate_stake_farm_tokens_transaction, 'stakeFarmTokens', 'enter farm tokens command')
-    add_generate_transaction_command(transactions_group, generate_exit_farm_locked_transaction, 'exitFarmLocked', 'exit simple lock command')
+    command_parser = contract_group.add_parser('update-boosted-factors-all', help='update boosted factors for all contracts command')
+    command_parser.set_defaults(func=update_boosted_factors)
+    
 
     return group_parser
 
-def fetch_and_save_farms_from_chain():
+
+def fetch_and_save_farms_from_chain(_):
     """Fetch and save farms from chain"""
 
     print("Fetching farms from chain...")
-
-    network_providers = NetworkProviders(API, PROXY)
 
     farmsv13 = get_farm_addresses_from_chain("v1.3")
     farmsv13locked = get_farm_addresses_locked_from_chain()
     farmsv12 = get_farm_addresses_from_chain("v1.2")
     farmsv2 = get_farm_addresses_from_chain("v2")
-    fetch_and_save_contracts(farmsv13, FARMSV13_LABEL, OUTPUT_FARMV13_CONTRACTS_FILE, network_providers.proxy)
-    fetch_and_save_contracts(farmsv13locked, FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE, network_providers.proxy)
-    fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE, network_providers.proxy)
-    fetch_and_save_contracts(farmsv2, FARMSV2_LABEL, OUTPUT_FARMV2_CONTRACTS_FILE, network_providers.proxy)
+
+    print(f"Retrieved {len(farmsv12)} farms v1.2 contracts.")
+    print(f"Retrieved {len(farmsv13)} farms v1.3 contracts.")
+    print(f"Retrieved {len(farmsv13locked)} farms v1.3 locked contracts.")
+    print(f"Retrieved {len(farmsv2)} farms v2 contracts.")
+
+    fetch_and_save_contracts(farmsv13, FARMSV13_LABEL, OUTPUT_FARMV13_CONTRACTS_FILE)
+    fetch_and_save_contracts(farmsv13locked, FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE)
+    fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE)
+    fetch_and_save_contracts(farmsv2, FARMSV2_LABEL, OUTPUT_FARMV2_CONTRACTS_FILE)
 
 
-def pause_farm_contracts():
+def pause_farm_contracts(_):
     """Pause all farms"""
 
     network_providers = NetworkProviders(API, PROXY)
@@ -99,7 +99,7 @@ def pause_farm_contracts():
     count = 1
     for farm_address in farm_addresses:
         print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
-        data_fetcher = FarmContractDataFetcher(Address(farm_address, "erd"), network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address.from_bech32(farm_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
         if contract_state != 0:
@@ -140,7 +140,7 @@ def pause_farm_contract(args: Any):
         print(f"Contract {farm_address} already inactive. Current state: {contract_state}")
 
 
-def resume_farm_contracts():
+def resume_farm_contracts(_):
     """Resume all farms"""
 
     print("Resuming farms...")
@@ -294,27 +294,32 @@ def upgrade_farmv2_contracts(args: Any):
 
     all_addresses = get_all_farm_v2_addresses()
 
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = get_file_from_url_or_path(config.FARM_V3_BYTECODE_PATH)
+
     print(f"Upgrading {len(all_addresses)} boosted farm contracts...")
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
+    
+    if compare_states:
+        print("Fetching contracts states before upgrade...")
+        fetch_contracts_states("pre", network_providers, all_addresses, FARMSV2_LABEL)
+
+        if not get_user_continue():
+            return
 
     count = 1
     for address in all_addresses:
         print(f"Processing contract {count} / {len(all_addresses)}: {address}")
         contract: FarmContract
-        contract = retrieve_farm_by_address(address)
-        lp_address = contract.get_lp_address(network_providers.proxy)
-
-        if compare_states:
-            print("Fetching contract state before upgrade...")
-            fetch_contracts_states("pre", network_providers, [address], FARMSV2_LABEL)
-
-            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                return
+        contract = FarmContract.load_contract_by_address(address)
 
         tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                            config.FARM_V2_BYTECODE_PATH,
-                                            [lp_address, dex_owner.address.bech32()])
+                                            bytecode_path,
+                                            [], True)
 
         if not network_providers.check_simple_tx_status(tx_hash, f"upgrade farm v2 contract: {address}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
@@ -347,7 +352,16 @@ def upgrade_farmv2_contract(args: Any):
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
 
-    contract = retrieve_farm_by_address(farm_address)
+    contract = FarmContract.load_contract_by_address(farm_address)
+
+    if args.bytecode:
+        bytecode_path = get_file_from_url_or_path(args.bytecode)
+    else:
+        bytecode_path = get_file_from_url_or_path(config.FARM_V3_BYTECODE_PATH)
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
 
     if compare_states:
         print("Fetching contract state before upgrade...")
@@ -357,10 +371,10 @@ def upgrade_farmv2_contract(args: Any):
             return
 
     tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
-                                        config.FARM_V3_BYTECODE_PATH,
+                                        bytecode_path,
                                         [], True)
 
-    if not network_providers.check_complex_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
+    if not network_providers.check_simple_tx_status(tx_hash, f"upgrade farm v2 contract: {farm_address}"):
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
@@ -369,6 +383,15 @@ def upgrade_farmv2_contract(args: Any):
 
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
         return
+    
+
+def verify_farmv2_contracts(args: Any):
+    print("Verifying v2 farms...")
+
+    all_addresses = get_all_farm_v2_addresses()
+    verify_contracts(args, all_addresses)
+    
+    print("All contracts have been verified.")
 
 
 def set_transfer_role_farmv13_contracts():
@@ -396,12 +419,14 @@ def set_transfer_role_farmv13_contracts():
         count += 1
 
 
-def replace_v2_ownership(old_owner: str, compare_states: bool = False):
+def replace_v2_ownership(args: Any):
+    old_owner = args.old_owner
+    compare_states = args.compare_states
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
     all_addresses = get_all_farm_v2_addresses()
-    cleaned_address = Address(old_owner).to_bech32()   # pass it through the Address class to check if it's valid
+    cleaned_address = Address.new_from_bech32(old_owner).to_bech32()   # pass it through the Address class to check if it's valid
 
     print(f"Searching farm ownership for {cleaned_address}...")
 
@@ -409,9 +434,9 @@ def replace_v2_ownership(old_owner: str, compare_states: bool = False):
     for address in all_addresses:
         print(f"Processing contract {count} / {len(all_addresses)}: {address}")
         contract = FarmContract("", "", "", address, FarmContractVersion.V2Boosted)
-        data_fetcher = FarmContractDataFetcher(Address(address), network_providers.proxy.url)
+        data_fetcher = FarmContractDataFetcher(Address.new_from_bech32(address), network_providers.proxy.url)
 
-        permissions = data_fetcher.get_data("getPermissions", [Address(cleaned_address).get_public_key()])
+        permissions = data_fetcher.get_data("getPermissions", [Address.new_from_bech32(cleaned_address).get_public_key()])
         if not permissions:
             continue
         print(f"Found permissions {permissions} for {cleaned_address} in contract {address}. Replace it?")
@@ -436,6 +461,29 @@ def replace_v2_ownership(old_owner: str, compare_states: bool = False):
 
         if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
+
+        count += 1
+
+
+def update_boosted_factors(_):
+    """Update boosted factors for all farms"""
+
+    print("Updating boosted factors for all farms...")
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    farm_addresses = get_all_farm_v2_addresses()
+
+    count = 1
+    for farm_address in farm_addresses:
+        print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
+        contract = FarmContract("", "", "", farm_address, FarmContractVersion.V2Boosted)
+        tx_hash = contract.set_boosted_yields_factors(dex_owner, network_providers.proxy,
+                                                      FARM_BOOSTED_YIELD_FACTORS)
+        if not network_providers.check_simple_tx_status(tx_hash, f"set boosted yields for farm contract: {farm_address}"):
+            if not get_user_continue():
+                return
 
         count += 1
 
@@ -484,153 +532,7 @@ def remove_penalty_farms():
                 return
 
         count += 1
-def generate_unstake_farm_tokens_transaction(args: Any):
-    context = Context()
-    farm_contracts = context.get_contracts(config.FARMS_V2)
-   
-    """Generate unstake farm tokens transaction"""
-    farm_address = args.address
-    exported_accounts_path = args.accounts_export
 
-    if not exported_accounts_path:
-        print("Missing required arguments!")
-        return
-
-    if not farm_address and not args.all:
-        print("Missing required arguments!")
-        return
-
-    default_account = Account(None, config.DEFAULT_OWNER)
-    network_providers = NetworkProviders(API, PROXY)
-    chain_id = network_providers.proxy.get_network_config().chain_id
-    config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
-    signature = get_default_signature()
-    proxy = network_providers.proxy
-    default_account.sync_nonce(proxy)
-
-    exported_accounts = read_accounts_from_json(exported_accounts_path)
-    fund_shadowfork_accounts(exported_accounts)
-    sleep(30)
-
-    farm_contract = FarmContract.load_contract_by_address(farm_address, FarmContractVersion.V2Boosted)
-    accounts_with_token = get_acounts_with_token(exported_accounts, farm_contract.farmToken)
-
-    transactions = []
-    accounts_index = 1
-    with ThreadPoolExecutor(max_workers=500) as executor:
-        exported_accounts = list(executor.map(sync_account_nonce, exported_accounts))
-
-    for account_with_token in accounts_with_token:
-        account = Account(account_with_token.address, config.DEFAULT_OWNER)
-        account.address = WrapperAddress.from_bech32(account_with_token.address)
-        account.sync_nonce(proxy)
-        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == farm_contract.farmToken ]
-        for token in tokens:
-            event = ExitFarmEvent(token.token_name, int(token.supply), int(token.token_nonce_hex, 16), '')
-            payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
-
-            if not account.address.is_smart_contract():
-                    builder = ContractCallBuilder(
-                        config=config_tx,
-                        contract=Address.new_from_bech32(farm_address),
-                        function_name="exitFarm",
-                        caller=account.address,
-                        call_arguments=[1, 1, event.amount],
-                        value=0,
-                        gas_limit=75000000,
-                        nonce=account.nonce,
-                        esdt_transfers=payment_tokens
-                    )
-                    tx = builder.build()
-                    tx.signature = signature
-
-                    transactions.append(tx)
-                    account.nonce += 1
-                         
-            index = exported_accounts.index(account_with_token)
-            exported_accounts[index].nonce = account.nonce
-            accounts_index += 1
-
-        transactions_chunks = split_to_chunks(transactions, 100)
-        for chunk in transactions_chunks:
-            network_providers.proxy.send_transactions(chunk)                    
-
-def generate_stake_farm_tokens_transaction(args: Any):
-    """Generate unstake farm tokens transaction"""
-
-    farm_address = args.address
-    exported_accounts_path = args.accounts_export
-
-    network_providers = NetworkProviders(API, PROXY)
-    proxy = network_providers.proxy
-
-    if not farm_address or not exported_accounts_path:
-        print("Missing required arguments!")
-        return
-
-    print(f"Generate stake farm tokens transaction for metastaking contract {farm_address}")
-
-    network_providers = NetworkProviders(API, PROXY)
-    farm_contract = FarmContract.load_contract_by_address(farm_address, FarmContractVersion.V2Boosted)
-
-    exported_accounts = read_accounts_from_json(exported_accounts_path)
-    accounts_with_token = get_acounts_with_token(exported_accounts, farm_contract.farmToken)
-
-    for account_with_token in accounts_with_token:
-        account = Account(account_with_token.address, config.DEFAULT_OWNER)
-        account.address = WrapperAddress.from_bech32(account_with_token.address)
-        account.sync_nonce(network_providers.proxy)
-        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == farm_contract.farmToken]
-        for token in tokens:
-                event = EnterFarmEvent(token.token_name, int(token.supply), int(token.token_nonce_hex, 16), '')
-                farm_contract.enterFarm(
-                    proxy,
-                    account,
-                    event
-                    )
-
-def generate_exit_farm_locked_transaction(args: Any):
-    """Generate exit farm locked tokens transaction"""
-    farm_address = args.address
-    exported_accounts_path = args.accounts_export
-
-    if not farm_address or not exported_accounts_path:
-        print("Missing required arguments!")
-        return
-
-    print(f"Generate unstake farm tokens transaction for contract {farm_address}")    
-    network_providers = NetworkProviders(API, PROXY)
-    proxy = network_providers.proxy
-
-    locked_token_hex = SimpleLockContractDataFetcher(Address(farm_address),
-                                                             proxy.url).get_data("getLockedTokenId")
-    locked_lp_token_hex = SimpleLockContractDataFetcher(Address(farm_address),
-                                                                proxy.url).get_data("getLpProxyTokenId")
-    locked_farm_token_hex = SimpleLockContractDataFetcher(Address(farm_address),
-                                                                proxy.url).get_data("getFarmProxyTokenId")
-    LOCKED_TOKEN = hex_to_string(locked_token_hex)
-    LOCKED_LP_TOKEN = hex_to_string(locked_lp_token_hex)
-    LOCKED_FARM_TOKEN = hex_to_string(locked_farm_token_hex)
-
-
-    farm_contract = SimpleLockContract(LOCKED_TOKEN, LOCKED_LP_TOKEN, LOCKED_FARM_TOKEN, farm_address)
-
-    exported_accounts = read_accounts_from_json(exported_accounts_path)
-    accounts_with_token = get_acounts_with_token(exported_accounts, farm_contract.farm_proxy_token)
-
-    for account_with_token in accounts_with_token:
-        account = Account(account_with_token.address, config.DEFAULT_OWNER)
-        account.address = WrapperAddress.from_bech32(account_with_token.address)
-        account.sync_nonce(network_providers.proxy)
-        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == farm_contract.farm_proxy_token ]
-
-        for token in tokens:
-              if(account.address.to_bech32() != ""):
-                    farm_contract.exit_farm_locked_token(
-                        account,
-                        proxy,
-                        [[ESDTToken(farm_contract.farm_proxy_token, int(token.token_nonce_hex, 16), int(token.supply))]]
-                )
 
 def get_farm_addresses_from_chain(version: str) -> list:
     """

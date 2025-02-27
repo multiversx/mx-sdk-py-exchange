@@ -34,6 +34,9 @@ class EnergyUpdateContract(DEXContractInterface):
     @classmethod
     def load_contract_by_address(cls, address: str):
         raise NotImplementedError
+    
+    def get_contract_tokens(self) -> list[str]:
+        return []
 
     def contract_deploy(
             self,

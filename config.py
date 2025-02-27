@@ -16,8 +16,11 @@ DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
 DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
-DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks
-DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks
+
+# SF related configuration
+SF_DEX_REFERENCE_ADDRESS = "erd1qqqqqqqqqqqqqpgqq66xk9gfr4esuhem3jru86wg5hvp33a62jps2fy57p"
+DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks; will be used if reference address not set
+DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks; will be used if reference address not set
 SHADOWFORK_FUNDING_ADDRESS = ""  # Only needed for shadowforks
 
 # Used DEX deploy configuration
@@ -40,10 +43,10 @@ FARM_COMMUNITY_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "de
 PRICE_DISCOVERY_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "dex" / "price-discovery" / "output" / "price-discovery.wasm"
 STAKING_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "farm-staking" / "farm-staking" / "output" / "farm-staking.wasm"
 STAKING_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "farm-staking.wasm"
-STAKING_V3_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "farm-staking.wasm"
+STAKING_V3_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-sc/releases/download/v3.1.1/farm-staking.wasm"
 STAKING_PROXY_BYTECODE_PATH = Path().home() / "dev" / "dex" / "sc-dex-rs" / "farm-staking" / "farm-staking-proxy" / "output" / "farm-staking-proxy.wasm"
 STAKING_PROXY_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "farm-staking-proxy.wasm"
-STAKING_PROXY_V3_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "farm-staking-proxy.wasm"
+STAKING_PROXY_V3_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-sc/releases/download/v3.0.8/farm-staking-proxy.wasm"
 SIMPLE_LOCK_ENERGY_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "energy-factory.wasm"
 UNSTAKER_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "token-unstake.wasm"
 FEES_COLLECTOR_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "fees-collector.wasm"
@@ -52,11 +55,14 @@ PAIR_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "pair.wasm"
 PAIR_VIEW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "safe-price-view.wasm"
 FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "dexv2-rs" / "proxy-deployer.wasm"
 FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "farm-with-locked-rewards" / "farm-with-locked-rewards.wasm"
-FARM_V3_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "farm-with-locked-rewards.wasm"
-GOVERNANCE_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "energy-integration" / "governance-v2" / "output" / "governance-v2.wasm"
-POSITION_CREATOR_BYTECODE_PATH = Path().home() / "MultiversX/mx-exchange-tools-sc/auto-pos-creator/output" / "auto-pos-creator.wasm"
+FARM_V3_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-sc/releases/download/v3.1.1/farm-with-locked-rewards.wasm"
+GOVERNANCE_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-sc/releases/download/v3.0.8/governance-v2.wasm"
+POSITION_CREATOR_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/auto-pos-creator.wasm"
+LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/locked-token-pos-creator.wasm"
 ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "lkmex-transfer.wasm"
 LK_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-wrapper.wasm"
+COMPOSABLE_TASKS_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/composable-tasks.wasm"
+PERMISSIONS_HUBS_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "permissions-hub" / "permissions-hub.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
@@ -76,6 +82,7 @@ DEFAULT_MINT_VALUE = 1  # EGLD      # TODO: don't go sub-unitary cause headaches
 CROSS_SHARD_DELAY = 60
 INTRA_SHARD_DELAY = 10
 
+# TODO: add new entries into DeployStructureArguments as well. For future, need to clean this up and make it seamless
 EGLD_WRAPS = "egld_wraps"
 LOCKED_ASSETS = "locked_assets"
 PROXIES = "proxies"
@@ -103,8 +110,11 @@ METASTAKINGS_BOOSTED = "metastakings_boosted"
 FEES_COLLECTORS = "fees_collectors"
 GOVERNANCES = "governances"
 POSITION_CREATOR = "position_creator"
+LOCKED_TOKEN_POSITION_CREATOR = "locked_token_position_creator"
 ESCROWS = "escrows"
 LK_WRAPS = "lk_wraps"
+COMPOSABLE_TASKS = "composable_tasks"
+PERMISSIONS_HUBS = "permissions_hubs"
 
 
 def get_default_tokens_file():

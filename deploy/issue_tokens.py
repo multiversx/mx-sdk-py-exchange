@@ -38,7 +38,7 @@ def main(cli_args: List[str]):
     network = proxy.get_network_config()
     builder_config = DefaultTransactionBuildersConfiguration(network.chain_id)
 
-    account = Account(pem_file=args.account)
+    account = Account.from_file(args.account)
     account.sync_nonce(proxy)
 
     tokens_system_contract = Address.from_bech32(config.TOKENS_CONTRACT_ADDRESS)

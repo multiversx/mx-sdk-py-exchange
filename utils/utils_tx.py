@@ -20,9 +20,9 @@ from multiversx_sdk.network_providers.transaction_status import \
 from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
 
 from utils.logger import get_logger
-from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction
+from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
-                                 log_unexpected_args, split_to_chunks)
+                                 log_unexpected_args, split_to_chunks, get_file_from_url_or_path)
 
 TX_CACHE: Dict[str, dict] = {}
 logger = get_logger(__name__)
@@ -45,6 +45,13 @@ class ESDTToken:
 
     def get_token_data(self) -> tuple:
         return self.token_id, self.token_nonce, self.token_amount
+    
+    def get_token_nonce_hex(self) -> str:
+        if not self.token_nonce:
+            return ""
+        
+        nonce_str = "0" + f"{self.token_nonce:x}" if len(f"{self.token_nonce:x}") % 2 else f"{self.token_nonce:x}"
+        return nonce_str
 
     def get_full_token_name(self) -> str:
         if self.token_nonce != 0:
@@ -63,7 +70,13 @@ class ESDTToken:
 
     @classmethod
     def from_non_fungible_on_network(cls, token: NonFungibleTokenOfAccountOnNetwork):
-        return cls(token.identifier, token.nonce, token.balance)
+        return cls(token.collection, token.nonce, token.balance)
+    
+    @classmethod
+    def from_full_token_name(cls, token_name: str):
+        # token id is everything before the last dash while nonce is everything after
+        token_id, token_nonce = token_name.rsplit("-", 1)
+        return cls(token_id, int(token_nonce, 16), 0)
 
     def to_token_payment(self) -> TokenPayment:
         return TokenPayment(self.token_id, self.token_nonce, self.token_amount, 18)
@@ -165,8 +178,8 @@ class NetworkProviders:
         logger.debug(f"Transaction {tx_hash} status: {results.status}")
         return True
 
-    def get_tx_operations(self, tx_hash: str) -> list:
-        if tx_hash not in TX_CACHE:
+    def get_tx_operations(self, tx_hash: str, no_cache: bool = False) -> list:
+        if no_cache or tx_hash not in TX_CACHE:
             # TODO replace with get_transaction after operations are added to the transaction object
             transaction = self.api.do_get_generic(f'transactions/{tx_hash}')
             TX_CACHE[tx_hash] = transaction     # add it into the hash cache to avoid fetching it again
@@ -279,6 +292,7 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Deploy arguments: {args}")
+    logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
     builder = ContractDeploymentBuilder(
         config=config,
         owner=deployer.address,
@@ -301,6 +315,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
     config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Upgrade arguments: {args}")
+    logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
     builder = ContractUpgradeBuilder(
         config=config,
         contract=contract_address,
@@ -475,8 +490,9 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
     logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
+    processed_bytecode_path = get_file_from_url_or_path(bytecode_path)
 
-    tx = prepare_deploy_tx(owner, network_config, gas, Path(bytecode_path), metadata, args)
+    tx = prepare_deploy_tx(owner, network_config, gas, processed_bytecode_path, metadata, args)
     tx_hash = send_deploy_tx(tx, proxy)
 
     if tx_hash:
@@ -491,8 +507,9 @@ def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
                  args: list) -> str:
     logger.debug(f"Upgrade {contract_label} contract")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
+    processed_bytecode_path = get_file_from_url_or_path(bytecode_path)
 
-    tx = prepare_upgrade_tx(owner, contract, network_config, gas, Path(bytecode_path), metadata, args)
+    tx = prepare_upgrade_tx(owner, contract, network_config, gas, processed_bytecode_path, metadata, args)
     tx_hash = send_contract_call_tx(tx, proxy)
     owner.nonce += 1 if tx_hash != "" else 0
 
@@ -542,6 +559,8 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
 
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
+    if "localhost" in proxy.url:
+        proxy.do_post(f"{proxy.url}/simulator/generate-blocks/1", {})
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""

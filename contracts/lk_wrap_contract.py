@@ -25,6 +25,9 @@ class LkWrapContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return LkWrapContract(address=config_dict['address'],
                               wrapped_token=config_dict['wrapped_token'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.wrapped_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):
@@ -101,7 +104,7 @@ class LkWrapContract(DEXContractInterface):
         if len(args) < 1:
             log_unexpected_args(function_purpose, args)
             return ""
-        return endpoint_call(proxy, 10000000, user, Address(self.address), "setTransferRoleWrappedToken", args)
+        return endpoint_call(proxy, 100000000, user, Address(self.address), "setTransferRoleWrappedToken", args)
     
     def unset_transfer_role_wrapped_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -112,7 +115,7 @@ class LkWrapContract(DEXContractInterface):
         if len(args) < 1:
             log_unexpected_args(function_purpose, args)
             return ""
-        return endpoint_call(proxy, 10000000, user, Address(self.address), "unsetTransferRoleWrappedToken", args)
+        return endpoint_call(proxy, 100000000, user, Address(self.address), "unsetTransferRoleWrappedToken", args)
     
     def issue_wrapped_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:

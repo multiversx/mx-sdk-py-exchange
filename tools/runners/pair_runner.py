@@ -6,12 +6,12 @@ from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract
+from contracts.router_contract import RouterContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue, run_graphql_query
 from tools.runners.common_runner import add_upgrade_all_command
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
-from utils.contract_retrievers import retrieve_router_by_address, retrieve_pair_by_address
 from utils.utils_tx import NetworkProviders
 
 import config
@@ -54,7 +54,7 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     return group_parser
 
 
-def fetch_and_save_pairs_from_chain():
+def fetch_and_save_pairs_from_chain(_):
     """Fetch and save pairs from chain"""
 
     print('fetch_and_save_pairs_from_chain')
@@ -67,7 +67,7 @@ def fetch_and_save_pairs_from_chain():
     fetch_and_save_contracts(registered_pairs, PAIRS_LABEL, OUTPUT_PAIR_CONTRACTS_FILE)
 
 
-def pause_pair_contracts():
+def pause_pair_contracts(_):
     """Pause pair contracts"""
 
     print("Pausing pair contracts")
@@ -78,7 +78,7 @@ def pause_pair_contracts():
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
     pair_addresses = get_all_pair_addresses()
-    router_contract = retrieve_router_by_address(router_address)
+    router_contract = RouterContract.load_contract_by_address(router_address)
 
     # pause all the pairs
     count = 1
@@ -97,7 +97,7 @@ def pause_pair_contracts():
         count += 1
 
 
-def resume_pair_contracts():
+def resume_pair_contracts(_):
     """Resume pair contracts"""
 
     print("Resuming pair contracts")
@@ -115,7 +115,7 @@ def resume_pair_contracts():
         contract_states = json.load(reader)
 
     pair_addresses = get_all_pair_addresses()
-    router_contract = retrieve_router_by_address(router_address)
+    router_contract = RouterContract.load_contract_by_address(router_address)
 
     # pause all the pairs
     count = 1
@@ -155,14 +155,14 @@ def upgrade_pair_contracts(args: Any):
     context = Context()
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
-    router_contract = retrieve_router_by_address(router_address)
+    router_contract = RouterContract.load_contract_by_address(router_contract)
     router_contract.version = RouterContractVersion.V2
     pair_addresses = get_all_pair_addresses()
 
     count = 1
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
-        pair_contract = retrieve_pair_by_address(pair_address)
+        pair_contract = PairContract.load_contract_by_address(pair_address)
         pair_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address),
                                                     network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
@@ -198,13 +198,10 @@ def upgrade_pair_contracts(args: Any):
         count += 1
 
 
-def set_fees_collector_in_pairs():
+def set_fees_collector_in_pairs(_):
     """Set fees collector in pairs"""
 
     print("Setting fees collector in all pairs")
-
-    network_providers = NetworkProviders(API, PROXY)
-    dex_owner = get_owner(network_providers.proxy)
 
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
@@ -219,7 +216,7 @@ def set_fees_collector_in_pairs():
     count = 1
     for pair_address in whitelist:
         print(f"Processing contract {count} / {len(whitelist)}: {pair_address}")
-        pair_contract = retrieve_pair_by_address(pair_address)
+        pair_contract = PairContract.load_contract_by_address(pair_address)
         fees_cut = 50000
 
         # setup fees collector in pair
@@ -233,7 +230,7 @@ def set_fees_collector_in_pairs():
         count += 1
 
 
-def remove_pairs_from_fees_collector():
+def remove_pairs_from_fees_collector(_):
     """Remove pairs from fees collector"""
 
     print("Removing pairs from fees collector")
@@ -253,14 +250,14 @@ def remove_pairs_from_fees_collector():
         if address in pair_addresses:
             pair_addresses.remove(address)
 
-        pair_contract = retrieve_pair_by_address(address)
+        pair_contract = PairContract.load_contract_by_address(address)
         whitelisted_tokens.append(pair_contract.firstToken)
         whitelisted_tokens.append(pair_contract.secondToken)
 
     removable_addresses = []
     removable_tokens = []
     for pair_address in pair_addresses:
-        pair_contract = retrieve_pair_by_address(pair_address)
+        pair_contract = PairContract.load_contract_by_address(pair_address)
 
         removable_addresses.append(pair_address)
         if pair_contract.firstToken not in whitelisted_tokens and \
@@ -302,7 +299,7 @@ def remove_pairs_from_fees_collector():
         return
 
 
-def update_fees_percentage():
+def update_fees_percentage(_):
     """Update fees percentage"""
 
     print("Updating fees percentage")
@@ -315,7 +312,7 @@ def update_fees_percentage():
     count = 1
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
-        pair_contract = retrieve_pair_by_address(pair_address)
+        pair_contract = PairContract.load_contract_by_address(pair_address)
         pair_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address),
                                                     network_providers.proxy.url)
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
@@ -378,7 +375,7 @@ def get_depositing_addresses() -> list:
         # whitelist only if pool was active
         if contract_states[pair_address] == 1:
             whitelist.append(pair_address)
-            pair_contract = retrieve_pair_by_address(pair_address)
+            pair_contract = PairContract.load_contract_by_address(pair_address)
             print(f"{pair_contract.firstToken} / {pair_contract.secondToken}")
 
     print(f"Number of contracts: {len(whitelist)}")

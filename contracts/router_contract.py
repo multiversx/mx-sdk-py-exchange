@@ -26,6 +26,9 @@ class RouterContract(DEXContractInterface):
     def load_config_dict(cls, config_dict: dict):
         return RouterContract(address=config_dict['address'],
                               version=RouterContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=RouterContractVersion.V2):
@@ -78,6 +81,21 @@ class RouterContract(DEXContractInterface):
             sc_args.append(token)
 
         return endpoint_call(proxy, gas_limit, owner, Address(self.address), "addCommonTokensForUserPairs", sc_args)
+    
+    def remove_common_tokens_for_user_pairs(self, owner: Account, proxy: ProxyNetworkProvider, *tokens):
+        """Expecting as args:
+            type[str..]: common token IDs
+        """
+        function_purpose = f"Remove common tokens for user pairs"
+        logger.info(function_purpose)
+
+        gas_limit = 100000000
+
+        sc_args = []
+        for token in tokens:
+            sc_args.append(token)
+
+        return endpoint_call(proxy, gas_limit, owner, Address(self.address), "removeCommonTokensForUserPairs", sc_args)
 
     def config_enable_by_user_parameters(self, deployer: Account, proxy: ProxyNetworkProvider, **kargs):
         """Expecting as args:
@@ -261,6 +279,20 @@ class RouterContract(DEXContractInterface):
             Address(pair_contract)
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
+    
+    def pause(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Pause router contract"
+        logger.info(function_purpose)
+
+        gas_limit = 60000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "pause", [Address(self.address)])
+    
+    def resume(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Resume router contract"
+        logger.info(function_purpose)
+
+        gas_limit = 60000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", [Address(self.address)])
 
     def set_pair_creation_enabled(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:

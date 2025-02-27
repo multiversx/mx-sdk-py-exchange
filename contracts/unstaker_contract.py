@@ -3,7 +3,7 @@ import traceback
 
 from contracts.contract_identities import DEXContractInterface
 from utils.logger import get_logger
-from utils.utils_tx import endpoint_call, deploy
+from utils.utils_tx import endpoint_call, deploy, upgrade_call
 from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import log_step_fail, log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
@@ -26,6 +26,9 @@ class UnstakerContract(DEXContractInterface):
     @classmethod
     def load_config_dict(cls, config_dict: dict):
         return UnstakerContract(address=config_dict['address'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):
@@ -51,6 +54,27 @@ class UnstakerContract(DEXContractInterface):
         arguments = args
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
+    
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None,
+                         no_init: bool = False):
+        """ Expected as args:
+        """
+        function_purpose = f"upgrade {type(self).__name__} contract"
+        logger.info(function_purpose)
+
+        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
+        gas_limit = 200000000
+
+        if no_init:
+            arguments = []
+        else:
+            # implement below in case of upgrade args needed
+            arguments = []
+
+        tx_hash = upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
+                                        bytecode_path, metadata, arguments)
+
+        return tx_hash
 
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -64,7 +88,7 @@ class UnstakerContract(DEXContractInterface):
             return ""
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setEnergyFactoryAddress", args)
 
-    def claim_unlocked_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+    def claim_unlocked_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ Expected as args:
             empty
         """
@@ -72,13 +96,21 @@ class UnstakerContract(DEXContractInterface):
         logger.info(function_purpose)
         return endpoint_call(proxy, 20000000, deployer, Address(self.address), "claimUnlockedTokens", [])
 
-    def cancel_unbond(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+    def cancel_unbond(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ Expected as args:
             empty
         """
         function_purpose = "cancel unbond"
         logger.info(function_purpose)
         return endpoint_call(proxy, 20000000, deployer, Address(self.address), "cancelUnbond", args)
+    
+    def set_fees_burn_percentage(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[int]: fees burn percentage
+        """
+        function_purpose = "set fees burn percentage"
+        logger.info(function_purpose)
+        return endpoint_call(proxy, 20000000, deployer, Address(self.address), "setFeesBurnPercentage", args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass
