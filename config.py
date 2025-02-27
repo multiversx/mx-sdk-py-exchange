@@ -62,6 +62,7 @@ LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH = "https://github.com/multiversx/mx-
 ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "lkmex-transfer.wasm"
 LK_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "locked-token-wrapper.wasm"
 COMPOSABLE_TASKS_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/composable-tasks.wasm"
+PERMISSIONS_HUBS_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "permissions-hub" / "permissions-hub.wasm"
 
 
 # ------------ Generic configuration below; Modify only in case of framework changes ------------ #
@@ -113,6 +114,7 @@ LOCKED_TOKEN_POSITION_CREATOR = "locked_token_position_creator"
 ESCROWS = "escrows"
 LK_WRAPS = "lk_wraps"
 COMPOSABLE_TASKS = "composable_tasks"
+PERMISSIONS_HUBS = "permissions_hubs"
 
 
 def get_default_tokens_file():

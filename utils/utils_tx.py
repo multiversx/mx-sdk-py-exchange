@@ -45,6 +45,13 @@ class ESDTToken:
 
     def get_token_data(self) -> tuple:
         return self.token_id, self.token_nonce, self.token_amount
+    
+    def get_token_nonce_hex(self) -> str:
+        if not self.token_nonce:
+            return ""
+        
+        nonce_str = "0" + f"{self.token_nonce:x}" if len(f"{self.token_nonce:x}") % 2 else f"{self.token_nonce:x}"
+        return nonce_str
 
     def get_full_token_name(self) -> str:
         if self.token_nonce != 0:
@@ -63,7 +70,13 @@ class ESDTToken:
 
     @classmethod
     def from_non_fungible_on_network(cls, token: NonFungibleTokenOfAccountOnNetwork):
-        return cls(token.identifier, token.nonce, token.balance)
+        return cls(token.collection, token.nonce, token.balance)
+    
+    @classmethod
+    def from_full_token_name(cls, token_name: str):
+        # token id is everything before the last dash while nonce is everything after
+        token_id, token_nonce = token_name.rsplit("-", 1)
+        return cls(token_id, int(token_nonce, 16), 0)
 
     def to_token_payment(self) -> TokenPayment:
         return TokenPayment(self.token_id, self.token_nonce, self.token_amount, 18)
@@ -165,8 +178,8 @@ class NetworkProviders:
         logger.debug(f"Transaction {tx_hash} status: {results.status}")
         return True
 
-    def get_tx_operations(self, tx_hash: str) -> list:
-        if tx_hash not in TX_CACHE:
+    def get_tx_operations(self, tx_hash: str, no_cache: bool = False) -> list:
+        if no_cache or tx_hash not in TX_CACHE:
             # TODO replace with get_transaction after operations are added to the transaction object
             transaction = self.api.do_get_generic(f'transactions/{tx_hash}')
             TX_CACHE[tx_hash] = transaction     # add it into the hash cache to avoid fetching it again
@@ -546,6 +559,8 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
 
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
+    if "localhost" in proxy.url:
+        proxy.do_post(f"{proxy.url}/simulator/generate-blocks/1", {})
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""

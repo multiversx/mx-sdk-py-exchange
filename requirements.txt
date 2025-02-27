@@ -1,4 +1,5 @@
 ipykernel
+ipytest
 toml
 debugpy
 wget

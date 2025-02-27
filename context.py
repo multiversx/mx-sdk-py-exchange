@@ -2,6 +2,7 @@ import random
 from datetime import datetime
 
 import config
+from contracts.contract_identities import DEXContractInterface
 from contracts.farm_contract import FarmContract
 from contracts.metastaking_contract import MetaStakingContract
 from contracts.pair_contract import PairContract
@@ -163,7 +164,7 @@ class Context:
     def get_price_discovery_contract(self, index: int):
         return self.deploy_structure.get_deployed_contract_by_index(config.PRICE_DISCOVERIES, index)
 
-    def get_contracts(self, contract_label: str):
+    def get_contracts(self, contract_label: str) -> list[DEXContractInterface]:
         return self.deploy_structure.get_deployed_contracts(contract_label)
 
     def get_farm_contract_by_address(self, address: str) -> FarmContract:

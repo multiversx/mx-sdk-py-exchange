@@ -1,23 +1,24 @@
 from typing import Any, Dict
 import config
 from contracts.contract_identities import StakingContractVersion
-from contracts.base_contracts import BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract
+from contracts.base_contracts import (BaseFarmContract, BaseBoostedContract, 
+                                      BaseSCWhitelistContract, BasePermissionsHubContract)
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string, base64_to_hex
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
                                 ClaimRewardsFarmEvent, CompoundRewardsFarmEvent)
 
-from utils import decoding_structures
+from utils.decoding_structures import STAKE_V1_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_UNBOND_TOKEN_ATTRIBUTES
 
 
 logger = get_logger(__name__)
 
 
-class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract):
+class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract, BasePermissionsHubContract):
     def __init__(self, farming_token: str, max_apr: int, rewards_per_block: int, unbond_epochs: int,
                  version: StakingContractVersion, farm_token: str = "", address: str = ""):
         self.farming_token = farming_token
@@ -50,6 +51,9 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
                                rewards_per_block=config_dict['rewards_per_block'],
                                unbond_epochs=config_dict['unbond_epochs'],
                                version=StakingContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.farm_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=StakingContractVersion.V3Boosted):
@@ -85,6 +89,33 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
 
         return multi_esdt_endpoint_call(stake_farm_fn, network_provider.proxy, gas_limit, user,
                                         Address(self.address), stake_farm_fn, args)
+    
+    def stake_farm_on_behalf(self, network_provider: NetworkProviders, user: Account, event: EnterFarmEvent) -> str:
+        """
+        Stakes a farm on behalf of another user.
+        Expected as args:
+            type[List[ESDTToken]]: tokens to use
+            type[str]: on behalf of address
+        """
+        function_purpose = "stake farm on behalf"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        stake_farm_fn = "stakeFarmOnBehalf"
+
+        logger.info(f"Calling {stake_farm_fn} endpoint...")
+
+        gas_limit = 50000000
+
+        tokens = [ESDTToken(event.farming_tk, event.farming_tk_nonce, event.farming_tk_amount)]
+        if event.farm_tk:
+            tokens.append(ESDTToken(event.farm_tk, event.farm_tk_nonce, event.farm_tk_amount))
+
+        sc_args = [tokens,
+                   Address(event.on_behalf)]
+
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), stake_farm_fn, sc_args)
 
     def unstake_farm(self, network_provider: NetworkProviders, user: Account, event: ExitFarmEvent) -> str:
         unstake_fn = 'unstakeFarm'
@@ -135,6 +166,19 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
 
         sc_args = [Address(event.user)] if event.user else []
         return endpoint_call(network_provider.proxy, gas_limit, user, Address(self.address), claim_fn, sc_args)
+    
+    def claim_rewards_on_behalf(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsFarmEvent) -> str:
+        function_purpose = f"claimRewardsOnBehalf"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 50000000
+        tokens = [ESDTToken(self.farm_token, event.nonce, event.amount)]
+        sc_args = [
+            tokens
+        ]
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), function_purpose, sc_args)
 
     def compound_rewards(self, network_provider: NetworkProviders, user: Account, event: CompoundRewardsFarmEvent) -> str:
         compound_fn = 'compoundRewards'
@@ -421,6 +465,26 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         if not raw_results:
             return -1
         return int(raw_results)
+    
+    def get_decoded_farm_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
+                                                              holder_address: str, token_nonce: int) -> Dict[str, Any]:
+        """ Get decoded attributes of the farm token from the proxy without underlying farm and stake tokens.
+        Proxy usage requires to know the holder address."""
+        farm_token_on_network = proxy.get_nonfungible_token_of_account(Address(holder_address), self.farm_token, token_nonce)
+
+        try:
+            farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), STAKE_V2_TOKEN_ATTRIBUTES)
+        except ValueError as e:
+            try:
+                # handle for old stake token attributes
+                farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), STAKE_V1_TOKEN_ATTRIBUTES)
+            except ValueError as e:
+                # unstake token
+                farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), STAKE_UNBOND_TOKEN_ATTRIBUTES)
+
+        logger.debug(f'Farm Tokens: {farm_token_decoded_attributes}')
+
+        return farm_token_decoded_attributes
     
     def get_all_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
         all_stats = {}

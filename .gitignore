@@ -13,3 +13,5 @@ __pycache__
 /dump
 /abis
 /wasm
+*downloads
+*state_dump

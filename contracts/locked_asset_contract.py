@@ -31,6 +31,9 @@ class LockedAssetContract(DEXContractInterface):
         return LockedAssetContract(address=config_dict['address'],
                                    unlocked_asset=config_dict['unlocked_asset'],
                                    locked_asset=config_dict['locked_asset'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.locked_asset]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

@@ -80,6 +80,9 @@ class PairContract(DEXContractInterface):
                             lpToken=config_dict['lpToken'],
                             address=config_dict['address'],
                             version=PairContractVersion(config_dict['version']))
+    
+    def get_contract_tokens(self) -> list[str]:
+        return [self.lpToken]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=PairContractVersion.V2, proxy_contract=None):

@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 from enum import Enum
 
+from typing import Any
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils.utils_tx import endpoint_call
 from utils.logger import get_logger
@@ -20,7 +21,7 @@ class DEXContractInterface(ABC):
     address: str = NotImplemented
 
     @abstractmethod
-    def get_config_dict(self) -> dict:
+    def get_config_dict(self) -> dict[str, Any]:
         pass
 
     @classmethod
@@ -34,7 +35,7 @@ class DEXContractInterface(ABC):
         pass
 
     @abstractmethod
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list) -> tuple[str, str]:
         pass
 
     @abstractmethod
@@ -43,6 +44,10 @@ class DEXContractInterface(ABC):
 
     @abstractmethod
     def print_contract_info(self):
+        pass
+
+    @abstractmethod
+    def get_contract_tokens(self) -> list[str]:
         pass
 
     def change_owner_address(self, deployer: Account, proxy: ProxyNetworkProvider, new_address: str) -> str:

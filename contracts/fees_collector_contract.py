@@ -22,6 +22,9 @@ class FeesCollectorContract(BaseBoostedContract):
     @classmethod
     def load_config_dict(cls, config_dict: dict):
         return FeesCollectorContract(address=config_dict['address'])
+    
+    def get_contract_tokens(self) -> list[str]:
+        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):
