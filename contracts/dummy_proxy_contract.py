@@ -45,7 +45,9 @@ class DummyProxyContract(DEXContractInterface):
         return tx_hash, address
 
     def call_endpoint(self, user: Account, proxy: ProxyNetworkProvider, amount: int, args: list = None):
-        """ Expected as args:
+        """ 
+        Simply calls the specified endpoint on given contract address.
+        Expected as args:
         type[int]: call type - 0 sync; 1 async; 2 promise; 3 transfer execute
         type[address]: contract address
         type[string]: function name
@@ -59,7 +61,9 @@ class DummyProxyContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "callEndpoint", sc_args, value=str(amount))
 
     def call_internal_transfer_endpoint(self, user: Account, proxy: ProxyNetworkProvider, args: list = None):
-        """ Expected as args:
+        """ 
+        Calls the specified endpoint on given contract address while it also transfers user given tokens with the call.
+        Expected as args:
         type[int]: call type - 0 sync; 1 async; 2 promise; 3 transfer execute
         type[str]: token id
         type[int]: nonce
@@ -75,7 +79,9 @@ class DummyProxyContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "callInternalTransferEndpoint", args)
     
     def call_transfer_endpoint(self, user: Account, proxy: ProxyNetworkProvider, args: list = None):
-        """ Expected as args:
+        """ 
+        Calls the specified endpoint on given contract address while it also transfers specified tokens owned by the dummy proxy with the call.
+        Expected as args:
         type[list[ESDTToken]]: tokens list
         type[int]: call type - 0 sync; 1 async; 2 promise; 3 transfer execute
         type[address]: contract address
@@ -90,7 +96,9 @@ class DummyProxyContract(DEXContractInterface):
                                         Address(self.address), "callTransferEndpoint", args)
     
     def call_hybrid_transfer_endpoint(self, user: Account, proxy: ProxyNetworkProvider, args: list = None):
-        """ Expected as args:
+        """ 
+        Calls the specified endpoint on given contract address while it also transfers user given tokens and internally owned tokens with the call.
+        Expected as args:
         type[list[ESDTToken]]: tokens list
         type[int]: call type - 0 sync; 1 async; 2 promise; 3 transfer execute
         type[str]: internal token id
