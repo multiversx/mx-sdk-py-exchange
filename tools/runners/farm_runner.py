@@ -1,20 +1,25 @@
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+from time import sleep
 from typing import Any
-
+from multiversx_sdk.core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
 from multiversx_sdk import Address
 from config import GRAPHQL
+from context import Context
 from contracts.contract_identities import FarmContractVersion
 from contracts.farm_contract import FarmContract
+from contracts.simple_lock_contract import SimpleLockContract
+from events.farm_events import EnterFarmEvent
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
-from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command, add_verify_command, verify_contracts
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_tx import NetworkProviders
-from utils.utils_chain import get_bytecode_codehash
-from utils.utils_generic import get_file_from_url_or_path
+from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
+from utils.contract_data_fetchers import FarmContractDataFetcher, SimpleLockContractDataFetcher
+from utils.utils_tx import ESDTToken, NetworkProviders
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, hex_to_string
+from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
 from tools.runners.common_config import FARM_BOOSTED_YIELD_FACTORS
 import config
 
@@ -532,6 +537,154 @@ def remove_penalty_farms():
                 return
 
         count += 1
+
+def generate_unstake_farm_tokens_transaction(args: Any):
+    context = Context()
+    farm_contracts = context.get_contracts(config.FARMS_V2)
+
+    """Generate unstake farm tokens transaction"""
+    farm_address = args.address
+    exported_accounts_path = args.accounts_export
+
+    if not exported_accounts_path:
+        print("Missing required arguments!")
+        return
+
+    if not farm_address and not args.all:
+        print("Missing required arguments!")
+        return
+
+    default_account = Account(None, config.DEFAULT_OWNER)
+    network_providers = NetworkProviders(API, PROXY)
+    chain_id = network_providers.proxy.get_network_config().chain_id
+    config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    signature = get_default_signature()
+    proxy = network_providers.proxy
+    default_account.sync_nonce(proxy)
+
+    exported_accounts = read_accounts_from_json(exported_accounts_path)
+    fund_shadowfork_accounts(exported_accounts)
+    sleep(30)
+
+    farm_contract = FarmContract.load_contract_by_address(farm_address, FarmContractVersion.V2Boosted)
+    accounts_with_token = get_acounts_with_token(exported_accounts, farm_contract.farmToken)
+
+    transactions = []
+    accounts_index = 1
+    with ThreadPoolExecutor(max_workers=500) as executor:
+        exported_accounts = list(executor.map(sync_account_nonce, exported_accounts))
+
+    for account_with_token in accounts_with_token:
+        account = Account(account_with_token.address, config.DEFAULT_OWNER)
+        account.address = WrapperAddress.from_bech32(account_with_token.address)
+        account.sync_nonce(proxy)
+        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == farm_contract.farmToken ]
+        for token in tokens:
+            event = ExitFarmEvent(token.token_name, int(token.supply), int(token.token_nonce_hex, 16), '')
+            payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
+
+            if not account.address.is_smart_contract():
+                    builder = ContractCallBuilder(
+                        config=config_tx,
+                        contract=Address.new_from_bech32(farm_address),
+                        function_name="exitFarm",
+                        caller=account.address,
+                        call_arguments=[1, 1, event.amount],
+                        value=0,
+                        gas_limit=75000000,
+                        nonce=account.nonce,
+                        esdt_transfers=payment_tokens
+                    )
+                    tx = builder.build()
+                    tx.signature = signature
+
+                    transactions.append(tx)
+                    account.nonce += 1
+
+            index = exported_accounts.index(account_with_token)
+            exported_accounts[index].nonce = account.nonce
+            accounts_index += 1
+
+        transactions_chunks = split_to_chunks(transactions, 100)
+        for chunk in transactions_chunks:
+            network_providers.proxy.send_transactions(chunk)                    
+
+def generate_stake_farm_tokens_transaction(args: Any):
+    """Generate unstake farm tokens transaction"""
+
+    farm_address = args.address
+    exported_accounts_path = args.accounts_export
+
+    network_providers = NetworkProviders(API, PROXY)
+    proxy = network_providers.proxy
+
+    if not farm_address or not exported_accounts_path:
+        print("Missing required arguments!")
+        return
+
+    print(f"Generate stake farm tokens transaction for metastaking contract {farm_address}")
+
+    network_providers = NetworkProviders(API, PROXY)
+    farm_contract = FarmContract.load_contract_by_address(farm_address, FarmContractVersion.V2Boosted)
+
+    exported_accounts = read_accounts_from_json(exported_accounts_path)
+    accounts_with_token = get_acounts_with_token(exported_accounts, farm_contract.farmToken)
+
+    for account_with_token in accounts_with_token:
+        account = Account(account_with_token.address, config.DEFAULT_OWNER)
+        account.address = WrapperAddress.from_bech32(account_with_token.address)
+        account.sync_nonce(network_providers.proxy)
+        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == farm_contract.farmToken]
+        for token in tokens:
+                event = EnterFarmEvent(token.token_name, int(token.supply), int(token.token_nonce_hex, 16), '')
+                farm_contract.enterFarm(
+                    proxy,
+                    account,
+                    event
+                    )
+
+def generate_exit_farm_locked_transaction(args: Any):
+    """Generate exit farm locked tokens transaction"""
+    farm_address = args.address
+    exported_accounts_path = args.accounts_export
+
+    if not farm_address or not exported_accounts_path:
+        print("Missing required arguments!")
+        return
+
+    print(f"Generate unstake farm tokens transaction for contract {farm_address}")    
+    network_providers = NetworkProviders(API, PROXY)
+    proxy = network_providers.proxy
+
+    locked_token_hex = SimpleLockContractDataFetcher(Address(farm_address),
+                                                             proxy.url).get_data("getLockedTokenId")
+    locked_lp_token_hex = SimpleLockContractDataFetcher(Address(farm_address),
+                                                                proxy.url).get_data("getLpProxyTokenId")
+    locked_farm_token_hex = SimpleLockContractDataFetcher(Address(farm_address),
+                                                                proxy.url).get_data("getFarmProxyTokenId")
+    LOCKED_TOKEN = hex_to_string(locked_token_hex)
+    LOCKED_LP_TOKEN = hex_to_string(locked_lp_token_hex)
+    LOCKED_FARM_TOKEN = hex_to_string(locked_farm_token_hex)
+
+
+    farm_contract = SimpleLockContract(LOCKED_TOKEN, LOCKED_LP_TOKEN, LOCKED_FARM_TOKEN, farm_address)
+
+    exported_accounts = read_accounts_from_json(exported_accounts_path)
+    accounts_with_token = get_acounts_with_token(exported_accounts, farm_contract.farm_proxy_token)
+
+    for account_with_token in accounts_with_token:
+        account = Account(account_with_token.address, config.DEFAULT_OWNER)
+        account.address = WrapperAddress.from_bech32(account_with_token.address)
+        account.sync_nonce(network_providers.proxy)
+        tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == farm_contract.farm_proxy_token ]
+
+        for token in tokens:
+              if(account.address.to_bech32() != ""):
+                    farm_contract.exit_farm_locked_token(
+                        account,
+                        proxy,
+                        [[ESDTToken(farm_contract.farm_proxy_token, int(token.token_nonce_hex, 16), int(token.supply))]]
+                )
 
 
 def get_farm_addresses_from_chain(version: str) -> list:
