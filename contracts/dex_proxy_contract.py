@@ -54,11 +54,12 @@ class DexProxyEnterFarmEvent:
 
 
 class DexProxyExitFarmEvent:
-    def __init__(self, farmContract: FarmContract, token: str, nonce: int, amount):
+    def __init__(self, farmContract: FarmContract, token: str, nonce: int, amount, original_caller: str = ""):
         self.farmContract = farmContract
         self.token = token
         self.nonce = nonce
         self.amount = amount
+        self.original_caller = original_caller
 
 
 class DexProxyClaimRewardsEvent:

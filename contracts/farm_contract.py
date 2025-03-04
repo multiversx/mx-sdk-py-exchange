@@ -67,24 +67,19 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
             return True
         return False
 
-    def enterFarm(self, network_provider: NetworkProviders, user: Account, event: EnterFarmEvent, lock: int = 0, initial: bool = False) -> str:
+    def enterFarm(self, network_provider: NetworkProviders, user: Account, event: EnterFarmEvent) -> str:
         # TODO: remove initial parameter by using the event data
         function_purpose = "enter farm"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
         enterFarmFn = "enterFarm"
-        if lock == 1:
-            enterFarmFn = "enterFarmAndLockRewards"
-        elif lock == 0:
-            enterFarmFn = "enterFarm"
-
         logger.info(f"Calling {enterFarmFn} endpoint...")
 
         gas_limit = 50000000
 
         tokens = [ESDTToken(event.farming_tk, event.farming_tk_nonce, event.farming_tk_amount)]
-        if not initial:
+        if event.farm_tk_amount > 0:
             tokens.append(ESDTToken(event.farm_tk, event.farm_tk_nonce, event.farm_tk_amount))
 
         sc_args = [tokens]

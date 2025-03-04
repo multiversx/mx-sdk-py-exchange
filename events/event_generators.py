@@ -233,8 +233,7 @@ def generate_random_swap_fixed_output(context: Context):
     generate_swap_fixed_output(context, userAccount, pairContract)
 
 
-def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract: FarmContract, lockRewards: int = 0):
-    """lockRewards: -1 - random; 0 - unlocked rewards; 1 - locked rewards;"""
+def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract: FarmContract):
     logger.info(f"Attempt generateEnterFarmEvent for {userAccount.address.bech32()} on {farmContract.address}")
     tx_hash = ""
     try:
@@ -247,8 +246,6 @@ def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract:
         if farmingTkNonce == 0 and farmingTkAmount == 0:
             logger.warning(f"SKIPPED: No {farming_token} found for {userAccount.address.bech32()}!")
             return
-
-        initial = True if farmTkNonce == 0 else False
 
         # set correct token balance in case it has been changed since the init of observers
         set_token_balance_event = SetTokenBalanceEvent(farming_token, farmingTkAmount, farmingTkNonce)
@@ -265,7 +262,7 @@ def generateEnterFarmEvent(context: Context, userAccount: Account, farmContract:
         event_log.set_generic_event_data(event, userAccount.address.bech32(), farmContract)
         event_log.set_pre_event_data(context.network_provider.proxy)
 
-        tx_hash = farmContract.enterFarm(context.network_provider, userAccount, event, lockRewards, initial)
+        tx_hash = farmContract.enterFarm(context.network_provider, userAccount, event)
         context.observable.set_event(farmContract, userAccount, event, tx_hash)
 
         # post-event logging
@@ -742,7 +739,7 @@ def generateRemoveLiquidityProxyEvent(context: Context):
     context.dexProxyContract.removeLiquidityProxy(context, userAccount, event)
 
 
-def generateEnterFarmProxyEvent(context: Context, user_account: Account, farm_contract: FarmContract, lock_rewards: int = 0):
+def generateEnterFarmProxyEvent(context: Context, user_account: Account, farm_contract: FarmContract):
 
     try:
         farm_token = farm_contract.proxyContract.farm_token
@@ -764,7 +761,7 @@ def generateEnterFarmProxyEvent(context: Context, user_account: Account, farm_co
             farm_contract, farming_token, farming_tk_nonce, farming_tk_amount, farm_token, farm_tk_nonce, farm_tk_amount
         )
 
-        context.dexProxyContract.enterFarmProxy(context, user_account, event, lock_rewards, initial_enter_farm)
+        context.dexProxyContract.enterFarmProxy(context, user_account, event, initial_enter_farm)
 
     except Exception as ex:
         logger.error("Exception encountered:", ex)

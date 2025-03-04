@@ -157,6 +157,5 @@ def fetch_all_contracts_states(args: Any):
     farm_v2_addresses = farm_runner.get_all_farm_v2_addresses()
     fetch_contracts_states(prefix, network_providers, farm_v2_addresses, farm_runner.FARMSV2_LABEL)
 
-
 if __name__ == '__main__':
     main(sys.argv[1:])
