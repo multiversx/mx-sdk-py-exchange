@@ -180,6 +180,12 @@ class DeployStructure:
             config.PROXIES_V2:
                 ContractStructure(config.PROXIES_V2, DexProxyContract, config.PROXY_V2_BYTECODE_PATH,
                                   self.proxy_deploy, False),
+            config.POSITION_CREATOR:
+                ContractStructure(config.POSITION_CREATOR, PositionCreatorContract, config.POSITION_CREATOR_BYTECODE_PATH,
+                                  self.position_creator_deploy, False),
+            config.LOCKED_TOKEN_POSITION_CREATOR:
+                ContractStructure(config.LOCKED_TOKEN_POSITION_CREATOR, LockedTokenPositionCreatorContract, config.LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH,
+                                  self.locked_token_position_creator_deploy, False),
             config.ROUTER:
                 ContractStructure(config.ROUTER, RouterContract, config.ROUTER_BYTECODE_PATH,
                                   self.router_deploy, False),
@@ -211,7 +217,7 @@ class DeployStructure:
                 ContractStructure(config.PROXY_DEPLOYERS, ProxyDeployerContract, config.FARM_DEPLOYER_BYTECODE_PATH,
                                   self.proxy_deployer_deploy, False),
             config.FARMS_V2:
-                ContractStructure(config.FARMS_V2, FarmContract, config.FARM_V2_BYTECODE_PATH,
+                ContractStructure(config.FARMS_V2, FarmContract, config.FARM_V3_BYTECODE_PATH,
                                   self.farm_boosted_deploy, False),  # self.farm_deploy_from_proxy_deployer, True),
             config.PRICE_DISCOVERIES:
                 ContractStructure(config.PRICE_DISCOVERIES, PriceDiscoveryContract, config.PRICE_DISCOVERY_BYTECODE_PATH,
@@ -234,12 +240,6 @@ class DeployStructure:
             config.METASTAKINGS_BOOSTED:
                 ContractStructure(config.METASTAKINGS_BOOSTED, MetaStakingContract, config.STAKING_PROXY_V3_BYTECODE_PATH,
                                   self.metastaking_deploy, False),
-            config.POSITION_CREATOR:
-                ContractStructure(config.POSITION_CREATOR, PositionCreatorContract, config.POSITION_CREATOR_BYTECODE_PATH,
-                                  self.position_creator_deploy, False),
-            config.LOCKED_TOKEN_POSITION_CREATOR:
-                ContractStructure(config.LOCKED_TOKEN_POSITION_CREATOR, LockedTokenPositionCreatorContract, config.LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH,
-                                  self.locked_token_position_creator_deploy, False),
             config.ESCROWS:
                 ContractStructure(config.ESCROWS, EscrowContract, config.ESCROW_BYTECODE_PATH,
                                   self.escrow_deploy, False),
@@ -1517,6 +1517,15 @@ class DeployStructure:
                 contract_config['lock_factory']
             )
 
+            # Get position creator contract
+            position_creator_contract: Optional[PositionCreatorContract] = None
+            if 'position_creator' not in contract_config:
+                log_step_fail(f"Position creator contract not specified!")
+                if not get_continue_confirmation(): 
+                    return
+            else:
+                position_creator_contract = self.contracts[config.POSITION_CREATOR].get_deployed_contract_by_index(contract_config['position_creator'])
+
             # get contract config
             farmed_token = self.tokens[contract_config['farmed_token']]
             farm_token = contract_config['farm_token']
@@ -1703,6 +1712,14 @@ class DeployStructure:
                                                                       deployed_simple_lock.address)
                 if not network_providers.check_simple_tx_status(tx_hash, "whitelist simple lock in farm"): return
 
+            # Whitelist position creator in farm
+            if position_creator_contract is not None:
+                tx_hash = deployed_contract.add_contract_to_whitelist(deployer_account, network_providers.proxy,
+                                                                      position_creator_contract.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist position creator in farm"): 
+                    if not get_continue_confirmation(): 
+                        return
+
             deployed_contracts.append(deployed_contract)
         self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
 
@@ -1866,6 +1883,15 @@ class DeployStructure:
             unbond_epochs = config_staking['unbond_epochs']
             topup_rewards = config_staking['rewards']
 
+            # Get position creator contract
+            position_creator_contract: Optional[PositionCreatorContract] = None
+            if 'position_creator' not in config_staking:
+                log_step_fail(f"Position creator contract not specified!")
+                if not get_continue_confirmation(): 
+                    return
+            else:
+                position_creator_contract = self.contracts[config.POSITION_CREATOR].get_deployed_contract_by_index(config_staking['position_creator'])
+
             if contracts_index == config.STAKINGS:
                 version = StakingContractVersion.V1
             elif contracts_index == config.STAKINGS_V2:
@@ -1961,6 +1987,13 @@ class DeployStructure:
                     log_step_fail(f"Failed to set up energy contract in staking. Energy contract not available!")
                     if not get_continue_confirmation(): return
 
+                # Whitelist position creator in staking
+                if position_creator_contract is not None:
+                    tx_hash = deployed_staking_contract.whitelist_contract(deployer_account, network_providers.proxy,
+                                                                            position_creator_contract.address)
+                    if not network_providers.check_simple_tx_status(tx_hash, "whitelist position creator in staking"):
+                        return
+
             # topup rewards
             if topup_rewards > 0:
                 tx_hash = deployed_staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_rewards)
@@ -2009,6 +2042,15 @@ class DeployStructure:
             elif 'staking_boosted' in config_metastaking:
                 staking = self.contracts[config.STAKINGS_BOOSTED].get_deployed_contract_by_index(
                     config_metastaking['staking_boosted'])
+                
+            # Get position creator contract
+            position_creator_contract: Optional[PositionCreatorContract] = None
+            if 'position_creator' not in config_metastaking:
+                log_step_fail(f"Position creator contract not specified!")
+                if not get_continue_confirmation(): 
+                    return
+            else:
+                position_creator_contract = self.contracts[config.POSITION_CREATOR].get_deployed_contract_by_index(config_metastaking['position_creator'])
 
             if contracts_index == config.METASTAKINGS:
                 version = MetaStakingContractVersion.V1
@@ -2078,6 +2120,13 @@ class DeployStructure:
             if not network_providers.check_simple_tx_status(tx_hash,
                                                             "whitelist metastaking contract in staking contract"):
                 if not get_continue_confirmation(): return
+
+            # Whitelist position creator in metastaking
+            if position_creator_contract is not None:
+                tx_hash = deployed_metastaking_contract.whitelist_contract(deployer_account, network_providers.proxy,
+                                                                            position_creator_contract.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "whitelist position creator in metastaking"):
+                    return
 
             deployed_contracts.append(deployed_metastaking_contract)
         self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
