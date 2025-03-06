@@ -4,6 +4,7 @@ import traceback
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
+from config import DEFAULT_MULTISIG_ADDRESS
 from multiversx_sdk import (Address, ApiNetworkProvider, GenericError,
                             ProxyNetworkProvider, TokenPayment, Transaction)
 from multiversx_sdk.core.interfaces import ICodeMetadata
@@ -20,7 +21,7 @@ from multiversx_sdk.network_providers.transaction_status import \
 from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
 
 from utils.logger import get_logger
-from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
+from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash, dec_to_padded_hex
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
                                  log_unexpected_args, split_to_chunks, get_file_from_url_or_path)
 
@@ -137,6 +138,9 @@ class NetworkProviders:
             return False
 
         logger.debug(f"Waiting for transaction {tx_hash} to be executed...")
+
+        if 'shadowfork' in self.api.url:
+            time.sleep(30)
 
         # temporary fix for the api returning the wrong status
         # start by avoiding an early false success followed by pending (usually occurring in the first 2 rounds)
@@ -304,6 +308,15 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
     )
 
     tx = builder.build()
+
+    if DEFAULT_MULTISIG_ADDRESS:
+        original_dest = Address.new_from_bech32(tx.receiver)
+        data = tx.data
+        tx.receiver = DEFAULT_MULTISIG_ADDRESS
+        new_data = f"proposeAsyncCall@{original_dest.hex()}@@@".encode()
+        new_data += data
+        tx.data = new_data
+
     tx.signature = deployer.sign_transaction(tx)
 
     return tx
@@ -351,6 +364,25 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
         nonce=deployer.nonce,
     )
     tx = builder.build()
+
+    if DEFAULT_MULTISIG_ADDRESS:
+        original_dest = Address.new_from_bech32(tx.receiver)
+
+        # replace the function name with the hex representation
+        data = tx.data
+        decoded_data = data.decode()
+        first_at = decoded_data.find('@')
+        if first_at != -1:
+            function_name = decoded_data[:first_at]
+            rest_of_data = decoded_data[first_at:]
+            hex_function = function_name.encode().hex()
+            data = (hex_function + rest_of_data).encode()
+
+        tx.receiver = DEFAULT_MULTISIG_ADDRESS
+        new_data = f"proposeAsyncCall@{original_dest.hex()}@{dec_to_padded_hex(value)}@@".encode()
+        new_data += data
+        tx.data = new_data
+
     tx.signature = deployer.sign_transaction(tx)
 
     return tx
@@ -376,6 +408,30 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
         esdt_transfers=payment_tokens
     )
     tx = builder.build()
+
+    if DEFAULT_MULTISIG_ADDRESS:
+        # TODO: the token transfer should be done separately first
+        if tokens:
+            raise ValueError("Token transfers via multisig endpoint calls are not supported yet")
+
+        original_dest = Address.new_from_bech32(tx.receiver)
+
+        # replace the function name with the hex representation
+        data = tx.data
+        decoded_data = data.decode()
+        first_at = decoded_data.find('@')
+        if first_at != -1:
+            function_name = decoded_data[:first_at]
+            rest_of_data = decoded_data[first_at:]
+            hex_function = function_name.encode().hex()
+            data = (hex_function + rest_of_data).encode()
+
+        # wrap the original encoded data within a proposeAsyncCall
+        tx.receiver = DEFAULT_MULTISIG_ADDRESS
+        new_data = f"proposeAsyncCall@{original_dest.hex()}@@@".encode()
+        new_data += data
+        tx.data = new_data
+
     tx.signature = user.sign_transaction(tx)
 
     return tx
