@@ -89,5 +89,12 @@
         "farmedToken": "MEX-455c57",
         "address": "erd1qqqqqqqqqqqqqpgqgg42sl557vh7rwt600w76pe48u64qngmkp2sl8mrfx",
         "version": 4
+    },
+    {
+        "farmingToken": "MEXUSH-179240",
+        "farmToken": "MEXUSHFL-c05c82",
+        "farmedToken": "MEX-455c57",
+        "address": "erd1qqqqqqqqqqqqqpgqx6qadfnrgfqkgfmq5nj92j3u2qm2yfs9kp2say42ng",
+        "version": 4
     }
 ]
