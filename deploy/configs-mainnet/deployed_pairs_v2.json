@@ -82,5 +82,12 @@
         "lpToken": "KWAKWEGLD-014bfc",
         "address": "erd1qqqqqqqqqqqqqpgqthhxe87ulznhhm72jekexj9rwqzu3zsv2jps88erau",
         "version": 2
+    },
+    {
+        "firstToken": "MEX-455c57",
+        "secondToken": "USH-111e09",
+        "lpToken": "MEXUSH-179240",
+        "address": "erd1qqqqqqqqqqqqqpgqyghvzwv9qyzq95vwhvk4tafg945r8hcf2jps0x7me7",
+        "version": 2
     }
 ]

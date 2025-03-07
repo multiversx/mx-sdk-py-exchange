@@ -1719,6 +1719,20 @@ class DeployStructure:
                 if not network_providers.check_simple_tx_status(tx_hash, "whitelist position creator in farm"): 
                     if not get_continue_confirmation(): 
                         return
+                    
+            # Set permissions hubs in farm
+            if "permissions_hub" in contract_config:
+                permissions_hub_contract: Optional[PermissionsHubContract] = None
+                permissions_hub_contract = self.contracts[config.PERMISSIONS_HUBS].get_deployed_contract_by_index(
+                    contract_config['permissions_hub']
+                )
+                if permissions_hub_contract is None:
+                    log_step_fail(f"Aborting setup: Permissions hub contract not available! Contract will be dumped.")
+                    return
+                tx_hash = deployed_contract.set_permissions_hub_address(deployer_account, network_providers.proxy, permissions_hub_contract.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "set permissions hub in farm"): 
+                    if not get_continue_confirmation(): 
+                        return
 
             deployed_contracts.append(deployed_contract)
         self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
@@ -1993,6 +2007,20 @@ class DeployStructure:
                                                                             position_creator_contract.address)
                     if not network_providers.check_simple_tx_status(tx_hash, "whitelist position creator in staking"):
                         return
+                    
+                # Set permissions hubs in farm
+                if "permissions_hub" in config_staking:
+                    permissions_hub_contract: Optional[PermissionsHubContract] = None
+                    permissions_hub_contract = self.contracts[config.PERMISSIONS_HUBS].get_deployed_contract_by_index(
+                        config_staking['permissions_hub']
+                    )
+                    if permissions_hub_contract is None:
+                        log_step_fail(f"Aborting setup: Permissions hub contract not available! Contract will be dumped.")
+                        return
+                    tx_hash = deployed_staking_contract.set_permissions_hub_address(deployer_account, network_providers.proxy, permissions_hub_contract.address)
+                    if not network_providers.check_simple_tx_status(tx_hash, "set permissions hub in farm"): 
+                        if not get_continue_confirmation(): 
+                            return
 
             # topup rewards
             if topup_rewards > 0:
@@ -2127,6 +2155,20 @@ class DeployStructure:
                                                                             position_creator_contract.address)
                 if not network_providers.check_simple_tx_status(tx_hash, "whitelist position creator in metastaking"):
                     return
+                
+            # Set permissions hubs in farm
+            if "permissions_hub" in config_metastaking:
+                permissions_hub_contract: Optional[PermissionsHubContract] = None
+                permissions_hub_contract = self.contracts[config.PERMISSIONS_HUBS].get_deployed_contract_by_index(
+                    config_metastaking['permissions_hub']
+                )
+                if permissions_hub_contract is None:
+                    log_step_fail(f"Aborting setup: Permissions hub contract not available! Contract will be dumped.")
+                    return
+                tx_hash = deployed_metastaking_contract.set_permissions_hub_address(deployer_account, network_providers.proxy, permissions_hub_contract.address)
+                if not network_providers.check_simple_tx_status(tx_hash, "set permissions hub in farm"): 
+                    if not get_continue_confirmation(): 
+                        return
 
             deployed_contracts.append(deployed_metastaking_contract)
         self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)

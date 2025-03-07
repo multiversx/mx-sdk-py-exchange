@@ -230,10 +230,27 @@
             "special_fee": 100,
             "fees_collector": 0,
             "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 0,
+            "accepted_token": 15,
+            "lp_token": "MEXUSH",
+            "lp_token_name": "MEXUSHLP",
+            "fee_token": 0,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
         }
     ],
 
     "pairs_view": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "permissions_hubs": [
         {
             "empty": 0
         }
@@ -477,6 +494,25 @@
             "farm_const": 0,
             "min_energy": 1,
             "min_farm": 1
+        },
+        {
+            "farming_pool": 12,
+            "farm_token": "MEXUSHFL",
+            "farm_token_name": "MEXUSHLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 1,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1000,
+            "position_creator": 0,
+            "permissions_hub": 0
         }
     ],
 
