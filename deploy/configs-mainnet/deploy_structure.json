@@ -239,6 +239,12 @@
         }
     ],
 
+    "permissions_hubs": [
+        {
+            "empty": 0
+        }
+    ],
+
     "farms_community": [
 
     ],
