@@ -53,7 +53,7 @@ def get_current_shard_chronology(proxy: ProxyNetworkProvider, shard: int = None)
 def get_contract_retrieval_labels(contracts: str) -> List[str]:
     labels = []
     base_labels = [config.EGLD_WRAPS, config.LOCKED_ASSETS, config.SIMPLE_LOCKS_ENERGY, 
-                  config.UNSTAKERS, config.FEES_COLLECTORS, config.ROUTER]
+                  config.UNSTAKERS, config.FEES_COLLECTORS, config.ROUTER_V2]
     if contracts == "base":
         return base_labels
     if contracts == "all":

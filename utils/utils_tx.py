@@ -5,11 +5,11 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 from multiversx_sdk import (Address, ApiNetworkProvider, GenericError,
-                            ProxyNetworkProvider, TokenPayment, Transaction)
+                            ProxyNetworkProvider, Transaction)
+from multiversx_sdk.core.tokens import Token, TokenTransfer
 from multiversx_sdk.core.interfaces import ICodeMetadata
-from multiversx_sdk.core.transaction_builders import (
-    ContractCallBuilder, ContractDeploymentBuilder, ContractUpgradeBuilder,
-    DefaultTransactionBuildersConfiguration, MultiESDTNFTTransferBuilder)
+from multiversx_sdk.core.transactions_factories import (TransactionsFactoryConfig, SmartContractTransactionsFactory,
+                                                        TransferTransactionsFactory)
 from multiversx_sdk.network_providers.network_config import NetworkConfig
 from multiversx_sdk.network_providers.tokens import (
     FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork)
@@ -61,8 +61,8 @@ class ESDTToken:
             return f"{self.token_id}"
 
     @classmethod
-    def from_token_payment(cls, token_payment: TokenPayment):
-        return cls(token_payment.token_identifier, token_payment.token_nonce, token_payment.amount_as_integer)
+    def from_token_transfer(cls, token_transfer: TokenTransfer):
+        return cls(token_transfer.token.identifier, token_transfer.token.nonce, token_transfer.amount)
 
     @classmethod
     def from_fungible_on_network(cls, token: FungibleTokenOfAccountOnNetwork):
@@ -78,8 +78,8 @@ class ESDTToken:
         token_id, token_nonce = token_name.rsplit("-", 1)
         return cls(token_id, int(token_nonce, 16), 0)
 
-    def to_token_payment(self) -> TokenPayment:
-        return TokenPayment(self.token_id, self.token_nonce, self.token_amount, 18)
+    def to_token_transfer(self) -> TokenTransfer:
+        return TokenTransfer(Token(self.token_id, self.token_nonce), self.token_amount)
 
 
 class NetworkProviders:
@@ -276,6 +276,10 @@ class NetworkProviders:
         return status.current_round
 
 
+def _get_flags_from_code_metadata(code_metadata: ICodeMetadata) -> tuple[bool, bool, bool, bool]:
+    return code_metadata.upgradeable, code_metadata.readable, code_metadata.payable, code_metadata.payable_by_contract
+
+
 def _prep_args_for_addresses(args: List):
     # TODO: remove this when the SDK supports bech32 addresses... or refactor the thing entirely
     new_args = []
@@ -289,21 +293,25 @@ def _prep_args_for_addresses(args: List):
 def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
                       gas_limit: int, contract_file: Path, code_metadata: ICodeMetadata,
                       args: list = None) -> Transaction:
-    config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
+    config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Deploy arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
-    builder = ContractDeploymentBuilder(
-        config=config,
-        owner=deployer.address,
-        gas_limit=gas_limit,
-        code_metadata=code_metadata,
-        code=contract_file.read_bytes(),
-        deploy_arguments=args,
-        nonce=deployer.nonce
-    )
 
-    tx = builder.build()
+    factory = SmartContractTransactionsFactory(config)
+    upgradeable, readable, payable, payable_by_contract = _get_flags_from_code_metadata(code_metadata)
+    tx = factory.create_transaction_for_deploy(
+        deployer.address,
+        contract_file.read_bytes(),
+        gas_limit,
+        args,
+        native_transfer_amount=0,
+        is_upgradeable=upgradeable,
+        is_readable=readable,
+        is_payable=payable,
+        is_payable_by_sc=payable_by_contract,
+    )
+    tx.nonce = deployer.nonce
     tx.signature = deployer.sign_transaction(tx)
 
     return tx
@@ -312,22 +320,26 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
 def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_config: NetworkConfig,
                        gas_limit: int, contract_file: Path, code_metadata: ICodeMetadata,
                        args: list = None) -> Transaction:
-    config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
+    config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Upgrade arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
-    builder = ContractUpgradeBuilder(
-        config=config,
-        contract=contract_address,
-        owner=deployer.address,
-        gas_limit=gas_limit,
-        code_metadata=code_metadata,
-        code=contract_file.read_bytes(),
-        upgrade_arguments=args,
-        nonce=deployer.nonce
-    )
 
-    tx = builder.build()
+    factory = SmartContractTransactionsFactory(config)
+    upgradeable, readable, payable, payable_by_contract = _get_flags_from_code_metadata(code_metadata)
+    tx = factory.create_transaction_for_upgrade(
+        deployer.address,
+        contract_address,
+        contract_file.read_bytes(),
+        gas_limit,
+        args,
+        native_transfer_amount=0,
+        is_upgradeable=upgradeable,
+        is_readable=readable,
+        is_payable=payable,
+        is_payable_by_sc=payable_by_contract,
+    )
+    tx.nonce = deployer.nonce
     tx.signature = deployer.sign_transaction(tx)
 
     return tx
@@ -337,20 +349,19 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
                              network_config: NetworkConfig, gas_limit: int,
                              function: str, args: list, value: str = "0") -> Transaction:
 
-    config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
+    config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Contract call arguments: {args}")
-    builder = ContractCallBuilder(
-        config=config,
-        contract=contract_address,
-        function_name=function,
-        caller=deployer.address,
-        call_arguments=args,
-        value=value,
-        gas_limit=gas_limit,
-        nonce=deployer.nonce,
+    factory = SmartContractTransactionsFactory(config)
+    tx = factory.create_transaction_for_execute(
+        deployer.address,
+        contract_address,
+        function,
+        gas_limit,
+        args,
+        value
     )
-    tx = builder.build()
+    tx.nonce = deployer.nonce
     tx.signature = deployer.sign_transaction(tx)
 
     return tx
@@ -360,22 +371,22 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
                                                      network_config: NetworkConfig, gas_limit: int,
                                                      endpoint: str, endpoint_args: list, tokens: List[ESDTToken],
                                                      value: str = "0") -> Transaction:
-    config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
-    payment_tokens = [token.to_token_payment() for token in tokens]
+    config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
+    payment_tokens = [token.to_token_transfer() for token in tokens]
     endpoint_args = _prep_args_for_addresses(endpoint_args)
     logger.debug(f"Contract call arguments: {endpoint_args}")
-    builder = ContractCallBuilder(
-        config=config,
-        contract=contract_address,
-        function_name=endpoint,
-        caller=user.address,
-        call_arguments=endpoint_args,
-        value=value,
-        gas_limit=gas_limit,
-        nonce=user.nonce,
-        esdt_transfers=payment_tokens
+
+    factory = SmartContractTransactionsFactory(config)
+    tx = factory.create_transaction_for_execute(
+        user.address,
+        contract_address,
+        endpoint,
+        gas_limit,
+        endpoint_args,
+        value,
+        payment_tokens
     )
-    tx = builder.build()
+    tx.nonce = user.nonce
     tx.signature = user.sign_transaction(tx)
 
     return tx
@@ -384,19 +395,19 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
 def prepare_multiesdtnfttransfer_tx(destination: Address, user: Account,
                                     network_config: NetworkConfig, gas_limit: int,
                                     tokens: List[ESDTToken], value: str = "0") -> Transaction:
-    config = DefaultTransactionBuildersConfiguration(chain_id=network_config.chain_id)
-    payment_tokens = [token.to_token_payment() for token in tokens]
-    builder = MultiESDTNFTTransferBuilder(
-        config=config,
-        sender=user.address,
-        destination=destination,
-        payments=payment_tokens,
-        gas_limit=gas_limit,
-        value=value,
-        nonce=user.nonce,
-    )
+    """
+    TODO: cleanup: gas_limit and value are ignored for this transaction type
+    """
+    config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
+    payment_tokens = [token.to_token_transfer() for token in tokens]
 
-    tx = builder.build()
+    factory = TransferTransactionsFactory(config)
+    tx = factory.create_transaction_for_esdt_token_transfer(
+        user.address,
+        destination,
+        payment_tokens
+    )
+    tx.nonce = user.nonce
     tx.signature = user.sign_transaction(tx)
     return tx
 

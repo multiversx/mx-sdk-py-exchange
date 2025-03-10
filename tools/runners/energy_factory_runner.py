@@ -5,8 +5,7 @@ from typing import Any
 
 import config
 from context import Context
-from multiversx_sdk.core.transaction_builders import ContractCallBuilder, \
-    DefaultTransactionBuildersConfiguration
+from multiversx_sdk.core.transactions_factories import TransactionsFactoryConfig, SmartContractTransactionsFactory
 from multiversx_sdk import Address
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tools.common import get_user_continue, fetch_contracts_states, fetch_new_and_compare_contract_states
@@ -110,7 +109,7 @@ def generate_unlock_tokens_transactions(args: Any):
     network_providers = NetworkProviders(config.DEFAULT_API, config.DEFAULT_PROXY)
     network_providers.network = network_providers.proxy.get_network_config()
     chain_id = network_providers.proxy.get_network_config().chain_id
-    config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    config_tx = TransactionsFactoryConfig(chain_id=chain_id)
     signature = get_default_signature()
     default_account = Account(None, config.DEFAULT_OWNER)
     default_account.sync_nonce(network_providers.proxy)
@@ -145,46 +144,42 @@ def generate_unlock_tokens_transactions(args: Any):
         print(f"Found {len(tokens)} tokens to unstake for account {account_with_token.address}")
 
         for token in tokens:
-            payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
+            payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_transfer()]
             if not account.address.is_smart_contract():
-                builder = ContractCallBuilder(
-                    config=config_tx,
-                    contract=Address.new_from_bech32(energy_contract.address),
-                    function_name=function_name,
-                    caller=account.address,
-                    call_arguments=[],
-                    value=0,
-                    gas_limit=13000000,
-                    nonce=account.nonce,
-                    esdt_transfers=payment_tokens
+                factory = SmartContractTransactionsFactory(config_tx)
+                tx = factory.create_transaction_for_execute(
+                    account.address,
+                    Address.new_from_bech32(energy_contract.address),
+                    function_name,
+                    13000000,
+                    [],
+                    0,
+                    payment_tokens
                 )
-
-                tx = builder.build()
+                tx.nonce = account.nonce
                 tx.signature = signature
 
                 transactions.append(tx)
                 account.nonce += 1
             else:
-                builder = ContractCallBuilder(
-                    config=config_tx,
-                    contract=account.address,
-                    function_name="callInternalTransferEndpoint",
-                    caller=default_account.address,
-                    call_arguments=[
+                factory = SmartContractTransactionsFactory(config_tx)
+                tx = factory.create_transaction_for_execute(
+                    default_account.address,
+                    account.address,
+                    "callInternalTransferEndpoint",
+                    50000000,
+                    [
                         token.token_name,
                         int(token.token_nonce_hex, 16),
                         int(token.supply),
                         Address.new_from_bech32(energy_contract.address),
                         function_name,
-                    ],
-                    value=0,
-                    gas_limit=50000000,
-                    nonce=default_account.nonce
+                    ]
                 )
-                default_account.nonce += 1
-                tx = builder.build()
+                tx.nonce = default_account.nonce
                 tx.signature = signature
                 transactions.append(tx)
+                default_account.nonce += 1
 
         index = exported_accounts.index(account_with_token)
         exported_accounts[index].nonce = account.nonce
