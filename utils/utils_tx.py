@@ -309,7 +309,7 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
         is_upgradeable=upgradeable,
         is_readable=readable,
         is_payable=payable,
-        is_payable_by_contract=payable_by_contract,
+        is_payable_by_sc=payable_by_contract,
     )
     tx.nonce = deployer.nonce
     tx.signature = deployer.sign_transaction(tx)
@@ -337,7 +337,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
         is_upgradeable=upgradeable,
         is_readable=readable,
         is_payable=payable,
-        is_payable_by_contract=payable_by_contract,
+        is_payable_by_sc=payable_by_contract,
     )
     tx.nonce = deployer.nonce
     tx.signature = deployer.sign_transaction(tx)
