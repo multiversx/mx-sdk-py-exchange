@@ -4,7 +4,7 @@ import json
 import os
 from time import sleep
 from typing import Any
-from multiversx_sdk.core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
+from multiversx_sdk.core.transactions_factories import SmartContractTransactionsFactory, TransactionsFactoryConfig
 from multiversx_sdk import Address
 from config import GRAPHQL
 from context import Context
@@ -557,7 +557,7 @@ def generate_unstake_farm_tokens_transaction(args: Any):
     default_account = Account(None, config.DEFAULT_OWNER)
     network_providers = NetworkProviders(API, PROXY)
     chain_id = network_providers.proxy.get_network_config().chain_id
-    config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    config_tx = TransactionsFactoryConfig(chain_id=chain_id)
     signature = get_default_signature()
     proxy = network_providers.proxy
     default_account.sync_nonce(proxy)
@@ -581,25 +581,24 @@ def generate_unstake_farm_tokens_transaction(args: Any):
         tokens = [token for token in account_with_token.account_tokens_supply if token.token_name == farm_contract.farmToken ]
         for token in tokens:
             event = ExitFarmEvent(token.token_name, int(token.supply), int(token.token_nonce_hex, 16), '')
-            payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
+            payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_transfer()]
 
             if not account.address.is_smart_contract():
-                    builder = ContractCallBuilder(
-                        config=config_tx,
-                        contract=Address.new_from_bech32(farm_address),
-                        function_name="exitFarm",
-                        caller=account.address,
-                        call_arguments=[1, 1, event.amount],
-                        value=0,
-                        gas_limit=75000000,
-                        nonce=account.nonce,
-                        esdt_transfers=payment_tokens
-                    )
-                    tx = builder.build()
-                    tx.signature = signature
+                factory = SmartContractTransactionsFactory(config_tx)
+                tx = factory.create_transaction_for_execute(
+                    account.address,
+                    Address.new_from_bech32(farm_address),
+                    "exitFarm",
+                    75000000,
+                    [1, 1, event.amount],
+                    0,
+                    payment_tokens
+                )
+                tx.nonce = account.nonce
+                tx.signature = signature
 
-                    transactions.append(tx)
-                    account.nonce += 1
+                transactions.append(tx)
+                account.nonce += 1
 
             index = exported_accounts.index(account_with_token)
             exported_accounts[index].nonce = account.nonce
