@@ -16,6 +16,7 @@ DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
 DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
+DEFAULT_MULTISIG_ADDRESS = ""
 
 # SF related configuration
 SF_DEX_REFERENCE_ADDRESS = "erd1qqqqqqqqqqqqqpgqq66xk9gfr4esuhem3jru86wg5hvp33a62jps2fy57p"
