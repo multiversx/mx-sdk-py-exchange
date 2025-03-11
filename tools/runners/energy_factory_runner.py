@@ -2,16 +2,16 @@ from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 from typing import Any
-
+import json
 import config
 from context import Context
 from multiversx_sdk.core.transactions_factories import TransactionsFactoryConfig, SmartContractTransactionsFactory
 from multiversx_sdk import Address
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tools.common import get_user_continue, fetch_contracts_states, fetch_new_and_compare_contract_states
-from tools.runners.common_runner import add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
+from tools.runners.common_runner import add_generate_transaction_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
 
-from utils.utils_tx import ESDTToken, NetworkProviders
+from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash
 
@@ -31,6 +31,12 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     command_parser.set_defaults(func=pause_energy_factory)
     command_parser = contract_group.add_parser('resume', help='resume contract command')
     command_parser.set_defaults(func=resume_energy_factory)
+
+    transactions_parser = subgroup_parser.add_parser('generate-transactions', help='energy factory transactions commands')
+
+    transactions_group = transactions_parser.add_subparsers()
+    add_generate_transaction_command(transactions_group, generate_energy_change_transactions, 'energyChange', 'generate energy change transactions command')
+    add_generate_transaction_command(transactions_group, generate_unlock_tokens_transactions, 'unlockTokens', 'generate unlock tokens transactions command')
 
     return group_parser
 
@@ -92,7 +98,84 @@ def verify_energy_factory(args: Any):
     verify_contracts(args, [energy_factory_address])
     
     print("All contracts have been verified.")
+
+
+def generate_energy_change_transactions(args: Any):
+    """Generate energy change transactions"""
+
+    number_of_accounts_per_tx = 300
+    tx_batches_to_send = 10
+
+    context = Context()
+    energy_contract: SimpleLockEnergyContract = context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
+
+    # read the accounts export file
+    # accounts export format:
+    # {
+    #     "bech32 address": "energy amount mismatch in signed integer",
+    #     "bech32 address": "energy amount mismatch in signed integer",
+    #     ...
+    # }
+    exported_accounts_path = args.accounts_export
+    if not exported_accounts_path:
+        print("Missing accounts export path!")
+        return
     
+    with open(exported_accounts_path, "r") as f:
+        exported_accounts = json.load(f)
+    
+    # Create batches of accounts
+    txs = []
+    current_batch = []
+
+    network_config = context.network_provider.proxy.get_network_config()
+    def compose_tx(batch: list[Any]):
+        tx = prepare_contract_call_tx(Address.new_from_bech32(energy_contract.address), 
+                          context.deployer_account, 
+                          network_config, 
+                          200000000, 
+                          "adjustUserEnergy", 
+                          batch)
+        context.deployer_account.nonce += 1
+        return tx
+    
+    for address, energy_change in exported_accounts.items():
+        current_batch.extend([address, energy_change, 0])
+        
+        if len(current_batch) >= number_of_accounts_per_tx:
+            # compose the tx for the current batch
+            tx = compose_tx(current_batch)
+            txs.append(tx)
+            current_batch = []
+    
+    # Add any remaining accounts in the last batch
+    if current_batch:
+        tx = compose_tx(current_batch)
+        txs.append(tx)
+
+    print(f"Created {len(txs)} transactions")
+
+    # split the txs by batches of tx_batches_to_send
+    txs_batches = split_to_chunks(txs, tx_batches_to_send)
+
+    counter = 0
+    for tx_batch in txs_batches:
+        print(f"Progress: {counter + len(tx_batch)} / {len(txs)} transactions")
+        # get the current nonce of the deployer account from proxy, send the txs and wait for the nonce on the account to be incremented with the number of txs sent
+        current_nonce = context.network_provider.proxy.get_account(context.deployer_account.address).nonce
+        expected_nonce = current_nonce + len(tx_batch)
+
+        num_sent, hashes = context.network_provider.proxy.send_transactions(tx_batch)
+        print(f"Sent {num_sent} transactions out of {len(tx_batch)}")
+        
+        while current_nonce < expected_nonce:
+            if "localhost" in context.network_provider.proxy.url:
+                context.network_provider.proxy.do_post(f"{context.network_provider.proxy.url}/simulator/generate-blocks/{10}", {})      # TODO: remove this; only for local testing
+            print(f"Current nonce: {current_nonce}, waiting for nonce: {expected_nonce}")
+            sleep(6)
+            current_nonce = context.network_provider.proxy.get_account(context.deployer_account.address).nonce
+
+        counter += len(tx_batch)
 
 def generate_unlock_tokens_transactions(args: Any):
     """Generate unlock tokens transactions"""
