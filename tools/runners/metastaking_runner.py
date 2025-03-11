@@ -4,8 +4,8 @@ from time import sleep
 from typing import Any
 
 from multiversx_sdk import Address
-from multiversx_sdk.core.transaction_builders import ContractCallBuilder, \
-    DefaultTransactionBuildersConfiguration
+from multiversx_sdk.core.transactions_factories import SmartContractTransactionsFactory, \
+    TransactionsFactoryConfig
 from contracts.contract_identities import MetaStakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract
 from events.event_generators import get_lp_from_metastake_token_attributes
@@ -309,7 +309,7 @@ def generate_unstake_farm_tokens_transaction(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     network_providers.network = network_providers.proxy.get_network_config()
     chain_id = network_providers.proxy.get_network_config().chain_id
-    config_tx = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    config_tx = TransactionsFactoryConfig(chain_id=chain_id)
     signature = get_default_signature()
     default_account = Account(None, config.DEFAULT_OWNER)
     default_account.sync_nonce(network_providers.proxy)
@@ -355,31 +355,31 @@ def generate_unstake_farm_tokens_transaction(args: Any):
                     int(token.supply),
                 )
 
-                payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_payment()]
+                payment_tokens = [ESDTToken(token.token_name, int(token.token_nonce_hex, 16), int(token.supply)).to_token_transfer()]
                 if not account.address.is_smart_contract():
-                    builder = ContractCallBuilder(
-                        config=config_tx,
-                        contract=Address.new_from_bech32(metastaking_address),
-                        function_name="unstakeFarmTokens",
-                        caller=account.address,
-                        call_arguments=[1, 1, farm_token_amount],
-                        value=0,
-                        gas_limit=75000000,
-                        nonce=account.nonce,
-                        esdt_transfers=payment_tokens
+                    factory = SmartContractTransactionsFactory(config_tx)
+                    tx = factory.create_transaction_for_execute(
+                        account.address,
+                        Address.new_from_bech32(metastaking_address),
+                        "unstakeFarmTokens",
+                        75000000,
+                        [1, 1, farm_token_amount],
+                        0,
+                        payment_tokens
                     )
-                    tx = builder.build()
+                    tx.nonce = account.nonce
                     tx.signature = signature
 
                     transactions.append(tx)
                     account.nonce += 1
                 else:
-                    builder = ContractCallBuilder(
-                        config=config_tx,
-                        contract=account.address,
-                        function_name="callInternalTransferEndpoint",
-                        caller=default_account.address,
-                        call_arguments=[
+                    factory = SmartContractTransactionsFactory(config_tx)
+                    tx = factory.create_transaction_for_execute(
+                        default_account.address,
+                        account.address,
+                        "callInternalTransferEndpoint",
+                        50000000,
+                        [
                             token.token_name,
                             int(token.token_nonce_hex, 16),
                             int(token.supply),
@@ -387,15 +387,11 @@ def generate_unstake_farm_tokens_transaction(args: Any):
                             "unstakeFarmTokens",
                             1, 1, farm_token_amount
                         ],
-                        value=0,
-                        gas_limit=50000000,
-                        nonce=default_account.nonce
                     )
-                    default_account.nonce += 1
-                    tx = builder.build()
+                    tx.nonce = default_account.nonce
                     tx.signature = signature
                     transactions.append(tx)
-
+                    default_account.nonce += 1
             index = exported_accounts.index(account_with_token)
             exported_accounts[index].nonce = account.nonce
             accounts_index += 1
