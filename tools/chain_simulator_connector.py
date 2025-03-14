@@ -485,7 +485,6 @@ def main(cli_args: List[str]):
     retrieve_parser.add_argument("--token", required=False, default="") # explicit token to retrieve sys account state for
     retrieve_parser.set_defaults(func=retrieve_handler)
     
-    subparsers = parser.add_subparsers()
     start_parser = subparsers.add_parser('start', help='start chain simulator')
     start_parser.add_argument("--docker-path", required=False, default="")
     start_parser.add_argument("--state-path", required=False, default="")
