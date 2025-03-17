@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+import subprocess
 import sys
 import time
 import json
@@ -6,6 +9,7 @@ from argparse import ArgumentParser
 from typing import Any, List
 from context import Context
 from contracts.contract_identities import DEXContractInterface
+import requests
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import decode_merged_attributes, get_current_tokens_for_address, string_to_hex, dec_to_padded_hex
 from utils.utils_chain import WrapperAddress, Account
@@ -13,7 +17,7 @@ from utils.logger import get_logger
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 from tools.runners.account_state_runner import get_account_keys_online, get_account_data_online
 from multiversx_sdk import ProxyNetworkProvider
-
+from multiversx_sdk.core.address import Address
 from utils.utils_tx import ESDTToken
 
 
@@ -21,11 +25,151 @@ logger = get_logger(__name__)
 
 
 SIMULATOR_URL = "http://localhost:8085"
+API_URL = "http://localhost:3001"
 GENERATE_BLOCKS_URL = f"{SIMULATOR_URL}/simulator/generate-blocks/"
 SET_STATE_URL = f"{SIMULATOR_URL}/simulator/set-state"
 SEND_USER_FUNDS_URL = f"{SIMULATOR_URL}/transaction/send-user-funds"
 STATES_FOLDER = "states"
 
+
+def is_valid_address(address: str) -> bool:
+    try:
+        Address.new_from_bech32(address)
+        return True
+    except Exception:
+        return False
+    
+
+def is_smart_contract(address: str) -> bool:
+    try:
+        return Address.new_from_bech32(address).is_smart_contract()
+    except Exception:
+        return False
+    
+
+def get_sc_states_files_in_folder(state_folder: Path) -> str | None:
+    state_files = list(state_folder.iterdir())
+    all_keys_file = None
+
+    for file in state_files:
+        if "all_all_keys.json" in file.name:
+            all_keys_file = file
+            break
+
+    return all_keys_file
+
+
+def get_user_states_in_folder(state_folder: Path, addresses: list[str]) -> list[dict[str, Any]] | None:
+    states = []
+    
+    for address in addresses:
+        logger.debug(f"Loading state for {address}")
+        user_path = f"0_{address}_0_chain_config_state.json"
+        system_account_path = f"0_system_account_state_{address}.json"
+        
+        user_file = state_folder / user_path
+        system_file = state_folder / system_account_path
+        
+        if user_file.exists():
+            with open(user_file, "r") as file:
+                user_state = json.load(file)
+                if user_state:
+                    logger.debug(f"Found {user_file.name}")
+                    states.append(user_state)
+                
+        if system_file.exists():
+            with open(system_file, "r") as file:
+                system_state = json.load(file)
+                if system_state:
+                    logger.debug(f"Found {system_file.name}")
+                    states.append(system_state)
+            
+    return states
+
+def get_users_in_folder(state_folder: Path) -> list[str]:
+    state_files = list(state_folder.iterdir())
+    users = []
+    for file in state_files:
+        if "_chain_config_state.json" in file.name:
+            # only for users. Smart contracts are already in all_all_keys.json
+            filename_no_ext = file.stem
+            potential_address = filename_no_ext.split("_")[1]
+            if is_valid_address(potential_address) and not is_smart_contract(potential_address):
+                users.append(potential_address)
+    return users
+
+
+def get_shard_chronology_in_folder(state_folder: Path) -> str | None:
+    state_files = list(state_folder.iterdir())
+    for file in state_files:
+        if "shard_chronology.json" in file.name:
+            return file
+    return None
+
+
+def get_all_sc_states_in_folder(state_folder: Path) -> list[str]:
+    state_file = get_sc_states_files_in_folder(state_folder)
+    if not state_file:
+        return []
+    with open(state_file, 'r', encoding="UTF-8") as f:
+        return [json.load(f)]
+    
+
+class ChainSimulator:
+    def __init__(self, docker_path: str):
+        self.docker_path = docker_path
+        self.proxy_url = SIMULATOR_URL
+        self.api_url = API_URL
+        self.process = None
+
+    def start(self):
+        p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
+        p.wait()
+        p.terminate()
+        
+        # TODO: need to pass get_shard_chronology_in_folder to docker; currently should be manually set in docker-compose.yml
+        self.process = subprocess.Popen(["docker", "compose", "up", "-d"], cwd = self.docker_path)
+        time.sleep(50)
+        return self.process
+
+    def stop(self):
+        if self.process:
+            self.process.terminate()
+        # go nuclear on anything that might be running
+        p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
+        p.wait()
+
+    def apply_states(self, states: list[dict[str, Any]]):
+        for state in states:
+            requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
+
+    def init_state_from_folder(self, state_folder: Path) -> list[str]:
+        all_sc_states = get_all_sc_states_in_folder(state_folder)
+        addresses = get_users_in_folder(state_folder)
+        all_user_states = get_user_states_in_folder(state_folder, addresses)
+
+        if all_sc_states:
+            self.apply_states(all_sc_states)
+            logger.info("Smart contracts states applied.")
+
+        if all_user_states:
+            self.apply_states(all_user_states)
+            logger.info("User states applied.") 
+
+        # return found user addresses
+        return addresses
+
+    def advance_blocks(self, number_of_blocks: int):
+        url = f"{self.proxy_url}/simulator/generate-blocks/{number_of_blocks}"
+        response = requests.post(url)
+        return response.json()
+    
+    def advance_epochs(self, number_of_epochs: int):
+        blocks_per_epoch = 20
+        blocks_to_advance = blocks_per_epoch * number_of_epochs
+        return self.advance_blocks(blocks_to_advance)
+
+    
 
 def get_retrieve_block(proxy: ProxyNetworkProvider, shard: int, block: int) -> int:
     block_number = block
@@ -164,7 +308,11 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
 
 def fetch_system_account_state_from_token(token: str, proxy: ProxyNetworkProvider, block_number: int = 0) -> dict[str, Any]:
     sys_account_keys = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number)
-    sys_account_keys.update(fetch_token_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number))
+
+    # TODO: need a fix below to uncomment the fetch_token_system_account_attributes function; 
+    # TODO: transfer roles on chain simulator don't work correctly if this is active, but without it, some roles can't be correctly assigned
+    # sys_account_keys.update(fetch_token_system_account_attributes(proxy, ESDTToken.from_full_token_name(token), block_number))
+
     sys_account_state = {
         "address": "erd1lllllllllllllllllllllllllllllllllllllllllllllllllllsckry7t",
         "pairs": sys_account_keys
@@ -275,17 +423,7 @@ def fetch_user_state_with_tokens(user_address: str, context: Context, proxy: Pro
     _ = fetch_context_system_account_state_from_account(proxy, context, address.bech32(), block_number)
 
 
-def main(cli_args: List[str]):
-    parser = ArgumentParser()
-    parser.add_argument("--gateway", required=False, default="")
-    parser.add_argument("--block", required=False, default="") # 0 - frozen to last block, x - frozen to specific block number, empty - unfrozen
-    parser.add_argument("--system-account", required=False, default="offline") # offline | online
-    parser.add_argument("--contracts", required=False, default="") # all | base | comma separated labels of contracts 
-    parser.add_argument("--contract-index", required=False, default="") # index of contract to retrieve state from; should only be used in conjunction with one specific type of --contracts
-    parser.add_argument("--account", required=False, default="") # explicit account address to retrieve state from 
-    parser.add_argument("--token", required=False, default="") # explicit token to retrieve sys account state for
-    args = parser.parse_args(cli_args)
-
+def retrieve_handler(args: Any):
     if not args.gateway:
         log_step_fail("Gateway is required. Please provide a gateway address.")
         return
@@ -315,7 +453,49 @@ def main(cli_args: List[str]):
 
     if args.token:
         fetch_system_account_state_from_token(args.token, proxy, block_number)
-        
+
+
+def start_handler(args: Any):
+    """
+    Starts the chain simulator and loads all the contract and account states found in the default folder.
+    """
+    if not args.docker_path:
+        log_step_fail("Docker path is required. Please provide a docker path.")
+        return
+    if not args.state_path:
+        log_warning("State path is not provided. Using default folder.")
+        args.state_path = STATES_FOLDER
+    
+    chain_sim = ChainSimulator(args.docker_path)
+    chain_sim.start()
+    chain_sim.init_state_from_folder(args.state_path)
+
+
+def main(cli_args: List[str]):
+    parser = ArgumentParser()
+    subparsers = parser.add_subparsers()
+
+    retrieve_parser = subparsers.add_parser('retrieve', help='retrive chain simulator states')
+    retrieve_parser.add_argument("--gateway", required=False, default="")
+    retrieve_parser.add_argument("--block", required=False, default="") # 0 - frozen to last block, x - frozen to specific block number, empty - unfrozen
+    retrieve_parser.add_argument("--system-account", required=False, default="offline") # offline | online
+    retrieve_parser.add_argument("--contracts", required=False, default="") # all | base | comma separated labels of contracts 
+    retrieve_parser.add_argument("--contract-index", required=False, default="") # index of contract to retrieve state from; should only be used in conjunction with one specific type of --contracts
+    retrieve_parser.add_argument("--account", required=False, default="") # explicit account address to retrieve state from 
+    retrieve_parser.add_argument("--token", required=False, default="") # explicit token to retrieve sys account state for
+    retrieve_parser.set_defaults(func=retrieve_handler)
+    
+    start_parser = subparsers.add_parser('start', help='start chain simulator')
+    start_parser.add_argument("--docker-path", required=False, default="")
+    start_parser.add_argument("--state-path", required=False, default="")
+    start_parser.set_defaults(func=start_handler)
+    
+    args = parser.parse_args(cli_args)
+    if not hasattr(args, 'func'):
+        parser.print_help()
+        return
+
+    args.func(args)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
@@ -323,7 +503,9 @@ if __name__ == "__main__":
 
 """
 Example usage:
-$ python3 tools/chain_simulator_connector.py --gateway=https://proxy-shadowfork-four.elrond.ro --contracts=all
-$ python3 tools/chain_simulator_connector.py --gateway=https://proxy-shadowfork-four.elrond.ro --account=erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97
-$ python3 tools/chain_simulator_connector.py --gateway=https://proxy-shadowfork-four.elrond.ro --token=METAUTKLK-112f52-0196c6
+$ python3 tools/chain_simulator_connector.py retrieve --gateway=https://proxy-shadowfork-four.elrond.ro --contracts=all
+$ python3 tools/chain_simulator_connector.py retrieve --gateway=https://proxy-shadowfork-four.elrond.ro --account=erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97
+$ python3 tools/chain_simulator_connector.py retrieve --gateway=https://proxy-shadowfork-four.elrond.ro --token=METAUTKLK-112f52-0196c6
+
+$ python3 tools/chain_simulator_connector.py start --docker-path=./docker --state-path=./states
 """
