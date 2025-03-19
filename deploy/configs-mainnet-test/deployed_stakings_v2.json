@@ -1,0 +1,11 @@
+[
+    {
+        "farming_token": "UTK-2f80e9",
+        "farm_token": "SUTK-ba35f3",
+        "address": "erd1qqqqqqqqqqqqqpgqcedkmj8ezme6mtautj79ngv7fez978le2jps8jtawn",
+        "max_apr": 2500,
+        "rewards_per_block": 13318000000000000000,
+        "unbond_epochs": 10,
+        "version": 2
+    }
+]

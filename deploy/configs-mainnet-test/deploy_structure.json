@@ -1,0 +1,199 @@
+{   
+    "token": 
+        {
+            "token_prefix": "E2ETK7",
+            "number_of_tokens": 11
+        },
+
+    "egld_wraps": [
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        }
+    ],
+
+    "simple_locks": [
+
+    ],
+
+    "simple_locks_energy": [
+        {
+            "base_token": 0,
+            "locked_token": "XMEX",
+            "locked_token_name": "xMEX",
+            "locked_asset_factory": 0,
+            "min_migrated_lock_epochs": 0,
+            "lock_options": [
+                360, 720, 1440
+            ],
+            "penalties": [
+                5000, 7000, 8000
+            ]
+        }
+    ],
+
+    "fees_collectors": [
+        {
+            "energy_factory": 0,
+            "lock_epochs": 1440,
+            "locked_tokens_per_block": 17500000000000000000000
+        }
+    ],
+
+    "unstakers": [
+        {
+            "energy_factory": 0,
+            "fees_collector": 0,
+            "unbond_epochs": 10,
+            "fees_burn_percentage": 5000
+        }
+    ],
+
+    "router_v2": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "pairs_v2": [
+        {
+            "launched_token": 1,
+            "accepted_token": 0,
+            "lp_token": "EGLDMEX",
+            "lp_token_name": "EGLDMEXLP",
+            "fee_token": 0,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500,
+            "proxy_v2": 0
+        },
+        {
+            "launched_token": 1,
+            "accepted_token": 2,
+            "lp_token": "EGLDUSDC",
+            "lp_token_name": "EGLDUSDCLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 5,
+            "accepted_token": 1,
+            "lp_token": "UTKWEGLD",
+            "lp_token_name": "UTKWEGLDLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
+        }
+    ],
+
+    "farms_community": [
+
+    ],
+
+    "farms_unlocked": [
+
+    ],
+
+    "farms_locked": [
+
+    ],
+
+    "proxy_deployers": [
+
+    ],
+
+    "farms_boosted": [
+        {
+            "farming_pool": 4,
+            "farm_token": "UTKWEGLDFL",
+            "farm_token_name": "UTKWEGLDLPStakedLK",
+            "farmed_token": 0,
+            "rpb": 21200000000000000000000,
+            "penalty": 300,
+            "min_farming_epochs": 7,
+            "lock_factory": 0,
+            "lock_epochs": 1440,
+            "boosted_rewards": 6000,
+            "base_const": 2,
+            "energy_const": 1,
+            "farm_const": 0,
+            "min_energy": 1,
+            "min_farm": 1
+        }
+    ],
+
+    "price_discoveries": [
+
+    ],
+
+    "stakings": [
+
+    ],
+
+    "stakings_v2": [
+        {
+            "staking_token": 5,
+            "stake_token": "SUTK",
+            "stake_token_name": "SUTK",
+            "apr": 2500,
+            "rpb": 4138000000000000000,
+            "unbond_epochs": 10,
+            "rewards": 10000000000000000000000000
+        }
+    ],
+
+    "metastakings": [
+
+    ],
+
+    "metastakings_v2": [
+        {
+            "token": 5,
+            "pool_v2": 4,
+            "farm_boosted": 4,
+            "staking_v2": 4,
+            "metastake_token": "METAUTKLK",
+            "metastake_token_name": "MetaStakedUtrustLK"
+        }
+    ],
+
+    "metastakings_boosted": [
+    ],
+
+    "escrows": [
+    ],
+
+    "lk_wraps": [
+    ],
+
+    "position_creator": [
+        {
+            "egld_wrap": 1,
+            "router_v2": 0
+        }
+    ],
+
+    "locked_token_position_creator": [
+    ],
+
+    "composable_tasks": [
+        {
+            "egld_wrap": 1,
+            "router_v2": 0
+        }
+    ],
+
+    "governances": [
+    ]
+}
