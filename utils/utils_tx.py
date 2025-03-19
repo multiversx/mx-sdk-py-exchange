@@ -313,9 +313,10 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
         original_dest = Address.new_from_bech32(tx.receiver)
         data = tx.data
         tx.receiver = DEFAULT_MULTISIG_ADDRESS
-        new_data = f"proposeAsyncCall@{original_dest.hex()}@@@".encode()
+        new_data = f"proposeTransferExecute@{original_dest.hex()}@@@".encode()
         new_data += data
         tx.data = new_data
+        tx.gas_limit = 600000000
 
     tx.signature = deployer.sign_transaction(tx)
 
@@ -341,6 +342,25 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
     )
 
     tx = builder.build()
+
+    if DEFAULT_MULTISIG_ADDRESS:
+        original_dest = Address.new_from_bech32(tx.receiver)
+
+        # replace the function name with the hex representation
+        data = tx.data
+        decoded_data = data.decode()
+        first_at = decoded_data.find('@')
+        if first_at != -1:
+            function_name = decoded_data[:first_at]
+            rest_of_data = decoded_data[first_at:]
+            hex_function = function_name.encode().hex()
+            data = (hex_function + rest_of_data).encode()
+
+        tx.receiver = DEFAULT_MULTISIG_ADDRESS
+        new_data = f"proposeTransferExecute@{original_dest.hex()}@@@".encode()
+        new_data += data
+        tx.data = new_data
+        tx.gas_limit = 600000000
     tx.signature = deployer.sign_transaction(tx)
 
     return tx
@@ -378,8 +398,9 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
             hex_function = function_name.encode().hex()
             data = (hex_function + rest_of_data).encode()
 
+        value = dec_to_padded_hex(value) if value != "0" else ""
         tx.receiver = DEFAULT_MULTISIG_ADDRESS
-        new_data = f"proposeAsyncCall@{original_dest.hex()}@{dec_to_padded_hex(value)}@@".encode()
+        new_data = f"proposeAsyncCall@{original_dest.hex()}@{value}@@".encode()
         new_data += data
         tx.data = new_data
 
