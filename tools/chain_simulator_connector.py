@@ -116,7 +116,7 @@ def get_all_sc_states_in_folder(state_folder: Path) -> list[str]:
     
 
 class ChainSimulator:
-    def __init__(self, docker_path: str):
+    def __init__(self, docker_path: Path):
         self.docker_path = docker_path
         self.proxy_url = SIMULATOR_URL
         self.api_url = API_URL
@@ -455,21 +455,22 @@ def retrieve_handler(args: Any):
         fetch_system_account_state_from_token(args.token, proxy, block_number)
 
 
-def start_handler(args: Any):
+def start_handler(args: Any) -> tuple[ChainSimulator, list[str]]:
     """
     Starts the chain simulator and loads all the contract and account states found in the default folder.
     """
-    if not args.docker_path:
-        log_step_fail("Docker path is required. Please provide a docker path.")
+    if not args.docker_path or not Path(args.docker_path).exists():
+        log_step_fail("Docker path is not provided or does not exist. Please provide a valid docker path.")
         return
-    if not args.state_path:
-        log_warning("State path is not provided. Using default folder.")
+    if not args.state_path or not Path(args.state_path).exists():
+        log_warning(f"State path is not provided or does not exist. Using default folder: {STATES_FOLDER}")
         args.state_path = STATES_FOLDER
     
     chain_sim = ChainSimulator(args.docker_path)
     chain_sim.start()
-    chain_sim.init_state_from_folder(args.state_path)
+    found_accounts = chain_sim.init_state_from_folder(Path(args.state_path))
 
+    return chain_sim, found_accounts
 
 def main(cli_args: List[str]):
     parser = ArgumentParser()
