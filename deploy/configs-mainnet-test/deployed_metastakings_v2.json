@@ -1,0 +1,14 @@
+[
+    {
+        "address": "erd1qqqqqqqqqqqqqpgqmgd0eu4z9kzvrputt4l4kw4fqf2wcjsekp2sftan7s",
+        "metastake_token": "METAUTKLK-112f52",
+        "staking_token": "UTK-2f80e9",
+        "lp_token": "UTKWEGLD-c960d1",
+        "farm_token": "UTKWEGLDFL-ba26d2",
+        "stake_token": "SUTK-ba35f3",
+        "lp_address": "erd1qqqqqqqqqqqqqpgq0lzzvt2faev4upyf586tg38s84d7zsaj2jpsglugga",
+        "farm_address": "erd1qqqqqqqqqqqqqpgq4acurmluezvmhna8tztgcrnwh0l70a2wkp2sfh6jkp",
+        "stake_address": "erd1qqqqqqqqqqqqqpgqcedkmj8ezme6mtautj79ngv7fez978le2jps8jtawn",
+        "version": 2
+    }
+]
