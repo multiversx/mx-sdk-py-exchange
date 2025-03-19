@@ -347,7 +347,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
 
 def prepare_contract_call_tx(contract_address: Address, deployer: Account,
                              network_config: NetworkConfig, gas_limit: int,
-                             function: str, args: list, value: str = "0") -> Transaction:
+                             function: str, args: list, value: int = 0) -> Transaction:
 
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
@@ -359,7 +359,7 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
         function,
         gas_limit,
         args,
-        value
+        int(value)
     )
     tx.nonce = deployer.nonce
     tx.signature = deployer.sign_transaction(tx)
@@ -370,7 +370,7 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
 def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, user: Account,
                                                      network_config: NetworkConfig, gas_limit: int,
                                                      endpoint: str, endpoint_args: list, tokens: List[ESDTToken],
-                                                     value: str = "0") -> Transaction:
+                                                     value: int = 0) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     payment_tokens = [token.to_token_transfer() for token in tokens]
     endpoint_args = _prep_args_for_addresses(endpoint_args)
@@ -383,7 +383,7 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
         endpoint,
         gas_limit,
         endpoint_args,
-        value,
+        int(value),
         payment_tokens
     )
     tx.nonce = user.nonce
@@ -394,7 +394,7 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
 
 def prepare_multiesdtnfttransfer_tx(destination: Address, user: Account,
                                     network_config: NetworkConfig, gas_limit: int,
-                                    tokens: List[ESDTToken], value: str = "0") -> Transaction:
+                                    tokens: List[ESDTToken], value: int = 0) -> Transaction:
     """
     TODO: cleanup: gas_limit and value are ignored for this transaction type
     """
