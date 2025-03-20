@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 import json
+import yaml
 import config
 from argparse import ArgumentParser
 from typing import Any, List
@@ -99,11 +100,12 @@ def get_users_in_folder(state_folder: Path) -> list[str]:
     return users
 
 
-def get_shard_chronology_in_folder(state_folder: Path) -> str | None:
+def get_shard_chronology_in_folder(state_folder: Path) -> dict[str, int] | None:
     state_files = list(state_folder.iterdir())
     for file in state_files:
         if "shard_chronology.json" in file.name:
-            return file
+            with open(file, 'r', encoding="UTF-8") as f:
+                return json.load(f)
     return None
 
 
@@ -122,12 +124,13 @@ class ChainSimulator:
         self.api_url = API_URL
         self.process = None
 
-    def start(self):
+    def start(self, block: int = 0, round: int = 0, epoch: int = 0):
         p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
         p.wait()
         p.terminate()
         
-        # TODO: need to pass get_shard_chronology_in_folder to docker; currently should be manually set in docker-compose.yml
+        # alter docker-compose.yml to start with the correct block, round and epoch & add other necessary mods
+        self._update_docker_compose(block, round, epoch)
         self.process = subprocess.Popen(["docker", "compose", "up", "-d"], cwd = self.docker_path)
         time.sleep(50)
         return self.process
@@ -168,6 +171,27 @@ class ChainSimulator:
         blocks_per_epoch = 20
         blocks_to_advance = blocks_per_epoch * number_of_epochs
         return self.advance_blocks(blocks_to_advance)
+
+    def _update_docker_compose(self, block: int, round: int, epoch: int):
+        # Load the docker-compose.yaml file
+        with open(self.docker_path / "docker-compose.yaml", 'r') as file:
+            docker_compose = yaml.safe_load(file)
+        
+        # Locate the chain-simulator service
+        chain_simulator = docker_compose['services'].get('chain-simulator', {})
+        
+        # Update the entrypoint
+        chain_simulator['entrypoint'] = (
+            "/bin/bash -c \" sed -i 's|http://localhost:9200|http://elasticsearch:9200|g' ./config/node/config/external.toml "
+            "&& sed -i '11i\\    { File = \\\"enableEpochs.toml\\\", Path = \\\"EnableEpochs.StakingV2EnableEpoch\\\", Value = 0},' ./config/nodeOverrideDefault.toml "
+            f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
+        )
+        
+        # Save the modified docker-compose.yaml file
+        with open(self.docker_path / "docker-compose.yaml", 'w') as file:
+            yaml.dump(docker_compose, file, default_flow_style=False, sort_keys=False)
+        
+        logger.info(f"Updated {self.docker_path / 'docker-compose.yaml'} with block {block}, round {round}, epoch {epoch}.")
 
     
 
@@ -459,6 +483,7 @@ def start_handler(args: Any) -> tuple[ChainSimulator, list[str]]:
     """
     Starts the chain simulator and loads all the contract and account states found in the default folder.
     """
+
     if not args.docker_path or not Path(args.docker_path).exists():
         log_step_fail("Docker path is not provided or does not exist. Please provide a valid docker path.")
         return
@@ -466,8 +491,13 @@ def start_handler(args: Any) -> tuple[ChainSimulator, list[str]]:
         log_warning(f"State path is not provided or does not exist. Using default folder: {STATES_FOLDER}")
         args.state_path = STATES_FOLDER
     
-    chain_sim = ChainSimulator(args.docker_path)
-    chain_sim.start()
+    chronology = get_shard_chronology_in_folder(Path(args.state_path))
+    if not chronology:
+        log_step_fail("Shard chronology file not found. Please provide a valid state path.")
+        return
+    
+    chain_sim = ChainSimulator(Path(args.docker_path))
+    chain_sim.start(block=chronology["block"], round=chronology["round"], epoch=chronology["epoch"])
     found_accounts = chain_sim.init_state_from_folder(Path(args.state_path))
 
     return chain_sim, found_accounts
@@ -487,8 +517,8 @@ def main(cli_args: List[str]):
     retrieve_parser.set_defaults(func=retrieve_handler)
     
     start_parser = subparsers.add_parser('start', help='start chain simulator')
-    start_parser.add_argument("--docker-path", required=False, default="")
-    start_parser.add_argument("--state-path", required=False, default="")
+    start_parser.add_argument("--docker-path", required=False, default="", help="path to full stack chain simulator docker compose folder")
+    start_parser.add_argument("--state-path", required=False, default="", help="path to folder where chain simulator states are saved")
     start_parser.set_defaults(func=start_handler)
     
     args = parser.parse_args(cli_args)
