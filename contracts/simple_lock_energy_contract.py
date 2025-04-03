@@ -322,6 +322,45 @@ class SimpleLockEnergyContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
                              "removeFromTokenTransferWhitelist", sc_args)
     
+    def add_sc_to_unlocked_token_mint_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, contract_addresses: List[str]):
+        """ Expected as args:
+            type[List[str]]: addresses
+        """
+        function_purpose = "Add SCs to Unlocked Token Mint Whitelist in simple lock energy contract"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [Address(contract_address) for contract_address in contract_addresses]
+
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "addToUnlockedTokenMintWhitelist", sc_args)
+
+    def remove_sc_from_unlocked_token_mint_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, contract_addresses: List[str]):
+        """ Expected as args:
+            type[List[str]]: addresses
+        """
+        function_purpose = "Remove SCs from Unlocked Token Mint Whitelist in simple lock energy contract"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [Address(contract_address) for contract_address in contract_addresses]
+
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "removeFromUnlockedTokenMintWhitelist", sc_args)
+    
+    def set_multisig_address(self, deployer: Account, proxy: ProxyNetworkProvider, contract_address: str):
+        """ Expected as args:
+            type[str]: address
+        """
+        function_purpose = "Set multisig address for claims in simple lock energy contract"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = [Address(contract_address)]
+
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
+                             "setMultisigAddress", sc_args)
+    
     def set_energy_for_old_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: address
