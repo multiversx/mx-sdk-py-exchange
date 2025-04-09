@@ -16,3 +16,4 @@ __pycache__
 *downloads
 *state_dump
 *states
+/docker

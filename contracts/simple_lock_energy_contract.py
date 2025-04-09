@@ -210,6 +210,18 @@ class SimpleLockEnergyContract(DEXContractInterface):
             return ""
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setFeesCollectorAddress", args)
 
+    def set_multisig_address(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: multisig address
+        """
+        function_purpose = "set multisig address"
+        logger.info(function_purpose)
+
+        if len(args) < 1:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setMultisigAddress", args)
+
     def set_token_unstake(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: token unstake address
