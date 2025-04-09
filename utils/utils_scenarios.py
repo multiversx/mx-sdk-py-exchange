@@ -72,10 +72,11 @@ class Pagination(IPagination):
 def collect_farm_contract_users(users_count: int, 
                                 contract_address: str, farming_token: str, farm_token: str, 
                                 source_api: ApiNetworkProvider,
-                                dest_proxy: ProxyNetworkProvider) -> FetchedUsers:
+                                dest_proxy: ProxyNetworkProvider,
+                                users_pagination_start: int = 0) -> FetchedUsers:
     logger.info(f'Collecting users from farm contract {contract_address} ...')
 
-    transactions = source_api.get_account_transactions(Address(contract_address), Pagination(0, users_count))
+    transactions = source_api.get_account_transactions(Address(contract_address), Pagination(users_pagination_start, users_count))
 
     fetched_users = FetchedUsers()
     set_users = set()

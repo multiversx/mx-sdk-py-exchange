@@ -157,7 +157,15 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         ]
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
                                         Address(self.address), "claimRewardsOnBehalf", sc_args)
+    
+    def collect_undistributed_boosted_rewards(self, proxy: ProxyNetworkProvider, user: Account) -> str:
+        claim_fn = 'collectUndistributedBoostedRewards'
+        logger.info(f"{claim_fn}")
+        logger.debug(f"Account: {user.address}")
 
+        gas_limit = 500000000
+
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), claim_fn, [])
 
     def compoundRewards(self, network_provider: NetworkProviders, user: Account, event: CompoundRewardsFarmEvent) -> str:
         function_purpose = f"compoundRewards"
