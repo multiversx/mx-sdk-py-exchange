@@ -40,6 +40,8 @@ def read_accounts_from_json(json_path: str) -> List[ExportedAccount]:
 
     exported_accounts = []
     for account in accounts:
+        if account['address'] == "":
+            continue
         exported_tokens = []
         for token in account['accountTokensSupply']:
             exported_token = ExportedToken(token['tokenName'], token['tokenNonceHex'], token['supply'], token['attributes'])
@@ -153,12 +155,12 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
         if int(account.value) > 10000000000000000:
             continue
 
-        print(f"Funding account {account.address} of {index}/{len(accounts)}")
+        # print(f"Funding account {account.address} of {index}/{len(accounts)}")
         transaction = EGLDTransferBuilder(
             config=tx_config,
             sender=funding_account.address,
             receiver=Address.from_bech32(account.address),
-            payment=TokenPayment.egld_from_amount(0.001),
+            payment=TokenPayment.egld_from_amount(0.01),
             nonce=funding_account.nonce,
         ).build()
         transaction.signature = signature
@@ -170,6 +172,8 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
     transactions_chunks = split_to_chunks(transactions, 100)
     for transactions_chunk in transactions_chunks:
         network_providers.proxy.send_transactions(transactions_chunk)
+
+    print(f"Funded {index} accounts!")
 
 
 def check_verified_contract(contract_address: str) -> bool:
