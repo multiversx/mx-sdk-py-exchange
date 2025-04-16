@@ -255,6 +255,7 @@ def generate_unlock_tokens_transactions(args: Any):
 
     fund_shadowfork_accounts(exported_accounts)
     sleep(35)
+    input("Funded accounts, press Enter to continue...")
 
     # # used only when wanting to sync on-chain, but it takes an eternity
     if ON_CHAIN_NONCES:
@@ -380,6 +381,12 @@ def generate_unlock_tokens_transactions(args: Any):
             "unlocking_function": "exitFarm",
             "args": [],
             "gas_limit": 30000000
+        },
+        "LKFARM-321c30": {
+            "contract_address": "erd1qqqqqqqqqqqqqpgqs0jjyjmx0cvek4p8yj923q5yreshtpa62jpsz6vt84",
+            "unlocking_function": "exitFarmLockedToken",
+            "args": [],
+            "gas_limit": 7000000
         }
     }
 
@@ -414,10 +421,6 @@ def generate_unlock_tokens_transactions(args: Any):
             function_name = searched_tokens_map[token.token_name]["unlocking_function"]
             gas_limit = searched_tokens_map[token.token_name]["gas_limit"]
             args = searched_tokens_map[token.token_name]["args"]
-
-            # this doesn't need to be unlocked as standalone, only if underlying in a proxy position
-            if token.token_name in ["EGLDMEXF-a4d81e", "EGLDMEXF-5bcc57", "MEXRIDEF-bf0320", "MEXFARM-e7af52", "MEXFARM-5d1dbb"]:
-                continue
 
             # for energy contract, we need to check if the token is already unlockable to use another function
             if token.token_name == energy_contract.locked_token:
@@ -523,6 +526,6 @@ def generate_unlock_tokens_transactions(args: Any):
         i += 1
         print(f"Sent {i} / {len(transactions) // 100 + 1 } chunks, {num_sent} / {len(chunk)} transactions")
 
-    if get_user_continue(f"Writing accounts to json file? {exported_accounts_path}"):
-        print(f"Writing accounts to json file")
+    print(f"Writing accounts to json file? {exported_accounts_path}")
+    if get_user_continue():
         write_accounts_to_json(exported_accounts, exported_accounts_path)
