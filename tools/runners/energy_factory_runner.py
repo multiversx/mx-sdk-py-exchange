@@ -387,6 +387,18 @@ def generate_unlock_tokens_transactions(args: Any):
             "unlocking_function": "exitFarmLockedToken",
             "args": [],
             "gas_limit": 7000000
+        },
+        "LKFARM-9620e7": {
+            "contract_address": "erd1qqqqqqqqqqqqqpgqawujux7w60sjhm8xdx3n0ed8v9h7kpqu2jpsecw6ek",
+            "unlocking_function": "exitFarmLockedToken",
+            "args": [],
+            "gas_limit": 7000000
+        },
+        "METARIDELK-bd8cda": {
+            "contract_address": "erd1qqqqqqqqqqqqqpgq389gc8qnqy0ksha948jf72c9cks9g3rf2jpsl5z0aa",
+            "unlocking_function": "unstakeFarmTokens",
+            "args": [1, 1],
+            "gas_limit": 70000000
         }
     }
 
