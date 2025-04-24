@@ -304,7 +304,7 @@ class FeesCollectorContract(BaseBoostedContract):
         function_purpose = f"Claim rewards from fees collector"
         logger.info(function_purpose)
 
-        gas_limit = 350000000
+        gas_limit = 80000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimRewards", sc_args)
     
@@ -312,7 +312,7 @@ class FeesCollectorContract(BaseBoostedContract):
         function_purpose = f"Claim rewards from fees collector"
         logger.info(function_purpose)
 
-        gas_limit = 500000000
+        gas_limit = 80000000
         sc_args = []
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimBoostedRewards", sc_args)
 
