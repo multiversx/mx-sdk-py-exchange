@@ -1,14 +1,16 @@
+from typing import Any
 from contracts.base_contracts import BaseBoostedContract
 from contracts.pair_contract import PairContract
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, upgrade_call
 from utils.utils_generic import log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
-from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider, SmartContractTransactionsFactory, TransactionComputer
+from multiversx_sdk.abi import Abi
 
 
 logger = get_logger(__name__)
-
+transaction_computer = TransactionComputer()
 
 class FeesCollectorContract(BaseBoostedContract):
     def __init__(self, address: str = ""):
@@ -331,25 +333,33 @@ class FeesCollectorContract(BaseBoostedContract):
         ]
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "depositSwapFees", sc_args)
 
-    def swap_token(self, user: Account, proxy: ProxyNetworkProvider, token: str, pair_contract: PairContract):
+    def swap_to_base_token(self, user: Account, proxy: ProxyNetworkProvider, abi, sc_args: list):
         """ Expected as args:
             token[str]: token address
             swap_operations[list]: `swap_operations` are pairs of (pair address, pair function name, token wanted, min amount out)" -> Address,bytes,TokenIdentifier,BigUint
                 "\"pair function name\" can only be \"swapTokensFixedInput\" or \"swapTokensFixedOutput\\",
                 "\"min amount out\" is a minimum of 1"
         """
-        
+        sc_factory = SmartContractTransactionsFactory(proxy.get_network_config(), abi)
+
         function_purpose = f"Swap token in fees collector"
-        logger.info(function_purpose)
+        logger.info(function_purpose)   
+        
+        transaction = sc_factory.create_transaction_for_execute(
+                                                    sender=user.address,
+                                                    contract=Address(self.address),
+                                                    function="swapTokenToBaseToken",
+                                                    gas_limit=50_000_000,
+                                                    arguments=sc_args
+                                                    )
+        transaction.nonce = user.nonce
+        transaction.signature = user.signer.sign(
+            transaction_computer.compute_bytes_for_signing(transaction)
+        )
 
-        gas_limit = 80000000
-        sc_args = [
-            pair_contract.secondToken,
-            [Address(pair_contract.address), bytes("swapTokensFixedInput"), pair_contract.firstToken, 1]
+        return proxy.send_transaction(transaction)
 
-        ]
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "swapTokenToBaseToken", sc_args)
-
+    
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass
 
