@@ -235,6 +235,16 @@ class FeeCollectorContractDataFetcher(DataFetcher):
             "getReservesAndTotalSupply": self._get_int_list_view,
             "getUserEnergyForWeek": self._get_hex_view,
             "getTotalEnergyForWeek": self._get_int_view,
+            "getAccumulatedFees": self._get_int_view,
+            "getLastLockedTokensAddWeek": self._get_int_view,
+            "getLockedTokensPerBlock": self._get_int_view,
+            "getLockingScAddress": self._get_hex_view,
+            "getLockEpochs": self._get_int_view,
+            "getEnergyFactoryAddress": self._get_hex_view,
+            "getCurrentWeek": self._get_int_view,
+            "getFirstWeekStartEpoch": self._get_int_view,
+            "getCurrentClaimProgress": self._get_hex_view
+
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
