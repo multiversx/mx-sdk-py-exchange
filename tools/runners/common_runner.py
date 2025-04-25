@@ -1,4 +1,5 @@
 from itertools import chain
+from time import sleep
 from typing import Any, List
 import json
 
@@ -39,6 +40,8 @@ def read_accounts_from_json(json_path: str) -> List[ExportedAccount]:
 
     exported_accounts = []
     for account in accounts:
+        if account['address'] == "":
+            continue
         exported_tokens = []
         for token in account['accountTokensSupply']:
             exported_token = ExportedToken(token['tokenName'], token['tokenNonceHex'], token['supply'], token['attributes'])
@@ -47,6 +50,42 @@ def read_accounts_from_json(json_path: str) -> List[ExportedAccount]:
         exported_accounts.append(ExportedAccount(account['address'], account['nonce'], account['value'], exported_tokens))
 
     return exported_accounts
+
+
+def write_accounts_to_json(accounts: List[ExportedAccount], json_path: str) -> None:
+    """Write accounts to json file and keep the initial structure:
+    - accountTokensSupply:
+        - tokenName
+        - tokenNonceHex
+        - supply
+        - attributes
+    - address
+    - nonce
+    - value
+    """
+
+    accounts_json = []
+    for account in accounts:
+        tokens_json = []
+        for token in account.account_tokens_supply:
+            token_json = {
+                'tokenName': token.token_name,
+                'tokenNonceHex': token.token_nonce_hex,
+                'supply': token.supply,
+                'attributes': token.attributes
+            }
+            tokens_json.append(token_json)
+
+        account_json = {
+            'address': account.address,
+            'nonce': account.nonce,
+            'value': account.value,
+            'accountTokensSupply': tokens_json
+        }
+        accounts_json.append(account_json)
+
+    with open(json_path, 'w') as file:
+        json.dump(accounts_json, file, indent=4)
 
 
 def get_acounts_with_token(accounts: List[ExportedAccount], token_name: str) -> List[ExportedAccount]:
@@ -67,7 +106,17 @@ def sync_account_nonce(exported_account: ExportedAccount) -> ExportedAccount:
     network_providers = NetworkProviders(API, PROXY)
     account = Account(exported_account.address, config.DEFAULT_OWNER)
     account.address = WrapperAddress.from_bech32(exported_account.address)
-    account.sync_nonce(network_providers.proxy)
+    
+    reattempts = 0
+    while True:
+        try:
+            account.sync_nonce(network_providers.proxy)
+            break
+        except Exception:
+            reattempts += 1
+            if reattempts > 5:
+                raise Exception("Failed to sync account nonce")
+            sleep(10)
     exported_account.nonce = account.nonce
     return exported_account
 
@@ -106,12 +155,12 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
         if int(account.value) > 10000000000000000:
             continue
 
-        print(f"Funding account {account.address} of {index}/{len(accounts)}")
+        # print(f"Funding account {account.address} of {index}/{len(accounts)}")
         transaction = EGLDTransferBuilder(
             config=tx_config,
             sender=funding_account.address,
             receiver=Address.from_bech32(account.address),
-            payment=TokenPayment.egld_from_amount(0.001),
+            payment=TokenPayment.egld_from_amount(0.01),
             nonce=funding_account.nonce,
         ).build()
         transaction.signature = signature
@@ -123,6 +172,8 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
     transactions_chunks = split_to_chunks(transactions, 100)
     for transactions_chunk in transactions_chunks:
         network_providers.proxy.send_transactions(transactions_chunk)
+
+    print(f"Funded {index} accounts!")
 
 
 def check_verified_contract(contract_address: str) -> bool:
