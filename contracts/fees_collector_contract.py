@@ -333,31 +333,19 @@ class FeesCollectorContract(BaseBoostedContract):
         ]
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "depositSwapFees", sc_args)
 
-    def swap_to_base_token(self, user: Account, proxy: ProxyNetworkProvider, abi, sc_args: list):
+    def swap_to_base_token(self, user: Account, proxy: ProxyNetworkProvider, abi: Abi, sc_args: list):
         """ Expected as args:
             token[str]: token address
             swap_operations[list]: `swap_operations` are pairs of (pair address, pair function name, token wanted, min amount out)" -> Address,bytes,TokenIdentifier,BigUint
                 "\"pair function name\" can only be \"swapTokensFixedInput\" or \"swapTokensFixedOutput\\",
                 "\"min amount out\" is a minimum of 1"
         """
-        sc_factory = SmartContractTransactionsFactory(proxy.get_network_config(), abi)
 
-        function_purpose = f"Swap token in fees collector"
+        function_purpose = f"Swap tokens to base token in fees collector"
         logger.info(function_purpose)   
-        
-        transaction = sc_factory.create_transaction_for_execute(
-                                                    sender=user.address,
-                                                    contract=Address(self.address),
-                                                    function="swapTokenToBaseToken",
-                                                    gas_limit=50_000_000,
-                                                    arguments=sc_args
-                                                    )
-        transaction.nonce = user.nonce
-        transaction.signature = user.signer.sign(
-            transaction_computer.compute_bytes_for_signing(transaction)
-        )
+        gas_limit = 80000000
 
-        return proxy.send_transaction(transaction)
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), "swapTokenToBaseToken", sc_args, abi = abi)
 
     
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
