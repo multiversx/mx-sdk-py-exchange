@@ -12,9 +12,9 @@ from contracts.metastaking_contract import MetaStakingContract, MetaStakingContr
 from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import get_file_from_url_or_path
-from runners.farm_runner import get_farm_addresses_from_chain
-from runners.staking_runner import get_staking_addresses_from_chain
-from runners.metastaking_runner import get_metastaking_addresses_from_chain_by_farms
+from tools.runners.farm_runner import get_farm_addresses_from_chain
+from tools.runners.staking_runner import get_staking_addresses_from_chain
+from tools.runners.metastaking_runner import get_metastaking_addresses_from_chain_by_farms
 from deploy import populate_deploy_lists
 import config
 
