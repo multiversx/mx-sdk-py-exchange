@@ -41,6 +41,12 @@ class MigratePositionFarmEvent:
         self.amount = amount
         self.nonce = nonce
 
+class MergePositionFarmEvent:
+    def __init__(self, amount: int, nonce: int, original_caller: str):
+        self.amount = amount
+        self.nonce = nonce
+        self.original_caller = original_caller
+
 
 class SetTokenBalanceEvent:
     def __init__(self, token: str, balance: int, nonce: int):
