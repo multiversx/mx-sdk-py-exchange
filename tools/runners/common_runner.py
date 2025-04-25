@@ -6,8 +6,7 @@ import json
 from multiversx_sdk import Address, TokenPayment
 from multiversx_sdk.core.transaction_builders.transfers_builders import EGLDTransferBuilder
 from multiversx_sdk.core.transaction_builders import DefaultTransactionBuildersConfiguration
-from multiversx_sdk_cli import cli_shared
-from multiversx_sdk_cli.contract_verification import trigger_contract_verification
+from tools.contract_verifier import trigger_contract_verification
 from tools.common import API, PROXY
 from utils.utils_chain import Account, WrapperAddress
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
@@ -194,9 +193,7 @@ def verify_contracts(args: Any, contract_addresses: list[str]) -> None:
 
     verifier_url = args.verifier_url
     packaged_src = get_file_from_url_or_path(args.packaged_src).expanduser().resolve()
-    args.pem = config.DEFAULT_OWNER
-    args.pem_index = 0
-    owner = cli_shared.prepare_account(args)
+    owner = Account(pem_file=config.DEFAULT_OWNER)
     docker_image = args.docker_image
     contract_variant = args.contract_variant
 
