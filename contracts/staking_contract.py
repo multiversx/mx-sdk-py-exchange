@@ -180,6 +180,15 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
                                         Address(self.address), function_purpose, sc_args)
 
+    def collect_undistributed_boosted_rewards(self, proxy: ProxyNetworkProvider, user: Account) -> str:
+        claim_fn = 'collectUndistributedBoostedRewards'
+        logger.info(f"{claim_fn}")
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 500000000
+
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), claim_fn, [])
+
     def compound_rewards(self, network_provider: NetworkProviders, user: Account, event: CompoundRewardsFarmEvent) -> str:
         compound_fn = 'compoundRewards'
         logger.info(f"{compound_fn}")
@@ -346,15 +355,6 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         sc_args = [percentage]
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setBoostedYieldsRewardsPercentage",
-                             sc_args)
-
-    def collect_undistributed_boosted_rewards(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Resume stake contract"
-        logger.info(function_purpose)
-
-        gas_limit = 30000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "collectUndistributedBoostedRewards",
                              sc_args)
     
     def set_max_apr(self, deployer: Account, proxy: ProxyNetworkProvider, percentage: int):

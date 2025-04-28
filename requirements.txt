@@ -4,5 +4,5 @@ toml
 debugpy
 wget
 pyyaml
-multiversx-sdk-cli==9.6.2
-multiversx-sdk==0.10.0
+multiversx-sdk-cli==9.8.1
+multiversx-sdk==0.16.3

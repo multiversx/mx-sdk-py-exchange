@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 from typing import Any
 from multiversx_sdk import Address
-from common import fetch_and_save_contracts, get_saved_contract_addresses
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
@@ -9,7 +8,7 @@ from contracts.pair_contract import PairContract
 from contracts.router_contract import RouterContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
-    get_user_continue, run_graphql_query
+    get_user_continue, run_graphql_query, fetch_and_save_contracts, get_saved_contract_addresses
 from tools.runners.common_runner import add_upgrade_all_command
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
 from utils.utils_tx import NetworkProviders

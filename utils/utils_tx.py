@@ -18,7 +18,7 @@ from multiversx_sdk.network_providers.transaction_events import \
 from multiversx_sdk.network_providers.transaction_status import \
     TransactionStatus
 from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
-
+from multiversx_sdk.abi import Abi
 from utils.logger import get_logger
 from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
@@ -347,12 +347,16 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
 
 def prepare_contract_call_tx(contract_address: Address, deployer: Account,
                              network_config: NetworkConfig, gas_limit: int,
-                             function: str, args: list, value: int = 0) -> Transaction:
+                             function: str, args: list, value: int = 0, abi: Abi = None) -> Transaction:
 
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
     logger.debug(f"Contract call arguments: {args}")
-    factory = SmartContractTransactionsFactory(config)
+    if(abi is not None):
+        factory = SmartContractTransactionsFactory(config, abi)
+    else:
+        factory = SmartContractTransactionsFactory(config)
+
     tx = factory.create_transaction_for_execute(
         deployer.address,
         contract_address,
@@ -481,7 +485,7 @@ def multi_esdt_transfer(proxy: ProxyNetworkProvider, gas: int, user: Account, de
 
 
 def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract: Address, endpoint: str, args: list,
-                  value: str = "0"):
+                  value: str = "0", abi: Abi = None):
     """ Expected as args:
         opt: type[str..]: endpoint arguments
     """
@@ -489,7 +493,7 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
     logger.debug(f"Args: {args}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
 
-    tx = prepare_contract_call_tx(contract, user, network_config, gas, endpoint, args, value)
+    tx = prepare_contract_call_tx(contract, user, network_config, gas, endpoint, args, value, abi)
     tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 

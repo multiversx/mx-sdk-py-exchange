@@ -11,7 +11,7 @@ from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex,
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
-                                CompoundRewardsFarmEvent, MigratePositionFarmEvent)
+                                CompoundRewardsFarmEvent, MergePositionFarmEvent, MigratePositionFarmEvent)
 from typing import Dict, Any
 
 logger = get_logger(__name__)
@@ -157,7 +157,15 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         ]
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
                                         Address(self.address), "claimRewardsOnBehalf", sc_args)
+    
+    def collect_undistributed_boosted_rewards(self, proxy: ProxyNetworkProvider, user: Account) -> str:
+        claim_fn = 'collectUndistributedBoostedRewards'
+        logger.info(f"{claim_fn}")
+        logger.debug(f"Account: {user.address}")
 
+        gas_limit = 500000000
+
+        return endpoint_call(proxy, gas_limit, user, Address(self.address), claim_fn, [])
 
     def compoundRewards(self, network_provider: NetworkProviders, user: Account, event: CompoundRewardsFarmEvent) -> str:
         function_purpose = f"compoundRewards"
@@ -195,6 +203,25 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         ]
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
                                         Address(self.address), "migratePosition", sc_args)
+    
+    def mergePositions(self, network_provider: NetworkProviders, user:Account, event_list: list[MergePositionFarmEvent]) -> str:
+        function_purpose = f"mergeFarmTokens"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 50000000
+
+        tokens = [ESDTToken(self.farmToken, event.nonce, event.amount) for event in event_list]
+        
+        original_caller = next((event.original_caller for event in event_list if hasattr(event, "original_caller")), None)
+        
+        sc_args = [tokens]
+
+        if original_caller:
+            sc_args.append(original_caller)
+
+        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
+                                        Address(self.address), "mergeFarmTokens", sc_args)
     
     def allow_external_claim(self, network_provider: NetworkProviders, user: Account) -> str:
         fn = 'allowExternalClaimBoostedRewards'
