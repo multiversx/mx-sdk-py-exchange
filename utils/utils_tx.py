@@ -5,8 +5,7 @@ import requests
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
-from multiversx_sdk import (Address, ApiNetworkProvider, GenericError,
-                            ProxyNetworkProvider, Transaction)
+from multiversx_sdk import (Address, ApiNetworkProvider, ProxyNetworkProvider, Transaction)
 from multiversx_sdk import Token, TokenTransfer
 from multiversx_sdk import CodeMetadata, TransactionOnNetwork
 from multiversx_sdk import (TransactionsFactoryConfig, SmartContractTransactionsFactory,

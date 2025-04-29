@@ -11,9 +11,8 @@ from typing import Any, List
 from context import Context
 from contracts.contract_identities import DEXContractInterface
 import requests
-from utils.contract_data_fetchers import PairContractDataFetcher
-from utils.utils_chain import decode_merged_attributes, get_current_tokens_for_address, string_to_hex, dec_to_padded_hex
-from utils.utils_chain import WrapperAddress, Account
+from utils.utils_chain import string_to_hex
+from utils.utils_chain import WrapperAddress
 from utils.logger import get_logger
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 from tools.runners.account_state_runner import get_account_keys_online, get_account_data_online

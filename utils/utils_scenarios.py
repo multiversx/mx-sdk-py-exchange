@@ -1,8 +1,7 @@
 from multiversx_sdk import ProxyNetworkProvider, ApiNetworkProvider
 from utils.utils_chain import Account, WrapperAddress as Address, get_all_token_nonces_details_for_account, get_token_details_for_address
 from multiprocessing.dummy import Pool
-from multiversx_sdk.network_providers.interface import IPagination
-from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
+from multiversx_sdk import TransactionOnNetwork
 from utils.logger import get_logger
 from typing import List, Tuple
 
@@ -57,7 +56,7 @@ class FetchedUsers:
     def __repr__(self) -> str:
         return self.__str__()
 
-class Pagination(IPagination):
+class Pagination:
     def __init__(self, start: int, size: int) -> None:
         self.start = start
         self.size = size
@@ -68,6 +67,12 @@ class Pagination(IPagination):
     def get_size(self) -> int:
         return self.size
     
+    def get_pagination_dict(self) -> dict[str, int]:
+        return {
+            "from": self.start,
+            "size": self.size
+        }
+    
 
 def collect_farm_contract_users(users_count: int, 
                                 contract_address: str, farming_token: str, farm_token: str, 
@@ -76,7 +81,8 @@ def collect_farm_contract_users(users_count: int,
                                 users_pagination_start: int = 0) -> FetchedUsers:
     logger.info(f'Collecting users from farm contract {contract_address} ...')
 
-    transactions = source_api.get_account_transactions(Address(contract_address), Pagination(users_pagination_start, users_count))
+    pagination = Pagination(users_pagination_start, users_count)
+    transactions = source_api.get_transactions(Address(contract_address), pagination.get_pagination_dict())
 
     fetched_users = FetchedUsers()
     set_users = set()

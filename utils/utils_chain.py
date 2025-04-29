@@ -11,9 +11,6 @@ from multiversx_sdk import (Address, AddressComputer, Message, MessageComputer,
                             ProxyNetworkProvider, Transaction,
                             TransactionComputer, UserSigner)
 from multiversx_sdk.wallet.pem_entry import PemEntry
-from multiversx_sdk.core.interfaces import ISignature
-from multiversx_sdk.network_providers.tokens import (
-    FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork)
 
 from utils import utils_generic
 from utils.logger import get_logger
@@ -69,12 +66,12 @@ class Account:
         else:
             raise Exception("Account.address is not set.")
 
-    def sign_transaction(self, transaction: Transaction) -> ISignature:
+    def sign_transaction(self, transaction: Transaction) -> bytes:
         assert self.signer is not None
         tx_computer = TransactionComputer()
         return self.signer.sign(tx_computer.compute_bytes_for_signing(transaction))
     
-    def sign_message(self, data: bytes) -> ISignature:
+    def sign_message(self, data: bytes) -> bytes:
         assert self.signer is not None
         message = Message(data)
         msg_computer = MessageComputer()
@@ -184,39 +181,39 @@ def prevent_spam_crash_elrond_proxy_go():
     time.sleep(1)
 
 
-def hex_to_base64(s):
+def hex_to_base64(s: str) -> str:
     return base64.b64encode(s.encode('hex'))
 
 
-def base64_to_hex(b):
+def base64_to_hex(b: str) -> str:
     return base64.b64decode(b).hex()
 
 
-def string_to_base64(s):
+def string_to_base64(s: str) -> str:
     return base64.b64encode(s.encode('utf-8'))
 
 
-def base64_to_string(b):
+def base64_to_string(b: str) -> str:
     return base64.b64decode(b).decode('utf-8')
 
 
-def denominated_amount(amount):
+def denominated_amount(amount: int) -> int:
     return amount / 1000000000000000000
 
 
-def nominated_amount(amount):
+def nominated_amount(amount: int) -> int:
     return amount * 1000000000000000000
 
 
-def dec_to_padded_hex(i):
+def dec_to_padded_hex(i: int) -> str:
     return "0" + f"{i:x}" if len(f"{i:x}") % 2 else f"{i:x}"
 
 
-def string_to_hex(s):
+def string_to_hex(s: str) -> str:
     return s.encode("ascii").hex()
 
 
-def hex_to_string(s):
+def hex_to_string(s: str) -> str:
     return bytearray.fromhex(s).decode("utf-8")
 
 
@@ -234,18 +231,6 @@ def _get_all_esdts_for_account(address: str, proxy: ProxyNetworkProvider):
 
     esdts = response.get('esdts')
     return esdts
-
-
-def _get_fungibles_from_esdts(items: Dict):
-    esdts = [items[key] for key in items.keys() if items[key].get('nonce', '') == '']
-    tokens = map(FungibleTokenOfAccountOnNetwork.from_http_response, esdts)
-    return tokens
-
-
-def _get_non_fungibles_from_esdts(items: Dict):
-    nfts = [items[key] for key in items.keys() if items[key].get('nonce', -1) > 0]
-    tokens = map(NonFungibleTokenOfAccountOnNetwork.from_http_response, nfts)
-    return tokens
 
 
 def get_all_token_nonces_details_for_account(in_token: str, address: str, proxy: ProxyNetworkProvider):
@@ -276,21 +261,15 @@ def get_current_tokens_for_address(address: Address, proxy: ProxyNetworkProvider
     # Went with this granular approach to reduce api calls (one call for all esdts instead
     # of two calls for fungibles and non-fungibles).
     esdts = _get_all_esdts_for_account(address.bech32(), proxy)
-    fungibles = _get_fungibles_from_esdts(esdts)
-    non_fungibles = _get_non_fungibles_from_esdts(esdts)
 
     tokens_dict = {}
-    for token in fungibles:
-        identifier = token.identifier
-        tokens_dict[identifier] = {
-            'nonce': 0,
-            'balance': token.balance,
-        }
-    for token in non_fungibles:
-        identifier = token.collection
-        tokens_dict[identifier] = {
-            'nonce': token.nonce,
-            'balance': token.balance
+
+    for token in esdts:
+        if token.get('nonce', '') == '':
+            token['nonce'] = 0
+        tokens_dict[token['identifier']] = {
+            'nonce': token['nonce'],
+            'balance': token['balance']
         }
 
     return tokens_dict
