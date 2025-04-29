@@ -180,7 +180,7 @@ def generate_energy_change_transactions(args: Any):
         
         while current_nonce < expected_nonce:
             if "localhost" in context.network_provider.proxy.url:
-                context.network_provider.proxy.do_post(f"{context.network_provider.proxy.url}/simulator/generate-blocks/{10}", {})      # TODO: remove this; only for local testing
+                context.network_provider.proxy.do_post_generic(f"{context.network_provider.proxy.url}/simulator/generate-blocks/{10}", {})      # TODO: remove this; only for local testing
             print(f"Current nonce: {current_nonce}, waiting for nonce: {expected_nonce}")
             sleep(6)
             current_nonce = context.network_provider.proxy.get_account(context.deployer_account.address).nonce
@@ -212,7 +212,7 @@ def generate_unlock_tokens_transactions(args: Any):
     default_account = Account(None, config.DEFAULT_OWNER)
     default_account.sync_nonce(network_providers.proxy)
 
-    current_epoch = network_providers.proxy.get_network_status(1).epoch_number
+    current_epoch = network_providers.proxy.get_network_status(1).current_epoch
 
     exported_accounts = read_accounts_from_json(exported_accounts_path)
     
@@ -234,7 +234,7 @@ def generate_unlock_tokens_transactions(args: Any):
         if FETCH_ON_CHAIN_TOKEN_DATA:
             # TODO: fetch on-chain token data
             def fetch_on_chain_token_data(account: ExportedAccount):
-                tokens = network_providers.proxy.get_nonfungible_tokens_of_account(Address.new_from_bech32(account.address))
+                tokens = network_providers.proxy.get_non_fungible_tokens_of_account(Address.new_from_bech32(account.address))
                 new_exported_tokens = []
                 for token in tokens:
                     exported_account_token = ExportedToken(token.collection, dec_to_padded_hex(token.nonce), token.balance, token.attributes)

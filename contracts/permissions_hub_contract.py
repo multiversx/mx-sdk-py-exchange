@@ -6,7 +6,7 @@ from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import log_step_fail, log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
-
+from multiversx_sdk.abi import AddressValue
 
 logger = get_logger(__name__)
 
@@ -113,8 +113,8 @@ class PermissionsHubContract(DEXContractInterface):
         data_fetcher = PermissionsHubContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('isWhitelisted', 
                                             [
-                                                Address(address).get_public_key(),
-                                                Address(user).get_public_key()
+                                                AddressValue.new_from_address(Address(address)),
+                                                AddressValue.new_from_address(Address(user))
                                             ])
         if not raw_results:
             return False

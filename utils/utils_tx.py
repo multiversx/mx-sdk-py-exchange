@@ -1,23 +1,21 @@
 import sys
 import time
 import traceback
+import requests
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 from multiversx_sdk import (Address, ApiNetworkProvider, GenericError,
                             ProxyNetworkProvider, Transaction)
-from multiversx_sdk.core.tokens import Token, TokenTransfer
-from multiversx_sdk.core.interfaces import ICodeMetadata
-from multiversx_sdk.core.transactions_factories import (TransactionsFactoryConfig, SmartContractTransactionsFactory,
+from multiversx_sdk import Token, TokenTransfer
+from multiversx_sdk import CodeMetadata, TransactionOnNetwork
+from multiversx_sdk import (TransactionsFactoryConfig, SmartContractTransactionsFactory,
                                                         TransferTransactionsFactory)
-from multiversx_sdk.network_providers.network_config import NetworkConfig
-from multiversx_sdk.network_providers.tokens import (
-    FungibleTokenOfAccountOnNetwork, NonFungibleTokenOfAccountOnNetwork)
-from multiversx_sdk.network_providers.transaction_events import \
-    TransactionEvent
-from multiversx_sdk.network_providers.transaction_status import \
-    TransactionStatus
-from multiversx_sdk.network_providers.transactions import TransactionOnNetwork
+from multiversx_sdk import NetworkConfig
+from multiversx_sdk import TokenAmountOnNetwork
+from multiversx_sdk import find_events_by_identifier
+from multiversx_sdk import TransactionEvent
+from multiversx_sdk import TransactionStatus
 from multiversx_sdk.abi import Abi
 from utils.logger import get_logger
 from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
@@ -65,11 +63,7 @@ class ESDTToken:
         return cls(token_transfer.token.identifier, token_transfer.token.nonce, token_transfer.amount)
 
     @classmethod
-    def from_fungible_on_network(cls, token: FungibleTokenOfAccountOnNetwork):
-        return cls(token.identifier, 0, token.balance)
-
-    @classmethod
-    def from_non_fungible_on_network(cls, token: NonFungibleTokenOfAccountOnNetwork):
+    def from_amount_on_network(cls, token: TokenAmountOnNetwork):
         return cls(token.collection, token.nonce, token.balance)
     
     @classmethod
@@ -93,11 +87,11 @@ class NetworkProviders:
         results = None
         while True:
             try:
-                results = self.api.get_transaction_status(tx_hash)
+                results = self.api.get_transaction(tx_hash).status
                 break   # if no exception, we got the results
-            except GenericError as e:
-                logger.debug(f"Transaction not found. Exception: {e.data}")
-                if e.data['statusCode'] == 404:
+            except requests.exceptions.RequestException as e:
+                logger.debug(f"Transaction not found. Exception: {e.response.json()}")
+                if e.response.status_code == 404:
                     # api didn't index the transaction yet, try again after a delay
                     logger.debug(f"Transaction {tx_hash} not indexed yet, "
                                 f"trying again in {API_TX_STATUS_REFETCH_DELAY} seconds...")
@@ -109,9 +103,9 @@ class NetworkProviders:
         if status is None:
             log_step_fail(f"Wait failed. Transaction {tx_hash} not found!")
             return None
-        while not status.is_executed():
+        while not status.is_completed:
             time.sleep(API_TX_STATUS_REFETCH_DELAY)
-            status = self.api.get_transaction_status(tx_hash)
+            status = self.api.get_transaction(tx_hash).status
             logger.debug(f"Transaction {tx_hash} status: {status.status}")
         return status
 
@@ -122,7 +116,7 @@ class NetworkProviders:
             return False
 
         status = self.wait_for_tx_executed(tx_hash)
-        if status is None or status.is_failed() or address == "":
+        if status is None or status.is_failed or address == "":
             if msg_label:
                 log_step_fail(f"FAIL: transaction for {msg_label} contract deployment failed "
                                      f"or couldn't retrieve address!")
@@ -171,7 +165,7 @@ class NetworkProviders:
             log_step_fail(f"FAIL: couldn't retrieve transaction {tx_hash} status!")
             return False
 
-        if results.is_failed():
+        if results.is_failed:
             if msg_label:
                 log_step_fail(f"Transaction to {msg_label} failed!")
             return False
@@ -252,31 +246,31 @@ class NetworkProviders:
                 return True
         return False
 
-    def wait_for_epoch(self, target_epoch, idle_time=30):
+    def wait_for_epoch(self, target_epoch: int, idle_time: int = 30):
         status = self.proxy.get_network_status()
-        while status.epoch_number < target_epoch:
+        while status.current_epoch < target_epoch:
             status = self.proxy.get_network_status
             time.sleep(idle_time)
 
-    def wait_for_nonce_in_shard(self, shard_id: int, target_nonce: int, idle_time=6):
+    def wait_for_nonce_in_shard(self, shard_id: int, target_nonce: int, idle_time: int = 6):
         status = self.proxy.get_network_status(shard_id)
-        while status.nonce < target_nonce:
+        while status.block_nonce < target_nonce:
             status = self.proxy.get_network_status(shard_id)
             time.sleep(idle_time)
 
-    def wait_epochs(self, num_epochs, idle_time=30):
+    def wait_epochs(self, num_epochs: int, idle_time: int = 30):
         status = self.proxy.get_network_status()
-        next_epoch = status.epoch_number + num_epochs
-        while status.epoch_number < next_epoch:
+        next_epoch = status.current_epoch + num_epochs
+        while status.current_epoch < next_epoch:
             status = self.proxy.get_network_status()
             time.sleep(idle_time)
 
-    def get_round(self):
+    def get_round(self) -> int:
         status = self.proxy.get_network_status(0)
         return status.current_round
 
 
-def _get_flags_from_code_metadata(code_metadata: ICodeMetadata) -> tuple[bool, bool, bool, bool]:
+def _get_flags_from_code_metadata(code_metadata: CodeMetadata) -> tuple[bool, bool, bool, bool]:
     return code_metadata.upgradeable, code_metadata.readable, code_metadata.payable, code_metadata.payable_by_contract
 
 
@@ -291,7 +285,7 @@ def _prep_args_for_addresses(args: List):
 
 
 def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
-                      gas_limit: int, contract_file: Path, code_metadata: ICodeMetadata,
+                      gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
                       args: list = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
@@ -318,7 +312,7 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
 
 
 def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_config: NetworkConfig,
-                       gas_limit: int, contract_file: Path, code_metadata: ICodeMetadata,
+                       gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
                        args: list = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     args = _prep_args_for_addresses(args)
@@ -501,7 +495,7 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
 
 
 def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
-           owner: Account, bytecode_path: str, metadata: ICodeMetadata, args: list) -> Tuple[str, str]:
+           owner: Account, bytecode_path: str, metadata: CodeMetadata, args: list) -> Tuple[str, str]:
     logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
@@ -518,7 +512,7 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
 
 
 def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
-                 owner: Account, contract: Address, bytecode_path: str, metadata: ICodeMetadata,
+                 owner: Account, contract: Address, bytecode_path: str, metadata: CodeMetadata,
                  args: list) -> str:
     logger.debug(f"Upgrade {contract_label} contract")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
@@ -534,7 +528,7 @@ def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
 def check_error_from_event(tx_result: TransactionOnNetwork) -> bool:
     searched_event_id = ["signalError", "internalVMErrors"]
     for event_id in searched_event_id:
-        error_event = tx_result.logs.find_first_or_none_event(event_id)
+        error_event = find_events_by_identifier(tx_result, event_id)
         if error_event is not None:
             return True
     return False
@@ -551,7 +545,7 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
             return None
 
         tx = proxy.get_transaction(tx_hash)
-        event = tx.logs.find_first_or_none_event(event_id)
+        event = find_events_by_identifier(tx,event_id)
 
         # if event is still not available, but the transaction was successful, try fetching again until either event is
         # available or transaction is failed
@@ -564,7 +558,7 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
                 return None
             time.sleep(API_TX_DELAY)
             tx = proxy.get_transaction(tx_hash)
-            event = tx.logs.find_first_or_none_event(event_id)
+            event = find_events_by_identifier(tx,event_id)
 
     except Exception as ex:
         logger.exception(f"Failed to get event due to: {ex}")
@@ -575,7 +569,7 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
     if "localhost" in proxy.url:
-        proxy.do_post(f"{proxy.url}/simulator/generate-blocks/1", {})
+        proxy.do_post_generic(f"{proxy.url}/simulator/generate-blocks/1", {})
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""

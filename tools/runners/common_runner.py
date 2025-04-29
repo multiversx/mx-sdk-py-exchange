@@ -3,9 +3,8 @@ from time import sleep
 from typing import Any, List
 import json
 
-from multiversx_sdk import Address, TokenPayment
-from multiversx_sdk.core.transaction_builders.transfers_builders import EGLDTransferBuilder
-from multiversx_sdk.core.transaction_builders import DefaultTransactionBuildersConfiguration
+from multiversx_sdk import Address
+from multiversx_sdk import TransactionsFactoryConfig, TransferTransactionsFactory
 from tools.contract_verifier import trigger_contract_verification
 from tools.common import API, PROXY
 from utils.utils_chain import Account, WrapperAddress
@@ -125,15 +124,17 @@ def get_default_signature() -> str:
 
     network_providers = NetworkProviders(API, PROXY)
     chain_id = network_providers.proxy.get_network_config().chain_id
-    tx_config = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    tx_config = TransactionsFactoryConfig(chain_id=chain_id)
+
     funding_account = Account(address=None, pem_file=config.DEFAULT_OWNER)
-    transaction = EGLDTransferBuilder(
-        config=tx_config,
+    factory = TransferTransactionsFactory(tx_config)
+    transaction = factory.create_transaction_for_native_token_transfer(
         sender=funding_account.address,
         receiver=funding_account.address,
-        payment=TokenPayment.egld_from_amount(0.001),
-        nonce=funding_account.nonce,
-    ).build()
+        native_amount=0.001,
+    )
+    transaction.nonce = funding_account.nonce
+
     return funding_account.sign_transaction(transaction)
 
 
@@ -142,9 +143,9 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
 
     network_providers = NetworkProviders(API, PROXY)
     chain_id = network_providers.proxy.get_network_config().chain_id
-    tx_config = DefaultTransactionBuildersConfiguration(chain_id=chain_id)
+    tx_config = TransactionsFactoryConfig(chain_id=chain_id)
     funding_account = Account(address=None, pem_file=config.DEFAULT_OWNER)
-    funding_account.address = WrapperAddress.from_bech32(config.SHADOWFORK_FUNDING_ADDRESS)
+    funding_account.address = WrapperAddress.new_from_bech32(config.SHADOWFORK_FUNDING_ADDRESS)
     funding_account.sync_nonce(network_providers.proxy)
     signature = get_default_signature()
 
@@ -155,13 +156,13 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
             continue
 
         # print(f"Funding account {account.address} of {index}/{len(accounts)}")
-        transaction = EGLDTransferBuilder(
-            config=tx_config,
+        factory = TransferTransactionsFactory(tx_config)
+        transaction = factory.create_transaction_for_native_token_transfer(
             sender=funding_account.address,
-            receiver=Address.from_bech32(account.address),
-            payment=TokenPayment.egld_from_amount(0.01),
-            nonce=funding_account.nonce,
-        ).build()
+            receiver=Address.new_from_bech32(account.address),
+            native_amount=0.01,
+        )
+        transaction.nonce = funding_account.nonce
         transaction.signature = signature
         transactions.append(transaction)
         funding_account.nonce += 1

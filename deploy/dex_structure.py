@@ -1829,8 +1829,8 @@ class DeployStructure:
             simple_lock_sc_address = deployed_simple_lock.address
             # start_block = dex_infra.extended_proxy.get_round() + 10
             deployer_shard = deployer_account.address.get_shard()
-            start_block = network_providers.proxy.get_network_status(deployer_shard).nonce + 10
-            unlock_epoch = network_providers.proxy.get_network_status(deployer_shard).epoch_number + 1
+            start_block = network_providers.proxy.get_network_status(deployer_shard).block_nonce + 10
+            unlock_epoch = network_providers.proxy.get_network_status(deployer_shard).current_epoch + 1
             phase_time = 50
 
             launched_token = self.tokens[config_pd_pool['launched_token']]

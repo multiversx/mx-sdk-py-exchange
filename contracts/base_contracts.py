@@ -4,6 +4,7 @@
 
 from utils.logger import get_logger
 from multiversx_sdk import ProxyNetworkProvider
+from multiversx_sdk.abi import AddressValue, U64Value
 from contracts.contract_identities import DEXContractInterface
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from utils.utils_generic import log_unexpected_args
@@ -21,7 +22,7 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     
     def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [Address(user_address).get_public_key()])
+        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [AddressValue.new_from_address(Address(user_address))])
         if not raw_results:
             return 0
         user_farm_position = int(raw_results)
@@ -84,7 +85,7 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     
     def get_user_energy_for_week(self, user_address: str, proxy: ProxyNetworkProvider, week: int) -> Dict[str, Any]:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [Address(user_address).get_public_key(), week])
+        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [AddressValue.new_from_address(Address(user_address)), U64Value(week)])
         if not raw_results:
             return {}
         user_energy_for_week = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
@@ -93,7 +94,7 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     
     def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [Address(user_address).get_public_key()])
+        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [AddressValue.new_from_address(Address(user_address))])
         if not raw_results:
             return 0
         week = int(raw_results)
@@ -102,7 +103,7 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     
     def get_current_claim_progress_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentClaimProgress', [Address(user_address).get_public_key()])
+        raw_results = data_fetcher.get_data('getCurrentClaimProgress', [AddressValue.new_from_address(Address(user_address))])
         if not raw_results:
             return {}
         response = decode_merged_attributes(raw_results, decoding_structures.USER_CLAIM_PROGRESS)
@@ -111,42 +112,42 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     
     def get_farm_supply_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFarmSupplyForWeek', [week])
+        raw_results = data_fetcher.get_data('getFarmSupplyForWeek', [U64Value(week)])
         if not raw_results:
             return 0
         return int(raw_results)
     
     def get_total_locked_tokens_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalLockedTokensForWeek', [week])
+        raw_results = data_fetcher.get_data('getTotalLockedTokensForWeek', [U64Value(week)])
         if not raw_results:
             return 0
         return int(raw_results)
     
     def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [week])
+        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [U64Value(week)])
         if not raw_results:
             return 0
         return int(raw_results)
     
     def get_total_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalRewardsForWeek', [week])
+        raw_results = data_fetcher.get_data('getTotalRewardsForWeek', [U64Value(week)])
         if not raw_results:
             return 0
         return int(raw_results)
     
     def get_remaining_boosted_rewards_to_distribute(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getRemainingBoostedRewardsToDistribute', [week])
+        raw_results = data_fetcher.get_data('getRemainingBoostedRewardsToDistribute', [U64Value(week)])
         if not raw_results:
             return 0
         return int(raw_results)
     
     def get_undistributed_boosted_rewards(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUndistributedBoostedRewards', [week])
+        raw_results = data_fetcher.get_data('getUndistributedBoostedRewards', [U64Value(week)])
         if not raw_results:
             return 0
         return int(raw_results)
@@ -285,7 +286,7 @@ class BaseSCWhitelistContract(DEXContractInterface, ABC):
     
     def is_contract_whitelisted(self, address: str, proxy: ProxyNetworkProvider) -> bool:
         data_fetcher = BaseContractWhitelistDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('isSCAddressWhitelisted', [Address(address).get_public_key()])
+        raw_results = data_fetcher.get_data('isSCAddressWhitelisted', [AddressValue.new_from_address(Address(address))])
         if not raw_results:
             return False
         return bool(raw_results)

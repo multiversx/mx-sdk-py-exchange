@@ -1,7 +1,7 @@
 import sys
 import traceback
 
-from multiversx_sdk import Address, ContractQueryBuilder, ProxyNetworkProvider
+from multiversx_sdk import Address, ProxyNetworkProvider, SmartContractController
 
 from utils.logger import get_logger
 from utils.utils_chain import base64_to_hex
@@ -24,13 +24,12 @@ class DataFetcher:
             raise ValueError(f"View name not registered in {type(self).__name__}")
 
     def _query_contract(self, view_name: str, attrs: List[Any] = []):
-        builder = ContractQueryBuilder(
-            contract=self.contract_address,
+        controller = SmartContractController(self.proxy.get_network_config().chain_id,self.proxy, self.contract_address)
+        query = controller.create_query(
             function=view_name,
-            call_arguments=attrs
+            arguments=attrs
         )
-        query = builder.build()
-        return self.proxy.query_contract(query)
+        return controller.run_query(query)
 
     def _get_int_view(self, view_name: str, attrs: List[Any]) -> int:
         result = None

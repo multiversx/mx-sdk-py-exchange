@@ -210,7 +210,7 @@ def get_current_shard_chronology(proxy: ProxyNetworkProvider, shard: int = None)
     # TODO: not sure if timestamp is necessary as well
     response = proxy.get_network_status(shard)
     response_dict = {
-        "epoch": response.epoch_number,
+        "epoch": response.current_epoch,
         "round": response.current_round,
         "block": response.highest_final_nonce
     }
@@ -299,7 +299,7 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
     context_tokens = get_context_used_tokens(context)
 
     try:
-        user_tokens = proxy.get_nonfungible_tokens_of_account(WrapperAddress(address))
+        user_tokens = proxy.get_non_fungible_tokens_of_account(WrapperAddress(address))
     except Exception as e:
         logger.error(f"Error fetching non-fungible tokens of account {address}: {e}")
         logger.error("System account state for this account will not be retrieved.")
@@ -312,7 +312,7 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
 
         if not token.collection in context_tokens:
             continue
-        sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_non_fungible_on_network(token), block_number)
+        sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_amount_on_network(token), block_number)
         sys_account_keys.update(sys_account_token_attributes)
     print() # new line after progress bar
 

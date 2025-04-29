@@ -8,7 +8,7 @@ from utils.utils_tx import multi_esdt_endpoint_call, endpoint_call, deploy, upgr
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
-
+from multiversx_sdk.abi import AddressValue
 import config
 
 
@@ -583,7 +583,7 @@ class SimpleLockEnergyContract(DEXContractInterface):
 
     def get_energy_for_user(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
         data_fetcher = SimpleLockEnergyContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getEnergyEntryForUser', [Address(user_address).get_public_key()])
+        raw_results = data_fetcher.get_data('getEnergyEntryForUser', [AddressValue.new_from_address(Address(user_address))])
         if not raw_results:
             return {}
         energy_entry_user = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
