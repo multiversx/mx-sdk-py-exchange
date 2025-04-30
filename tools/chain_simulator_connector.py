@@ -309,7 +309,7 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
     for token in user_tokens:
         print(f"\rProcessing token {user_tokens.index(token) + 1}/{len(user_tokens)}", end="", flush=True) # this can take a while depending on the number of tokens
 
-        if not token.collection in context_tokens:
+        if not token.token.identifier in context_tokens:
             continue
         sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_amount_on_network(token), block_number)
         sys_account_keys.update(sys_account_token_attributes)

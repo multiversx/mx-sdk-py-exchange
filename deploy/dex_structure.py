@@ -78,7 +78,7 @@ class ContractStructure:
 
         return contracts_list
 
-    def get_deployed_contract_by_address(self, address: str) -> DEXContractInterface or None:
+    def get_deployed_contract_by_address(self, address: str) -> Optional[DEXContractInterface]:
         found_contract = None
         for contract in self.deployed_contracts:
             if contract.address == address:
@@ -87,7 +87,7 @@ class ContractStructure:
 
         return found_contract
 
-    def get_deployed_contract_by_index(self, index: int) -> DEXContractInterface or None:
+    def get_deployed_contract_by_index(self, index: int) -> Optional[DEXContractInterface]:
         if index+1 > len(self.deployed_contracts):
             return None
         return self.deployed_contracts[index]

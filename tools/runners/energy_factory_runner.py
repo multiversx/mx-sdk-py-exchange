@@ -5,7 +5,7 @@ from typing import Any, List
 import json
 import config
 from context import Context
-from multiversx_sdk.core.transactions_factories import TransactionsFactoryConfig, SmartContractTransactionsFactory
+from multiversx_sdk import TransactionsFactoryConfig, SmartContractTransactionsFactory
 from multiversx_sdk import Address
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.locked_asset_contract import LockedAssetContract
@@ -17,7 +17,7 @@ from tools.runners.common_runner import ExportedAccount, ExportedToken, add_gene
 
 from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
-from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, string_to_hex, dec_to_padded_hex
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, string_to_hex, dec_to_padded_hex, hex_to_base64
 from utils.decoding_structures import XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES
 
 
@@ -237,7 +237,7 @@ def generate_unlock_tokens_transactions(args: Any):
                 tokens = network_providers.proxy.get_non_fungible_tokens_of_account(Address.new_from_bech32(account.address))
                 new_exported_tokens = []
                 for token in tokens:
-                    exported_account_token = ExportedToken(token.collection, dec_to_padded_hex(token.nonce), token.balance, token.attributes)
+                    exported_account_token = ExportedToken(token.token.identifier, dec_to_padded_hex(token.token.nonce), token.amount, hex_to_base64(token.attributes.hex()))
                     new_exported_tokens.append(exported_account_token)
                 account.account_tokens_supply = new_exported_tokens
                 return account
