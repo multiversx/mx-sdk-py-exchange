@@ -319,7 +319,7 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
                       gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
                       args: list = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
-    args = _prep_legacy_args(args)
+
     logger.debug(f"Deploy arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
 
@@ -329,7 +329,7 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
         deployer.address,
         contract_file.read_bytes(),
         gas_limit,
-        args,
+        _prep_legacy_args(args),
         native_transfer_amount=0,
         is_upgradeable=upgradeable,
         is_readable=readable,
@@ -346,7 +346,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
                        gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
                        args: list = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
-    args = _prep_legacy_args(args)
+
     logger.debug(f"Upgrade arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
 
@@ -357,7 +357,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
         contract_address,
         contract_file.read_bytes(),
         gas_limit,
-        args,
+        _prep_legacy_args(args),
         native_transfer_amount=0,
         is_upgradeable=upgradeable,
         is_readable=readable,
@@ -375,7 +375,7 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
                              function: str, args: list, value: int = 0, abi: Abi = None) -> Transaction:
 
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
-    args = _prep_legacy_args(args)
+    
     logger.debug(f"Contract call arguments: {args}")
     if(abi is not None):
         factory = SmartContractTransactionsFactory(config, abi)
@@ -387,7 +387,7 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
         contract_address,
         function,
         gas_limit,
-        args,
+        _prep_legacy_args(args),
         int(value)
     )
     tx.nonce = deployer.nonce
@@ -402,7 +402,7 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
                                                      value: int = 0) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     payment_tokens = [token.to_token_transfer() for token in tokens]
-    endpoint_args = _prep_legacy_args(endpoint_args)
+    
     logger.debug(f"Contract call arguments: {endpoint_args}")
 
     factory = SmartContractTransactionsFactory(config)
@@ -411,7 +411,7 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
         contract_address,
         endpoint,
         gas_limit,
-        endpoint_args,
+        _prep_legacy_args(endpoint_args),
         int(value),
         payment_tokens
     )

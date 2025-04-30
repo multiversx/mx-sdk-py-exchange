@@ -4,8 +4,7 @@ from contracts.simple_lock_contract import SimpleLockContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
 from tools.runners.common_runner import add_upgrade_command
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash, hex_to_string
-from utils.contract_data_fetchers import ProxyContractDataFetcher
+from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
 from utils.utils_generic import get_file_from_url_or_path
 import config
 

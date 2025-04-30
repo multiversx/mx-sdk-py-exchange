@@ -4,20 +4,20 @@ import json
 import os
 from time import sleep
 from typing import Any
-from multiversx_sdk.core.transactions_factories import SmartContractTransactionsFactory, TransactionsFactoryConfig
+from multiversx_sdk import SmartContractTransactionsFactory, TransactionsFactoryConfig
 from multiversx_sdk import Address
 from config import GRAPHQL
 from context import Context
 from contracts.contract_identities import FarmContractVersion
 from contracts.farm_contract import FarmContract
 from contracts.simple_lock_contract import SimpleLockContract
-from events.farm_events import EnterFarmEvent
+from events.farm_events import EnterFarmEvent, ExitFarmEvent
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
 from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
 from utils.contract_data_fetchers import FarmContractDataFetcher, SimpleLockContractDataFetcher
-from utils.utils_tx import ESDTToken, NetworkProviders
+from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, hex_to_string
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
 from tools.runners.common_config import FARM_BOOSTED_YIELD_FACTORS
@@ -590,7 +590,7 @@ def generate_unstake_farm_tokens_transaction(args: Any):
                     Address.new_from_bech32(farm_address),
                     "exitFarm",
                     75000000,
-                    [1, 1, event.amount],
+                    _prep_legacy_args([1, 1, event.amount]),
                     0,
                     payment_tokens
                 )

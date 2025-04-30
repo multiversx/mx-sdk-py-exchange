@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 from typing import Any
 from context import Context
-from contracts.contract_identities import FarmContractVersion, ProxyContractVersion
 from contracts.dex_proxy_contract import DexProxyContract, DexProxyExitFarmEvent
 from contracts.farm_contract import FarmContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
