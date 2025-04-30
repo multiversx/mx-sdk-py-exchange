@@ -1,9 +1,11 @@
 import sys
 import time
 import traceback
+from multiversx_sdk.abi.typesystem import is_list_of_typed_values
+from multiversx_sdk.core.constants import INTEGER_MAX_NUM_BYTES
 import requests
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Protocol, Sequence, Tuple, Union
 
 from multiversx_sdk import (Address, ApiNetworkProvider, ProxyNetworkProvider, Transaction)
 from multiversx_sdk import Token, TokenTransfer
@@ -17,6 +19,7 @@ from multiversx_sdk import TransactionEvent
 from multiversx_sdk import TransactionStatus
 from multiversx_sdk.abi import Abi
 from utils.logger import get_logger
+from utils.errors import GenericError
 from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
                                  log_unexpected_args, split_to_chunks, get_file_from_url_or_path)
@@ -28,6 +31,11 @@ API_TX_DELAY = 3
 API_LONG_TX_DELAY = 6
 API_TX_STATUS_REFETCH_DELAY = 2
 MAX_TX_FETCH_RETRIES = 50 // API_TX_DELAY
+
+
+class IArgument(Protocol):
+    def serialize(self) -> bytes:
+        ...
 
 
 class ESDTToken:
@@ -63,7 +71,7 @@ class ESDTToken:
 
     @classmethod
     def from_amount_on_network(cls, token: TokenAmountOnNetwork):
-        return cls(token.collection, token.nonce, token.balance)
+        return cls(token.token.identifier, token.token.nonce, token.amount)
     
     @classmethod
     def from_full_token_name(cls, token_name: str):
@@ -88,9 +96,9 @@ class NetworkProviders:
             try:
                 results = self.api.get_transaction(tx_hash).status
                 break   # if no exception, we got the results
-            except requests.exceptions.RequestException as e:
-                logger.debug(f"Transaction not found. Exception: {e.response.json()}")
-                if e.response.status_code == 404:
+            except GenericError as e:
+                logger.debug(f"Transaction not found. Exception: {e.data}")
+                if e.data['statusCode'] == 404:
                     # api didn't index the transaction yet, try again after a delay
                     logger.debug(f"Transaction {tx_hash} not indexed yet, "
                                 f"trying again in {API_TX_STATUS_REFETCH_DELAY} seconds...")
@@ -273,21 +281,45 @@ def _get_flags_from_code_metadata(code_metadata: CodeMetadata) -> tuple[bool, bo
     return code_metadata.upgradeable, code_metadata.readable, code_metadata.payable, code_metadata.payable_by_contract
 
 
-def _prep_args_for_addresses(args: List):
-    # TODO: remove this when the SDK supports bech32 addresses... or refactor the thing entirely
-    new_args = []
-    for item in args:
-        if type(item) is str and "erd" in item:
-            item = WrapperAddress(item)
-        new_args.append(item)
-    return new_args
+def encode_unsigned_number(arg: int) -> bytes:
+    return arg.to_bytes(INTEGER_MAX_NUM_BYTES, byteorder="big", signed=False).lstrip(bytes([0]))
+
+
+def encode_signed_number(arg: int) -> bytes:
+    if arg == 0:
+        return b''
+    length = ((arg + (arg < 0)).bit_length() + 7 + 1) // 8
+    return arg.to_bytes(length, byteorder="big", signed=True)
+
+
+def _arg_to_buffer(arg: Any) -> bytes:
+    if isinstance(arg, str):
+        return arg.encode("utf-8")
+    if isinstance(arg, int):
+        if arg < 0:
+            return encode_signed_number(arg)
+        return encode_unsigned_number(arg)
+    if isinstance(arg, Address):
+        return arg.get_public_key()
+    if isinstance(arg, IArgument):
+        return arg.serialize()
+    return arg
+
+
+def _args_to_buffers(args: Sequence[Any]) -> List[bytes]:
+    return [_arg_to_buffer(arg) for arg in args]
+
+
+def _prep_legacy_args(args: List):
+    # This is now an important piece of code, as it's used to serialize the old untyped arguments without changing EVERYTHING
+    return _args_to_buffers(args)
 
 
 def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
                       gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
                       args: list = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
-    args = _prep_args_for_addresses(args)
+    args = _prep_legacy_args(args)
     logger.debug(f"Deploy arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
 
@@ -314,7 +346,7 @@ def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_con
                        gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
                        args: list = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
-    args = _prep_args_for_addresses(args)
+    args = _prep_legacy_args(args)
     logger.debug(f"Upgrade arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
 
@@ -343,7 +375,7 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
                              function: str, args: list, value: int = 0, abi: Abi = None) -> Transaction:
 
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
-    args = _prep_args_for_addresses(args)
+    args = _prep_legacy_args(args)
     logger.debug(f"Contract call arguments: {args}")
     if(abi is not None):
         factory = SmartContractTransactionsFactory(config, abi)
@@ -370,7 +402,7 @@ def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, 
                                                      value: int = 0) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     payment_tokens = [token.to_token_transfer() for token in tokens]
-    endpoint_args = _prep_args_for_addresses(endpoint_args)
+    endpoint_args = _prep_legacy_args(endpoint_args)
     logger.debug(f"Contract call arguments: {endpoint_args}")
 
     factory = SmartContractTransactionsFactory(config)
@@ -536,10 +568,10 @@ def check_error_from_event(tx_result: TransactionOnNetwork) -> bool:
 def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) -> Union[TransactionEvent, None]:
     try:
         time.sleep(API_TX_DELAY)
-        while not proxy.get_transaction_status(tx_hash).is_executed():
+        while not proxy.get_transaction_status(tx_hash).is_completed:
             time.sleep(6)
 
-        if not proxy.get_transaction_status(tx_hash).is_successful():
+        if not proxy.get_transaction_status(tx_hash).is_successful:
             logger.debug(f"Transaction {tx_hash} failed.")
             return None
 
