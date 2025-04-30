@@ -27,7 +27,7 @@ class Context:
 
         if "shadowfork" in config.DEFAULT_PROXY and config.SF_DEX_REFERENCE_ADDRESS:
             # get owner of the SF reference contract
-            owner = self.network_provider.proxy.get_account(Address(config.SF_DEX_REFERENCE_ADDRESS)).owner_address.to_bech32()
+            owner = self.network_provider.proxy.get_account(Address(config.SF_DEX_REFERENCE_ADDRESS)).contract_owner_address.to_bech32()
             print(f"Shadowfork detected. Owner: {owner}")
 
             config.DEX_OWNER_ADDRESS = owner if not config.DEX_OWNER_ADDRESS else config.DEX_OWNER_ADDRESS

@@ -199,7 +199,7 @@ def get_retrieve_block(proxy: ProxyNetworkProvider, shard: int, block: int) -> i
     if block_number == 0:
         # get last block number
         response = proxy.get_network_status(shard)
-        block_number = response.highest_final_nonce
+        block_number = response.highest_final_block_nonce
     
     return block_number
 
@@ -211,7 +211,7 @@ def get_current_shard_chronology(proxy: ProxyNetworkProvider, shard: int = None)
     response_dict = {
         "epoch": response.current_epoch,
         "round": response.current_round,
-        "block": response.highest_final_nonce
+        "block": response.highest_final_block_nonce
     }
 
     return response_dict
