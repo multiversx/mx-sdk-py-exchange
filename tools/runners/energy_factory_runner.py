@@ -6,7 +6,7 @@ import json
 import config
 from context import Context
 from multiversx_sdk import TransactionsFactoryConfig, SmartContractTransactionsFactory
-from multiversx_sdk import Address
+from multiversx_sdk import Address, Token
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.locked_asset_contract import LockedAssetContract
 from contracts.dex_proxy_contract import DexProxyContract
@@ -15,7 +15,7 @@ from tools.runners.common_runner import ExportedAccount, ExportedToken, add_gene
       fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json,\
         sync_account_nonce, verify_contracts, write_accounts_to_json
 
-from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx
+from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx, _prep_legacy_args
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, string_to_hex, dec_to_padded_hex, hex_to_base64
 from utils.decoding_structures import XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES
@@ -454,7 +454,8 @@ def generate_unlock_tokens_transactions(args: Any):
                 # TODO: temporary skip if the token is no longer owned by the account (already unlocked since the last snapshot)
                 if esdt_token.get_full_token_name() not in filtered_addresses[account_with_token.address]:
                     continue
-                on_chain_amount = network_providers.proxy.get_nonfungible_token_of_account(account.address, esdt_token.token_id, esdt_token.token_nonce).balance
+                searched_token = Token(esdt_token.token_id, esdt_token.token_nonce)
+                on_chain_amount = network_providers.proxy.get_token_of_account(account.address, searched_token).amount
                 if on_chain_amount == 0:
                     continue
                 esdt_token.token_amount = on_chain_amount
@@ -467,7 +468,7 @@ def generate_unlock_tokens_transactions(args: Any):
                     Address.new_from_bech32(receiver_address),
                     function_name,
                     gas_limit,
-                    args,
+                    _prep_legacy_args(args),
                     0,
                     payment_tokens
                 )

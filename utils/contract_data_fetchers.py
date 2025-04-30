@@ -1,7 +1,7 @@
 import sys
 import traceback
 
-from multiversx_sdk import Address, ProxyNetworkProvider, SmartContractController
+from multiversx_sdk import Address, ProxyNetworkProvider, SmartContractController, Token
 
 from utils.logger import get_logger
 from typing import List, Any
@@ -153,7 +153,8 @@ class PriceDiscoveryContractDataFetcher(DataFetcher):
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
-        data = self.proxy.get_token_of_account(self.contract_address, token_ticker)
+        token = Token(token_ticker)
+        data = self.proxy.get_token_of_account(self.contract_address, token)
         return data.amount
 
 
@@ -216,7 +217,8 @@ class PairContractDataFetcher(DataFetcher):
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
-        data = self.proxy.get_token_of_account(self.contract_address, token_ticker)
+        token = Token(token_ticker)
+        data = self.proxy.get_token_of_account(self.contract_address, token)
         return data.amount
 
 
@@ -241,7 +243,8 @@ class FeeCollectorContractDataFetcher(DataFetcher):
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
-        data = self.proxy.get_token_of_account(self.contract_address, token_ticker)
+        token = Token(token_ticker)
+        data = self.proxy.get_token_of_account(self.contract_address, token)
         return data.amount
 
 

@@ -306,11 +306,11 @@ def _arg_to_buffer(arg: Any) -> bytes:
     return arg
 
 
-def _args_to_buffers(args: Sequence[Any]) -> List[bytes]:
+def _args_to_buffers(args: Sequence[Any]) -> List[Any]:
     return [_arg_to_buffer(arg) for arg in args]
 
 
-def _prep_legacy_args(args: List):
+def _prep_legacy_args(args: List[Any]) -> List[Any]:
     # This is now an important piece of code, as it's used to serialize the old untyped arguments without changing EVERYTHING
     return _args_to_buffers(args)
 
