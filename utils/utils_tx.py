@@ -294,6 +294,8 @@ def encode_signed_number(arg: int) -> bytes:
 
 def _arg_to_buffer(arg: Any) -> bytes:
     if isinstance(arg, str):
+        if arg.startswith("erd1"):
+            return Address.from_bech32(arg).get_public_key()
         return arg.encode("utf-8")
     if isinstance(arg, int):
         if arg < 0:
@@ -301,8 +303,6 @@ def _arg_to_buffer(arg: Any) -> bytes:
         return encode_unsigned_number(arg)
     if isinstance(arg, Address):
         return arg.get_public_key()
-    if isinstance(arg, IArgument):
-        return arg.serialize()
     return arg
 
 
@@ -443,7 +443,7 @@ def prepare_multiesdtnfttransfer_tx(destination: Address, user: Account,
 
 def send_deploy_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
     try:
-        tx_hash = proxy.send_transaction(tx)
+        tx_hash = proxy.send_transaction(tx).hex()
         log_explorer_transaction(tx_hash, proxy.url)
     except Exception as ex:
         log_step_fail(f"Failed to deploy due to: {ex}")
@@ -455,7 +455,7 @@ def send_deploy_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
 
 def send_contract_call_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
     try:
-        tx_hash = proxy.send_transaction(tx)
+        tx_hash = proxy.send_transaction(tx).hex()
         # TODO: check if needed to wait for tx to be processed
         log_explorer_transaction(tx_hash, proxy.url)
     except Exception as ex:
@@ -576,7 +576,7 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
             return None
 
         tx = proxy.get_transaction(tx_hash)
-        event = find_events_by_identifier(tx,event_id)
+        event = find_events_by_identifier(tx,event_id)[0]
 
         # if event is still not available, but the transaction was successful, try fetching again until either event is
         # available or transaction is failed
@@ -589,7 +589,7 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
                 return None
             time.sleep(API_TX_DELAY)
             tx = proxy.get_transaction(tx_hash)
-            event = find_events_by_identifier(tx,event_id)
+            event = find_events_by_identifier(tx,event_id)[0]
 
     except Exception as ex:
         logger.exception(f"Failed to get event due to: {ex}")
@@ -624,7 +624,7 @@ def broadcast_transactions(transactions: List[Transaction], proxy: ProxyNetworkP
             logger.debug(f"sent {num_sent} instead of {len(chunk)}")
 
         chunk_index += 1
-        hashes.extend(sent_hashes)
+        hashes.extend([hash.hex() for hash in sent_hashes])
 
         if sleep is not None:
             time.sleep(sleep)

@@ -24,10 +24,10 @@ class BunchOfTracks:
 
             balance = token.amount
 
-            if token not in self.accounts_by_token:
+            if token.token.identifier not in self.accounts_by_token:
                 self.accounts_by_token[token.token.identifier] = dict()
 
-            self.accounts_by_token[token.token.identifier][address.bech32()] = balance
+            self.accounts_by_token[token.token.identifier][address.to_bech32()] = balance
 
     def put_all_tokens(self, tokens: List[str]):
         self.all_tokens = [token for token in tokens if token.startswith(self.prefix)]

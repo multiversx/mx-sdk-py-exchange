@@ -5,7 +5,7 @@ from typing import List
 import config
 from utils.logger import get_logger
 from utils.utils_chain import (Account, build_token_name, build_token_ticker)
-from multiversx_sdk import ProxyNetworkProvider, Address, TokenPayment, Transaction, TransactionsFactoryConfig, TokenManagementTransactionsFactory
+from multiversx_sdk import ProxyNetworkProvider, Transaction, TransactionsFactoryConfig, TokenManagementTransactionsFactory
 
 from utils.utils_tx import broadcast_transactions
 
@@ -43,8 +43,8 @@ def main(cli_args: List[str]):
     supply = pow(10, args.supply_exp)
     num_decimals = args.num_decimals
     prefix = args.tokens_prefix
-    logger.info("Supply: ", supply, "Decimals: ", num_decimals, "Prefix: ", prefix)
-    logger.info("Number of tokens: ", args.num_tokens)
+    logger.info(f"Supply: {supply}, Decimals: {num_decimals}, Prefix: {prefix}")
+    logger.info(f"Number of tokens: {args.num_tokens}")
 
     def issue_token():
         for i in range(0, args.num_tokens):
@@ -70,9 +70,9 @@ def main(cli_args: List[str]):
             tx.nonce = account.nonce
             tx.signature = account.sign_transaction(tx)
 
-            logger.info("Holder account: ", account.address.bech32())
-            logger.info("Token name: ", token_name)
-            logger.info("Token ticker: ", token_ticker)
+            logger.info(f"Holder account: {account.address.bech32()}")
+            logger.info(f"Token name: {token_name}")
+            logger.info(f"Token ticker: {token_ticker}")
 
             transactions.append(tx)
             account.nonce += 1
