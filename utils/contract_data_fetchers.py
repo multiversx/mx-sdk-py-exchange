@@ -23,8 +23,9 @@ class DataFetcher:
             raise ValueError(f"View name not registered in {type(self).__name__}")
 
     def _query_contract(self, view_name: str, attrs: List[Any] = []):
-        controller = SmartContractController(self.proxy.get_network_config().chain_id,self.proxy, self.contract_address)
+        controller = SmartContractController(self.proxy.get_network_config().chain_id,self.proxy)
         query = controller.create_query(
+            contract=self.contract_address,
             function=view_name,
             arguments=attrs
         )
