@@ -1,9 +1,7 @@
 import sys
 import time
 import traceback
-from multiversx_sdk.abi.typesystem import is_list_of_typed_values
 from multiversx_sdk.core.constants import INTEGER_MAX_NUM_BYTES
-import requests
 from pathlib import Path
 from typing import Any, Dict, List, Protocol, Sequence, Tuple, Union
 
@@ -18,6 +16,7 @@ from multiversx_sdk import find_events_by_identifier
 from multiversx_sdk import TransactionEvent
 from multiversx_sdk import TransactionStatus
 from multiversx_sdk.abi import Abi
+from multiversx_sdk.network_providers.errors import TransactionFetchingError
 from utils.logger import get_logger
 from utils.errors import GenericError
 from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
@@ -96,7 +95,7 @@ class NetworkProviders:
             try:
                 results = self.api.get_transaction(tx_hash).status
                 break   # if no exception, we got the results
-            except GenericError as e:
+            except (TransactionFetchingError, GenericError) as e:
                 logger.debug(f"Transaction not found. Exception: {e.data}")
                 if e.data['statusCode'] == 404:
                     # api didn't index the transaction yet, try again after a delay
@@ -317,20 +316,21 @@ def _prep_legacy_args(args: List[Any]) -> List[Any]:
 
 def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
                       gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
-                      args: list = None) -> Transaction:
+                      args: list = None, value: int = 0, abi: Abi = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
 
     logger.debug(f"Deploy arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
 
-    factory = SmartContractTransactionsFactory(config)
+    factory = SmartContractTransactionsFactory(config, abi) if abi else SmartContractTransactionsFactory(config)
+    call_args = _prep_legacy_args(args) if not abi else args
     upgradeable, readable, payable, payable_by_contract = _get_flags_from_code_metadata(code_metadata)
     tx = factory.create_transaction_for_deploy(
         deployer.address,
         contract_file.read_bytes(),
         gas_limit,
-        _prep_legacy_args(args),
-        native_transfer_amount=0,
+        call_args,
+        native_transfer_amount=value,
         is_upgradeable=upgradeable,
         is_readable=readable,
         is_payable=payable,
@@ -342,23 +342,24 @@ def prepare_deploy_tx(deployer: Account, network_config: NetworkConfig,
     return tx
 
 
-def prepare_upgrade_tx(deployer: Account, contract_address: Address, network_config: NetworkConfig,
+def prepare_upgrade_tx(contract_address: Address, deployer: Account, network_config: NetworkConfig,
                        gas_limit: int, contract_file: Path, code_metadata: CodeMetadata,
-                       args: list = None) -> Transaction:
+                       args: list = None, value: int = 0, abi: Abi = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
 
     logger.debug(f"Upgrade arguments: {args}")
     logger.debug(f"Bytecode codehash: {get_bytecode_codehash(contract_file)}")
 
-    factory = SmartContractTransactionsFactory(config)
+    factory = SmartContractTransactionsFactory(config, abi) if abi else SmartContractTransactionsFactory(config)
+    call_args = _prep_legacy_args(args) if not abi else args
     upgradeable, readable, payable, payable_by_contract = _get_flags_from_code_metadata(code_metadata)
     tx = factory.create_transaction_for_upgrade(
         deployer.address,
         contract_address,
         contract_file.read_bytes(),
         gas_limit,
-        _prep_legacy_args(args),
-        native_transfer_amount=0,
+        call_args,
+        native_transfer_amount=value,
         is_upgradeable=upgradeable,
         is_readable=readable,
         is_payable=payable,
@@ -377,17 +378,15 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     
     logger.debug(f"Contract call arguments: {args}")
-    if(abi is not None):
-        factory = SmartContractTransactionsFactory(config, abi)
-    else:
-        factory = SmartContractTransactionsFactory(config)
+    factory = SmartContractTransactionsFactory(config, abi) if abi else SmartContractTransactionsFactory(config)
+    call_args = _prep_legacy_args(args) if not abi else args
 
     tx = factory.create_transaction_for_execute(
         deployer.address,
         contract_address,
         function,
         gas_limit,
-        _prep_legacy_args(args),
+        call_args,
         int(value)
     )
     tx.nonce = deployer.nonce
@@ -399,19 +398,20 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
 def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, user: Account,
                                                      network_config: NetworkConfig, gas_limit: int,
                                                      endpoint: str, endpoint_args: list, tokens: List[ESDTToken],
-                                                     value: int = 0) -> Transaction:
+                                                     value: int = 0, abi: Abi = None) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     payment_tokens = [token.to_token_transfer() for token in tokens]
     
     logger.debug(f"Contract call arguments: {endpoint_args}")
 
-    factory = SmartContractTransactionsFactory(config)
+    factory = SmartContractTransactionsFactory(config, abi) if abi else SmartContractTransactionsFactory(config)
+    call_args = _prep_legacy_args(endpoint_args) if not abi else endpoint_args
     tx = factory.create_transaction_for_execute(
         user.address,
         contract_address,
         endpoint,
         gas_limit,
-        _prep_legacy_args(endpoint_args),
+        call_args,
         int(value),
         payment_tokens
     )
@@ -467,7 +467,7 @@ def send_contract_call_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
 
 
 def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
-                             user: Account, contract: Address, endpoint: str, args: list):
+                             user: Account, contract: Address, endpoint: str, args: list, value: int = 0, abi: Abi = None):
     """ Expected as args:
         type[List[ESDTToken]]: tokens list
         opt: type[str..]: endpoint arguments
@@ -482,7 +482,7 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
 
     ep_args = args[1:] if len(args) != 1 else []
     tx = prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract, user, network_config,
-                                                          gas, endpoint, ep_args, args[0])
+                                                          gas, endpoint, ep_args, args[0], value, abi)
     tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 
@@ -510,7 +510,7 @@ def multi_esdt_transfer(proxy: ProxyNetworkProvider, gas: int, user: Account, de
 
 
 def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract: Address, endpoint: str, args: list,
-                  value: str = "0", abi: Abi = None):
+                  value: int = 0, abi: Abi = None):
     """ Expected as args:
         opt: type[str..]: endpoint arguments
     """
@@ -526,13 +526,13 @@ def endpoint_call(proxy: ProxyNetworkProvider, gas: int, user: Account, contract
 
 
 def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
-           owner: Account, bytecode_path: str, metadata: CodeMetadata, args: list) -> Tuple[str, str]:
+           owner: Account, bytecode_path: str, metadata: CodeMetadata, args: list, value: int = 0, abi: Abi = None) -> Tuple[str, str]:
     logger.debug(f"Deploy {contract_label}")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     tx_hash, contract_address = "", ""
     processed_bytecode_path = get_file_from_url_or_path(bytecode_path)
 
-    tx = prepare_deploy_tx(owner, network_config, gas, processed_bytecode_path, metadata, args)
+    tx = prepare_deploy_tx(owner, network_config, gas, processed_bytecode_path, metadata, args, value, abi)
     tx_hash = send_deploy_tx(tx, proxy)
 
     if tx_hash:
@@ -544,12 +544,12 @@ def deploy(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
 
 def upgrade_call(contract_label: str, proxy: ProxyNetworkProvider, gas: int,
                  owner: Account, contract: Address, bytecode_path: str, metadata: CodeMetadata,
-                 args: list) -> str:
+                 args: list, value: int = 0, abi: Abi = None) -> str:
     logger.debug(f"Upgrade {contract_label} contract")
     network_config = proxy.get_network_config()     # TODO: find solution to avoid this call
     processed_bytecode_path = get_file_from_url_or_path(bytecode_path)
 
-    tx = prepare_upgrade_tx(owner, contract, network_config, gas, processed_bytecode_path, metadata, args)
+    tx = prepare_upgrade_tx(contract, owner, network_config, gas, processed_bytecode_path, metadata, args, value, abi)
     tx_hash = send_contract_call_tx(tx, proxy)
     owner.nonce += 1 if tx_hash != "" else 0
 
