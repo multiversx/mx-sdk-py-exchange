@@ -4,8 +4,7 @@ from time import sleep
 from typing import Any
 
 from multiversx_sdk import Address
-from multiversx_sdk.core.transactions_factories import SmartContractTransactionsFactory, \
-    TransactionsFactoryConfig
+from multiversx_sdk import SmartContractTransactionsFactory, TransactionsFactoryConfig
 from contracts.contract_identities import MetaStakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract
 from events.event_generators import get_lp_from_metastake_token_attributes
@@ -19,9 +18,9 @@ from tools.runners.common_runner import add_generate_transaction_command, \
     add_verify_command, verify_contracts, fund_shadowfork_accounts, \
     get_default_signature, sync_account_nonce
 from tools.runners.farm_runner import get_farm_addresses_from_chain
-from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash
-from utils.utils_tx import ESDTToken, NetworkProviders
-from utils.utils_generic import get_file_from_url_or_path
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, base64_to_hex
+from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
+from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
 
 import config
 
@@ -363,7 +362,7 @@ def generate_unstake_farm_tokens_transaction(args: Any):
                         Address.new_from_bech32(metastaking_address),
                         "unstakeFarmTokens",
                         75000000,
-                        [1, 1, farm_token_amount],
+                        _prep_legacy_args([1, 1, farm_token_amount]),
                         0,
                         payment_tokens
                     )
@@ -379,14 +378,14 @@ def generate_unstake_farm_tokens_transaction(args: Any):
                         account.address,
                         "callInternalTransferEndpoint",
                         50000000,
-                        [
+                        _prep_legacy_args([
                             token.token_name,
                             int(token.token_nonce_hex, 16),
                             int(token.supply),
                             Address.new_from_bech32(metastaking_address),
                             "unstakeFarmTokens",
                             1, 1, farm_token_amount
-                        ],
+                        ]),
                     )
                     tx.nonce = default_account.nonce
                     tx.signature = signature

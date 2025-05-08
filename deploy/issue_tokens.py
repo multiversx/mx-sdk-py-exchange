@@ -5,8 +5,7 @@ from typing import List
 import config
 from utils.logger import get_logger
 from utils.utils_chain import (Account, build_token_name, build_token_ticker)
-from multiversx_sdk import ProxyNetworkProvider, Address, TokenPayment, Transaction
-from multiversx_sdk.core.transaction_builders import ContractCallBuilder, DefaultTransactionBuildersConfiguration
+from multiversx_sdk import ProxyNetworkProvider, Transaction, TransactionsFactoryConfig, TokenManagementTransactionsFactory
 
 from utils.utils_tx import broadcast_transactions
 
@@ -36,51 +35,44 @@ def main(cli_args: List[str]):
 
     proxy = ProxyNetworkProvider(args.proxy)
     network = proxy.get_network_config()
-    builder_config = DefaultTransactionBuildersConfiguration(network.chain_id)
+    factory_config = TransactionsFactoryConfig(network.chain_id)
 
     account = Account.from_file(args.account)
     account.sync_nonce(proxy)
 
-    tokens_system_contract = Address.from_bech32(config.TOKENS_CONTRACT_ADDRESS)
-
     supply = pow(10, args.supply_exp)
     num_decimals = args.num_decimals
     prefix = args.tokens_prefix
-    logger.info("Supply: ", supply, "Decimals: ", num_decimals, "Prefix: ", prefix)
-    logger.info("Number of tokens: ", args.num_tokens)
+    logger.info(f"Supply: {supply}, Decimals: {num_decimals}, Prefix: {prefix}")
+    logger.info(f"Number of tokens: {args.num_tokens}")
 
     def issue_token():
         for i in range(0, args.num_tokens):
-            token_name, token_name_hex = build_token_name(account.address, prefix)
-            token_ticker, token_ticker_hex = build_token_ticker(account.address, prefix)
-            value = int(args.value)
+            token_name, _ = build_token_name(account.address, prefix)
+            token_ticker, _ = build_token_ticker(account.address, prefix)
 
-            builder = ContractCallBuilder(
-                config=builder_config,
-                contract=tokens_system_contract,
-                caller=account.address,
-                function_name="issue",
-                call_arguments=[
-                    token_name,
-                    token_ticker,
-                    supply,
-                    num_decimals
-                ],
-                value=TokenPayment.egld_from_integer(value)
+            factory = TokenManagementTransactionsFactory(factory_config)
+
+            tx = factory.create_transaction_for_issuing_fungible(
+                sender=account.address,
+                token_name=token_name,
+                token_ticker=token_ticker,
+                initial_supply=supply,
+                num_decimals=num_decimals,
+                can_freeze=True,
+                can_wipe=True,
+                can_pause=True,
+                can_change_owner=True,
+                can_upgrade=True,
+                can_add_special_roles=True
             )
 
-            # calculate precise gas limit
-            tx_data = builder.build_payload()
-            gas_limit = args.gas_limit or args.base_gas_limit + 50000 + 1500 * tx_data.length()
-            builder.gas_limit = gas_limit
-
-            tx = builder.build()
             tx.nonce = account.nonce
             tx.signature = account.sign_transaction(tx)
 
-            logger.info("Holder account: ", account.address.bech32())
-            logger.info("Token name: ", token_name)
-            logger.info("Token ticker: ", token_ticker)
+            logger.info(f"Holder account: {account.address.bech32()}")
+            logger.info(f"Token name: {token_name}")
+            logger.info(f"Token ticker: {token_ticker}")
 
             transactions.append(tx)
             account.nonce += 1

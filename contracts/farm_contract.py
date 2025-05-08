@@ -9,6 +9,7 @@ from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
+from multiversx_sdk.abi import AddressValue
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
                                 CompoundRewardsFarmEvent, MergePositionFarmEvent, MigratePositionFarmEvent)
@@ -499,7 +500,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
     
     def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPermissions', [Address(address).get_public_key()])
+        raw_results = data_fetcher.get_data('getPermissions', [AddressValue.new_from_address(Address(address))])
         if not raw_results:
             return -1
         return int(raw_results)

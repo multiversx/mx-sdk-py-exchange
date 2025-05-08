@@ -15,5 +15,5 @@ __pycache__
 /wasm
 *downloads
 *state_dump
-*states
+*states*
 docker/*

@@ -5,8 +5,8 @@ from typing import Any, List
 import json
 import config
 from context import Context
-from multiversx_sdk.core.transactions_factories import TransactionsFactoryConfig, SmartContractTransactionsFactory
-from multiversx_sdk import Address
+from multiversx_sdk import TransactionsFactoryConfig, SmartContractTransactionsFactory
+from multiversx_sdk import Address, Token
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.locked_asset_contract import LockedAssetContract
 from contracts.dex_proxy_contract import DexProxyContract
@@ -15,9 +15,9 @@ from tools.runners.common_runner import ExportedAccount, ExportedToken, add_gene
       fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json,\
         sync_account_nonce, verify_contracts, write_accounts_to_json
 
-from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx
+from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx, _prep_legacy_args
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
-from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, string_to_hex, dec_to_padded_hex
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, string_to_hex, dec_to_padded_hex, hex_to_base64
 from utils.decoding_structures import XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES
 
 
@@ -180,7 +180,7 @@ def generate_energy_change_transactions(args: Any):
         
         while current_nonce < expected_nonce:
             if "localhost" in context.network_provider.proxy.url:
-                context.network_provider.proxy.do_post(f"{context.network_provider.proxy.url}/simulator/generate-blocks/{10}", {})      # TODO: remove this; only for local testing
+                context.network_provider.proxy.do_post_generic(f"{context.network_provider.proxy.url}/simulator/generate-blocks/{10}", {})      # TODO: remove this; only for local testing
             print(f"Current nonce: {current_nonce}, waiting for nonce: {expected_nonce}")
             sleep(6)
             current_nonce = context.network_provider.proxy.get_account(context.deployer_account.address).nonce
@@ -212,7 +212,7 @@ def generate_unlock_tokens_transactions(args: Any):
     default_account = Account(None, config.DEFAULT_OWNER)
     default_account.sync_nonce(network_providers.proxy)
 
-    current_epoch = network_providers.proxy.get_network_status(1).epoch_number
+    current_epoch = network_providers.proxy.get_network_status(1).current_epoch
 
     exported_accounts = read_accounts_from_json(exported_accounts_path)
     
@@ -234,10 +234,10 @@ def generate_unlock_tokens_transactions(args: Any):
         if FETCH_ON_CHAIN_TOKEN_DATA:
             # TODO: fetch on-chain token data
             def fetch_on_chain_token_data(account: ExportedAccount):
-                tokens = network_providers.proxy.get_nonfungible_tokens_of_account(Address.new_from_bech32(account.address))
+                tokens = network_providers.proxy.get_non_fungible_tokens_of_account(Address.new_from_bech32(account.address))
                 new_exported_tokens = []
                 for token in tokens:
-                    exported_account_token = ExportedToken(token.collection, dec_to_padded_hex(token.nonce), token.balance, token.attributes)
+                    exported_account_token = ExportedToken(token.token.identifier, dec_to_padded_hex(token.token.nonce), token.amount, hex_to_base64(token.attributes.hex()))
                     new_exported_tokens.append(exported_account_token)
                 account.account_tokens_supply = new_exported_tokens
                 return account
@@ -454,7 +454,8 @@ def generate_unlock_tokens_transactions(args: Any):
                 # TODO: temporary skip if the token is no longer owned by the account (already unlocked since the last snapshot)
                 if esdt_token.get_full_token_name() not in filtered_addresses[account_with_token.address]:
                     continue
-                on_chain_amount = network_providers.proxy.get_nonfungible_token_of_account(account.address, esdt_token.token_id, esdt_token.token_nonce).balance
+                searched_token = Token(esdt_token.token_id, esdt_token.token_nonce)
+                on_chain_amount = network_providers.proxy.get_token_of_account(account.address, searched_token).amount
                 if on_chain_amount == 0:
                     continue
                 esdt_token.token_amount = on_chain_amount
@@ -467,7 +468,7 @@ def generate_unlock_tokens_transactions(args: Any):
                     Address.new_from_bech32(receiver_address),
                     function_name,
                     gas_limit,
-                    args,
+                    _prep_legacy_args(args),
                     0,
                     payment_tokens
                 )

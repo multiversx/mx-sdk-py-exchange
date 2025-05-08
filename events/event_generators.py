@@ -28,6 +28,7 @@ from utils.utils_chain import (prevent_spam_crash_elrond_proxy_go,
                                decode_merged_attributes, dec_to_padded_hex)
 from utils.utils_generic import log_step_fail
 from utils.utils_chain import Account, WrapperAddress as Address
+from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
 
 
 logger = get_logger(__name__)
@@ -52,8 +53,8 @@ def generate_add_liquidity_event(context: Context, user_account: Account, pair_c
         max_amount_a = int(amount_token_a * context.add_liquidity_max_amount)
         # should do a try except block on get equivalent
         equivalent_amount_b = contract_data_fetcher.get_data("getEquivalent",
-                                                             [tokens[0],
-                                                              max_amount_a])
+                                                             [TokenIdentifierValue(tokens[0]),
+                                                              BigUIntValue(max_amount_a)])
 
         if equivalent_amount_b <= 0 or equivalent_amount_b > amount_token_b:
             log_step_fail(f'Minimum token equivalent amount not satisfied.')
@@ -111,7 +112,7 @@ def generate_remove_liquidity_event(context: Context, user_account: Account, pai
 
         amount = random.randrange(int(amount_lp_token * context.remove_liquidity_max_amount))
         token_amounts = contract_data_fetcher.get_data("getTokensForGivenPosition",
-                                                       [amount])
+                                                       [BigUIntValue(amount)])
         decoding_schema = {
             'token_id': 'string',
             'token_nonce': 'u64',
@@ -159,8 +160,8 @@ def generate_swap_fixed_input(context: Context, user_account: Account, pair_cont
                                                   int(amount_token_a * context.swap_max_tokens_to_spend))
 
         equivalent_amount_token_b = contract_data_fetcher.get_data("getAmountOut",
-                                                                   [tokens[0],
-                                                                    amount_token_a_swapped])
+                                                                   [TokenIdentifierValue(tokens[0]),
+                                                                    BigUIntValue(amount_token_a_swapped)])
 
         if equivalent_amount_token_b <= 0:
             log_step_fail(f'Minimum token equivalent amount not satisfied. Token amount: {equivalent_amount_token_b}')
@@ -208,8 +209,8 @@ def generate_swap_fixed_output(context: Context, user_account: Account, pair_con
 
         # TODO: switch to getAmountIn
         equivalent_amount_token_b = contract_data_fetcher.get_data("getAmountOut",
-                                                                   [tokens[0],
-                                                                    amount_token_a_max])
+                                                                   [TokenIdentifierValue(tokens[0]),
+                                                                    BigUIntValue(amount_token_a_max)])
         # TODO: apply slippage on token A
         event = SwapFixedOutputEvent(
             tokens[0], amount_token_a_max, tokens[1], context.get_slippaged_below_value(equivalent_amount_token_b)

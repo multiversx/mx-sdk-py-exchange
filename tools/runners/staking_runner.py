@@ -5,8 +5,7 @@ import os
 from time import sleep
 from typing import Any
 from multiversx_sdk import Address
-from multiversx_sdk.core.transactions_factories import SmartContractTransactionsFactory, \
-    TransactionsFactoryConfig
+from multiversx_sdk import SmartContractTransactionsFactory, TransactionsFactoryConfig
 from config import GRAPHQL
 from contracts.contract_identities import StakingContractVersion
 from contracts.staking_contract import StakingContract
@@ -22,7 +21,7 @@ from tools.runners.metastaking_runner import get_metastaking_addresses_from_chai
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.utils_chain import Account, WrapperAddress
 from utils.utils_generic import split_to_chunks, get_file_from_url_or_path
-from utils.utils_tx import ESDTToken, NetworkProviders
+from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
 import config
 
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
@@ -263,9 +262,7 @@ def setup_boosted_parameters_with_energy_address(staking_addresses: list[str], e
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    energy_contract = SimpleLockEnergyContract("", "", "", "", energy_address)
     count = 1
-
     for staking_address in staking_addresses:
         print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
 
@@ -458,13 +455,13 @@ def generate_unstake_tokens_transactions(args: Any):
                         account.address,
                         "callInternalTransferEndpoint",
                         50000000,
-                        [
+                        _prep_legacy_args([
                             token.token_name,
                             int(token.token_nonce_hex, 16),
                             int(token.supply),
                             Address.new_from_bech32(staking_address),
                             function_name,
-                        ]
+                        ]),
                     )
                     tx.nonce = default_account.nonce
                     tx.signature = signature
