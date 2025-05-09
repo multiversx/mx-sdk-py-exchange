@@ -2,7 +2,7 @@ import json
 import os
 from argparse import ArgumentParser
 from typing import Dict, Any, Tuple
-from multiversx_sdk import ProxyNetworkProvider
+from multiversx_sdk import ProxyNetworkProvider, NetworkProviderConfig
 from multiversx_sdk.network_providers.errors import NetworkProviderError
 from utils.errors import GenericError
 import requests
@@ -30,7 +30,8 @@ def get_account_keys_online(address: str, proxy_url: str, block_number: int = 0,
     else:
         resource_url = f"address/{address}/keys?blockNonce={block_number}"
 
-    proxy = ProxyNetworkProvider(proxy_url)
+    network_config = NetworkProviderConfig(requests_options={"timeout": 60})
+    proxy = ProxyNetworkProvider(proxy_url, config=network_config)
     response = {}
 
     while True:
