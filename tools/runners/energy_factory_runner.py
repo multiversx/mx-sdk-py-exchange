@@ -145,6 +145,8 @@ def generate_energy_change_transactions(args: Any):
         return tx
     
     for address, energy_change in exported_accounts.items():
+        if int(energy_change) == 0:
+            continue
         current_batch.extend([address, int(energy_change), 0])
         
         if len(current_batch) >= number_of_accounts_per_tx:
