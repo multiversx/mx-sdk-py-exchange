@@ -176,7 +176,7 @@ def generate_energy_change_transactions(args: Any):
 
         num_sent, hashes = context.network_provider.proxy.send_transactions(tx_batch)
         print(f"Sent {num_sent} transactions out of {len(tx_batch)}")
-        print(f"Hashes: {hashes}")
+        print(f"Hashes: {[hash.hex() for hash in hashes]}")
         
         while current_nonce < expected_nonce:
             if "localhost" in context.network_provider.proxy.url:

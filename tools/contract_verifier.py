@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import requests
-from multiversx_sdk_core import Address
+from multiversx_sdk import Address
 
 from utils.utils_chain import Account
 from utils.errors import KnownError
