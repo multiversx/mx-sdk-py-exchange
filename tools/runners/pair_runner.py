@@ -63,6 +63,7 @@ def fetch_and_save_pairs_from_chain(_):
     print(f"Router address: {router_address}")
     router_data_fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), PROXY)
     registered_pairs = router_data_fetcher.get_data("getAllPairsManagedAddresses")
+    registered_pairs = [Address.new_from_hex(pair).to_bech32() for pair in registered_pairs]
     fetch_and_save_contracts(registered_pairs, PAIRS_LABEL, OUTPUT_PAIR_CONTRACTS_FILE)
 
 
