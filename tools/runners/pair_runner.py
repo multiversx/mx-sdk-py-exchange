@@ -128,15 +128,15 @@ def resume_pair_contracts(_):
         # resume only if the pool was active
         if contract_states[pair_address] == 1:
             tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, pair_address)
-            if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
-                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                    return
+            # if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
+            #     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            #         return
         elif contract_states[pair_address] == 2:
             pair_contract = PairContract("", "", PairContractVersion.V2, address=pair_address)
             tx_hash = pair_contract.set_active_no_swaps(dex_owner, network_providers.proxy)
-            if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
-                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                    return
+            # if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
+            #     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            #         return
         else:
             print(f"Contract {pair_address} wasn't touched" \
                   " because of initial state: {contract_states[pair_address]}")
