@@ -87,9 +87,10 @@ def pause_pair_contracts(_):
         contract_state = data_fetcher.get_data("getState")
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
-            if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
-                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                    return
+            print(tx_hash)
+            # if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
+            #     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+            #         return
         else:
             print(f"Contract {pair_address} already inactive. Current state: {contract_state}")
 
