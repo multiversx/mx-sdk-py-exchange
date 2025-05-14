@@ -31,7 +31,7 @@ def get_logger(name: str) -> logging.Logger:
 
     # console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(ScreenFormatter())
 
     # file handler

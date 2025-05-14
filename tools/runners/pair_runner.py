@@ -82,13 +82,14 @@ def pause_pair_contracts(_):
 
     # pause all the pairs
     count = 1
+    hashes = []
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         if contract_state != 0:
             tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
-            print(tx_hash)
+            hashes.append(tx_hash)
             # if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
             #     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             #         return
@@ -96,6 +97,13 @@ def pause_pair_contracts(_):
             print(f"Contract {pair_address} already inactive. Current state: {contract_state}")
 
         count += 1
+
+    print(f"Done processing {len(hashes)} pairs out of {len(pair_addresses)}")
+    print(f"Checking for success...")
+
+    for tx_hash in hashes:
+        if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
+            print(f"Failed to pause on hash: {tx_hash}")
 
 
 def resume_pair_contracts(_):
@@ -120,6 +128,7 @@ def resume_pair_contracts(_):
 
     # pause all the pairs
     count = 1
+    hashes = []
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         if pair_address not in contract_states:
@@ -128,12 +137,14 @@ def resume_pair_contracts(_):
         # resume only if the pool was active
         if contract_states[pair_address] == 1:
             tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, pair_address)
+            hashes.append(tx_hash)
             # if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
             #     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             #         return
         elif contract_states[pair_address] == 2:
             pair_contract = PairContract("", "", PairContractVersion.V2, address=pair_address)
             tx_hash = pair_contract.set_active_no_swaps(dex_owner, network_providers.proxy)
+            hashes.append(tx_hash)
             # if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
             #     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             #         return
@@ -142,6 +153,13 @@ def resume_pair_contracts(_):
                   " because of initial state: {contract_states[pair_address]}")
 
         count += 1
+
+    print(f"Done processing {len(hashes)} pairs out of {len(pair_addresses)}")
+    print(f"Checking for success...")
+
+    for tx_hash in hashes:
+        if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
+            print(f"Failed to resume on hash: {tx_hash}")
 
 
 def upgrade_pair_contracts(args: Any):
