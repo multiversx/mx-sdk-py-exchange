@@ -4,13 +4,15 @@ from multiversx_sdk import Address
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
-from contracts.pair_contract import PairContract
+from contracts.pair_contract import PairContract, SwapFixedInputEvent
 from contracts.router_contract import RouterContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue, run_graphql_query, fetch_and_save_contracts, get_saved_contract_addresses
 from tools.runners.common_runner import add_upgrade_all_command
+from utils import decoding_structures
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
+from utils.utils_chain import Account, decode_merged_attributes, hex_to_string
 from utils.utils_tx import NetworkProviders
 
 import config
@@ -49,6 +51,16 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     command_parser = contract_group.add_parser('update-fees', help='update fees percentage in all contracts command')
     command_parser.set_defaults(func=update_fees_percentage)
+
+    contract_parser = subgroup_parser.add_parser('swap', help='pairs swap commands')
+
+    contract_group = contract_parser.add_subparsers()
+
+    command_parser = contract_group.add_parser('generate-volumes', help='swap in both directions to generate volumes')
+    command_parser.add_argument('--address', type=str, help='pair address')
+    command_parser.add_argument('--firstTokenAmount', type=str, help='nominated amount for first token')
+    command_parser.add_argument('--secondTokenAmount', type=str, help='nominated amount for second token')
+    command_parser.set_defaults(func=generate_volumes)
 
     return group_parser
 
@@ -331,6 +343,38 @@ def update_fees_percentage(_):
             return
 
         count += 1
+
+
+def generate_volumes(args: Any):
+    """Generate trading volumes on a single pair"""
+
+    print('Start volume generator')
+
+    pair_address = args.address
+    network_provider = NetworkProviders(API, PROXY)
+
+    user_account = Account.from_file(config.DEFAULT_ACCOUNTS)
+
+    pair_contract = PairContract.load_contract_by_address(pair_address, PairContractVersion.V2)
+    swap_first_token_event = SwapFixedInputEvent(
+        pair_contract.firstToken,
+        int(args.firstTokenAmount),
+        pair_contract.secondToken,
+        1
+    )
+    swap_second_token_event = SwapFixedInputEvent(
+        pair_contract.secondToken,
+        int(args.secondTokenAmount),
+        pair_contract.firstToken,
+        1
+    )
+
+    for i in range(0, 100):
+        user_account.sync_nonce(network_provider.proxy)
+        swap_event = swap_second_token_event if i % 2 == 0 else swap_first_token_event
+        tx = pair_contract.swap_fixed_input(network_provider, user_account, swap_event)
+        print(f'Swap transaction hash: {tx}')
+        time.sleep(30)
 
 
 def deploy_pair_view():
