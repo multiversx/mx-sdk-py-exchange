@@ -5,6 +5,53 @@
             "number_of_tokens": 15
         },
 
+    "egld_wraps": [
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        },
+        {
+            "unlocked_asset": 1
+        }
+    ],
+
+    "router_v2": [
+        {
+            "empty": 0
+        }
+    ],
+
+    "simple_locks_energy": [
+        {
+            "base_token": 0,
+            "locked_token": "XMEX",
+            "locked_token_name": "xMEX",
+            "locked_asset_factory": 0,
+            "min_migrated_lock_epochs": 0,
+            "lock_options": [
+                360, 720, 1440
+            ],
+            "penalties": [
+                5000, 7000, 8000
+            ]
+        }
+    ],
+
+    "position_creator": [
+        {
+            "egld_wrap": 1,
+            "router_v2": 0
+        }
+    ],
+
+    "permissions_hubs": [
+        {
+            "empty": 0
+        }
+    ],
+
     "stakings_boosted": [
         {
             "staking_token": 16,
@@ -20,7 +67,9 @@
             "energy_const": 1,
             "farm_const": 0,
             "min_energy": 1,
-            "min_farm": 1000
+            "min_farm": 1000,
+            "position_creator": 0,
+            "permissions_hub": 0
         }
     ]
 }
