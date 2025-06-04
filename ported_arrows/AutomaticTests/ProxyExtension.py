@@ -20,7 +20,7 @@ class ProxyExtension(ProxyNetworkProvider):
             "funcName": function_name
         }
 
-        result = self.do_post('/vm-values/query', payload)
+        result = self.do_post_generic('/vm-values/query', payload)
         return_data = result['data']
         value = return_data['returnData']
         return value

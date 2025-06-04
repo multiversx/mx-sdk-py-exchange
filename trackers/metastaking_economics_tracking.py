@@ -13,7 +13,7 @@ from trackers.staking_economics_tracking import StakingEconomics
 from events.farm_events import EnterFarmEvent, ClaimRewardsFarmEvent, ExitFarmEvent
 from utils.utils_chain import decode_merged_attributes, base64_to_hex
 from contracts.pair_contract import PairContract, RemoveLiquidityEvent, SetCorrectReservesEvent
-
+from multiversx_sdk.abi import BigUIntValue
 
 class MetastakingEconomics(Subscriber):
     def __init__(self, contract_address: str, staking_address: str, farm_contract: FarmContract,
@@ -36,7 +36,7 @@ class MetastakingEconomics(Subscriber):
 
         farm_tk_amount = publisher.event.metastaking_tk_amount
         lp_tokens_amount = self.pair_tracker.pair_data_fetcher.get_data(
-            'updateAndGetTokensForGivenPositionWithSafePrice', [farm_tk_amount]
+            'updateAndGetTokensForGivenPositionWithSafePrice', [BigUIntValue(farm_tk_amount)]
         )
         first_token, second_token = self.__get_tokens_for_lp_amount(lp_tokens_amount)
 
@@ -117,7 +117,7 @@ class MetastakingEconomics(Subscriber):
         self.farm_tracker.exit_farm_event_tracking(publisher.user, exit_farm_event, publisher.tx_hash)
 
         lp_amount = farm_token_amount
-        token_amounts = self.pair_tracker.pair_data_fetcher.get_data("getTokensForGivenPosition", [lp_amount])
+        token_amounts = self.pair_tracker.pair_data_fetcher.get_data("getTokensForGivenPosition", [BigUIntValue(lp_amount)])
 
         decoding_schema = {
             'token_id': 'string',

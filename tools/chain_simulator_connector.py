@@ -11,9 +11,8 @@ from typing import Any, List
 from context import Context
 from contracts.contract_identities import DEXContractInterface
 import requests
-from utils.contract_data_fetchers import PairContractDataFetcher
-from utils.utils_chain import decode_merged_attributes, get_current_tokens_for_address, string_to_hex, dec_to_padded_hex
-from utils.utils_chain import WrapperAddress, Account
+from utils.utils_chain import string_to_hex
+from utils.utils_chain import WrapperAddress
 from utils.logger import get_logger
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 from tools.runners.account_state_runner import get_account_keys_online, get_account_data_online
@@ -200,7 +199,7 @@ def get_retrieve_block(proxy: ProxyNetworkProvider, shard: int, block: int) -> i
     if block_number == 0:
         # get last block number
         response = proxy.get_network_status(shard)
-        block_number = response.highest_final_nonce
+        block_number = response.highest_final_block_nonce
     
     return block_number
 
@@ -210,9 +209,9 @@ def get_current_shard_chronology(proxy: ProxyNetworkProvider, shard: int = None)
     # TODO: not sure if timestamp is necessary as well
     response = proxy.get_network_status(shard)
     response_dict = {
-        "epoch": response.epoch_number,
+        "epoch": response.current_epoch,
         "round": response.current_round,
-        "block": response.highest_final_nonce
+        "block": response.highest_final_block_nonce
     }
 
     return response_dict
@@ -299,7 +298,7 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
     context_tokens = get_context_used_tokens(context)
 
     try:
-        user_tokens = proxy.get_nonfungible_tokens_of_account(WrapperAddress(address))
+        user_tokens = proxy.get_non_fungible_tokens_of_account(WrapperAddress(address))
     except Exception as e:
         logger.error(f"Error fetching non-fungible tokens of account {address}: {e}")
         logger.error("System account state for this account will not be retrieved.")
@@ -310,9 +309,9 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
     for token in user_tokens:
         print(f"\rProcessing token {user_tokens.index(token) + 1}/{len(user_tokens)}", end="", flush=True) # this can take a while depending on the number of tokens
 
-        if not token.collection in context_tokens:
+        if not token.token.identifier in context_tokens:
             continue
-        sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_non_fungible_on_network(token), block_number)
+        sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_amount_on_network(token), block_number)
         sys_account_keys.update(sys_account_token_attributes)
     print() # new line after progress bar
 
