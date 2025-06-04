@@ -7,6 +7,7 @@ import config
 from contracts.escrow_contract import EscrowContract
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.lk_wrap_contract import LkWrapContract
+from contracts.mex_governance_contract import MEXGovernanceContract
 from contracts.position_creator_contract import PositionCreatorContract
 from contracts.locked_token_position_creator_contract import LockedTokenPositionCreatorContract
 from contracts.proxy_deployer_contract import ProxyDeployerContract
@@ -139,6 +140,7 @@ class DeployStructureArguments:
         parser.add_argument("--metastakings", action="store_true", help="Deploy clean metastakings")
         parser.add_argument("--metastakings-v2", action="store_true", help="Deploy clean metastakings v2")
         parser.add_argument("--metastakings-boosted", action="store_true", help="Deploy clean metastakings boosted")
+        parser.add_argument("--mex-governance", action="store_true", help="Deploy clean mex governance")
         parser.add_argument("--governances", action="store_true", help="Deploy clean governances")
         parser.add_argument("--position-creator", action="store_true", help="Deploy clean position_ reators")
         parser.add_argument("--locked-token-position-creator", action="store_true", help="Deploy clean locked token position creator")
@@ -240,6 +242,9 @@ class DeployStructure:
             config.METASTAKINGS_BOOSTED:
                 ContractStructure(config.METASTAKINGS_BOOSTED, MetaStakingContract, config.STAKING_PROXY_V3_BYTECODE_PATH,
                                   self.metastaking_deploy, False),
+            config.MEX_GOVERNANCE:
+                ContractStructure(config.MEX_GOVERNANCE, MEXGovernanceContract, config.MEX_GOVERNANCE_BYTECODE_PATH,
+                                  self.metastaking_deploy, False),                                  
             config.ESCROWS:
                 ContractStructure(config.ESCROWS, EscrowContract, config.ESCROW_BYTECODE_PATH,
                                   self.escrow_deploy, False),
@@ -2409,6 +2414,47 @@ class DeployStructure:
             
             deployed_contracts.append(contract)
         self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
+
+    def mex_governance_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
+        contract_structure = self.contracts[contracts_index]
+        deployed_contracts = []
+        energy_factory = self.get_deployed_contract_by_index(config.SIMPLE_LOCKS_ENERGY, 0)
+
+        num_already_deployed = len(self.contracts[contracts_index].deployed_contracts)
+        for contract_config in contract_structure.deploy_structure_list[num_already_deployed:]:
+            locking_contract: Optional[SimpleLockEnergyContract] = None
+            locking_contract = self.contracts[config.SIMPLE_LOCKS_ENERGY].get_deployed_contract_by_index(
+                contract_config.get('energy_factory', 0)
+            )
+            mex_governance_contract: Optional[MEXGovernanceContract] = None
+            mex_governance_contract = self.contracts[config.MEX_GOVERNANCE].get_deployed_contract_by_index(
+                contract_config.get('mex_governance_Contract', 0)
+            )
+            reference_emission_rate = contract_config['reference_emission_rate']
+            incentive_token = contract_config['incentive_token']
+            energy_factory_address = contract_config['energy_factory_address']
+            energy_factory.address = Address(energy_factory_address)
+
+            contract = MEXGovernanceContract(locking_contract.base_token)
+            tx_hash, contract_address = contract.contract_deploy(
+                deployer_account,
+                network_providers.proxy,
+                contract_structure.bytecode,
+                [
+                    reference_emission_rate,
+                    incentive_token,
+                    energy_factory.address
+                ]
+            )
+
+            if not network_providers.check_deploy_tx_status(tx_hash, contract_address, "mex governance contract"):
+                return
+            log_step_pass(f"MEX Governance contract address: {contract_address}")
+            contract.address = contract_address
+            
+            deployed_contracts.append(contract)
+        self.contracts[contracts_index].deployed_contracts.extend(deployed_contracts)
+
 
     def composable_tasks_deploy(self, contracts_index: str, deployer_account: Account, network_providers: NetworkProviders):
         contract_structure = self.contracts[contracts_index]

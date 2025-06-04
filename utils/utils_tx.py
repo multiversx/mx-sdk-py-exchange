@@ -374,13 +374,17 @@ def prepare_contract_call_tx(contract_address: Address, deployer: Account,
 def prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract_address: Address, user: Account,
                                                      network_config: NetworkConfig, gas_limit: int,
                                                      endpoint: str, endpoint_args: list, tokens: List[ESDTToken],
-                                                     value: int = 0) -> Transaction:
+                                                     abi: Abi = None, value: int = 0) -> Transaction:
     config = TransactionsFactoryConfig(chain_id=network_config.chain_id)
     payment_tokens = [token.to_token_transfer() for token in tokens]
     endpoint_args = _prep_args_for_addresses(endpoint_args)
     logger.debug(f"Contract call arguments: {endpoint_args}")
 
-    factory = SmartContractTransactionsFactory(config)
+    if(abi is not None):
+        factory = SmartContractTransactionsFactory(config, abi)
+    else:
+        factory = SmartContractTransactionsFactory(config)
+
     tx = factory.create_transaction_for_execute(
         user.address,
         contract_address,
@@ -442,7 +446,7 @@ def send_contract_call_tx(tx: Transaction, proxy: ProxyNetworkProvider) -> str:
 
 
 def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider, gas: int,
-                             user: Account, contract: Address, endpoint: str, args: list):
+                             user: Account, contract: Address, endpoint: str, args: list, abi: Abi = None):
     """ Expected as args:
         type[List[ESDTToken]]: tokens list
         opt: type[str..]: endpoint arguments
@@ -457,7 +461,7 @@ def multi_esdt_endpoint_call(function_purpose: str, proxy: ProxyNetworkProvider,
 
     ep_args = args[1:] if len(args) != 1 else []
     tx = prepare_multiesdtnfttransfer_to_endpoint_call_tx(contract, user, network_config,
-                                                          gas, endpoint, ep_args, args[0])
+                                                          gas, endpoint, ep_args, args[0], abi)
     tx_hash = send_contract_call_tx(tx, proxy)
     user.nonce += 1 if tx_hash != "" else 0
 

@@ -572,6 +572,34 @@ class SimpleLockEnergyContract(DEXContractInterface):
 
         return endpoint_call(proxy, 10000000, deployer, Address(self.address), "adjustUserEnergy", args)
 
+    def add_to_unlocked_token_mint_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: address
+        """
+        function_purpose = "Add to unlocked token mint whitelist"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            Address(args[0])
+        ]
+
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addToUnlockedTokenMintWhitelist", sc_args)
+    
+    def remove_from_unlocked_token_mint_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: address
+        """
+        function_purpose = "Remove from unlocked token mint whitelist"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            Address(args[0])
+        ]
+
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeFromUnlockedTokenMintWhitelist", sc_args)
+
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         self.resume(deployer, proxy)
 

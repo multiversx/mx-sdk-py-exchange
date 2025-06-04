@@ -6,7 +6,7 @@ DEFAULT_WORKSPACE = Path(__file__).parent
 # ------------ For normal operation, modify below ------------ #
 # Used net
 DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"                     # Proxy to be used for ALL operations
-DEFAULT_API = "https://devnet-api.multiversx.com"                           # API to be used for ALL operations
+DEFAULT_API = "https://devnet-api.multiversx.com"                                 # API to be used for ALL operations
 GRAPHQL = 'https://graph.xexchange.com/graphql'                              # GraphQL service; only needed for the upgrader scripts
 HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
 # TODO: try to override the default issue token price with testnet definition to tidy code up
@@ -16,6 +16,7 @@ DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.
 DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
 DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
 DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
+DEFAULT_MULTISIG_ADDRESS = ""
 
 # SF related configuration
 SF_DEX_REFERENCE_ADDRESS = "erd1qqqqqqqqqqqqqpgqq66xk9gfr4esuhem3jru86wg5hvp33a62jps2fy57p"
@@ -57,6 +58,7 @@ FARM_DEPLOYER_BYTECODE_PATH = Path().home() / "projects" / "dex" / "dex-v2" / "d
 FARM_V2_BYTECODE_PATH = DEFAULT_WORKSPACE.home() / "projects" / "dex" / "dex-v2" / "sc-dex-rs" / "output-docker" / "farm-with-locked-rewards" / "farm-with-locked-rewards.wasm"
 FARM_V3_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-sc/releases/download/v3.1.1/farm-with-locked-rewards.wasm"
 GOVERNANCE_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-sc/releases/download/v3.0.8/governance-v2.wasm"
+MEX_GOVERNANCE_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "mex-governance" / "mex-governance.wasm"
 POSITION_CREATOR_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/auto-pos-creator.wasm"
 LOCKED_TOKEN_POSITION_CREATOR_BYTECODE_PATH = "https://github.com/multiversx/mx-exchange-tools-sc/releases/download/v1.0.0-rc3/locked-token-pos-creator.wasm"
 ESCROW_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm-v3" / "lkmex-transfer.wasm"
@@ -107,6 +109,7 @@ STAKINGS_BOOSTED = "stakings_boosted"
 METASTAKINGS = "metastakings"
 METASTAKINGS_V2 = "metastakings_v2"
 METASTAKINGS_BOOSTED = "metastakings_boosted"
+MEX_GOVERNANCE = "mex_governance"
 FEES_COLLECTORS = "fees_collectors"
 GOVERNANCES = "governances"
 POSITION_CREATOR = "position_creator"
