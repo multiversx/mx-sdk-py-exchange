@@ -30,7 +30,7 @@ def main(cli_args: List[str]):
     for account in accounts.get_all():
         account.sync_nonce(proxy)
         fungibles = proxy.get_fungible_tokens_of_account(account.address)
-        nonfungibles = proxy.get_nonfungible_tokens_of_account(account.address)
+        nonfungibles = proxy.get_non_fungible_tokens_of_account(account.address)
 
         def prep_txs(payments: List[TokenPayment]):
             if len(payments) == 0:

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 
 from utils import utils_generic as utils
 from utils.utils_chain import WrapperAddress as Address
-from multiversx_sdk.network_providers.tokens import FungibleTokenOfAccountOnNetwork
+from multiversx_sdk import TokenAmountOnNetwork
 
 
 class BunchOfTracks:
@@ -17,17 +17,17 @@ class BunchOfTracks:
         self.all_tokens: List[str] = []
         self.prefix = prefix.upper()
 
-    def put_for_account(self, address: Address, tokens: List[FungibleTokenOfAccountOnNetwork]):
+    def put_for_account(self, address: Address, tokens: List[TokenAmountOnNetwork]):
         for token in tokens:
-            if not token.identifier.startswith(self.prefix):
+            if not token.token.identifier.startswith(self.prefix):
                 continue
 
-            balance = token.balance
+            balance = token.amount
 
-            if token not in self.accounts_by_token:
-                self.accounts_by_token[token.identifier] = dict()
+            if token.token.identifier not in self.accounts_by_token:
+                self.accounts_by_token[token.token.identifier] = dict()
 
-            self.accounts_by_token[token.identifier][address.bech32()] = balance
+            self.accounts_by_token[token.token.identifier][address.to_bech32()] = balance
 
     def put_all_tokens(self, tokens: List[str]):
         self.all_tokens = [token for token in tokens if token.startswith(self.prefix)]

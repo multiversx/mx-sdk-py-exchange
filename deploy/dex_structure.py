@@ -78,7 +78,7 @@ class ContractStructure:
 
         return contracts_list
 
-    def get_deployed_contract_by_address(self, address: str) -> DEXContractInterface or None:
+    def get_deployed_contract_by_address(self, address: str) -> Optional[DEXContractInterface]:
         found_contract = None
         for contract in self.deployed_contracts:
             if contract.address == address:
@@ -87,7 +87,7 @@ class ContractStructure:
 
         return found_contract
 
-    def get_deployed_contract_by_index(self, index: int) -> DEXContractInterface or None:
+    def get_deployed_contract_by_index(self, index: int) -> Optional[DEXContractInterface]:
         if index+1 > len(self.deployed_contracts):
             return None
         return self.deployed_contracts[index]
@@ -1829,8 +1829,8 @@ class DeployStructure:
             simple_lock_sc_address = deployed_simple_lock.address
             # start_block = dex_infra.extended_proxy.get_round() + 10
             deployer_shard = deployer_account.address.get_shard()
-            start_block = network_providers.proxy.get_network_status(deployer_shard).nonce + 10
-            unlock_epoch = network_providers.proxy.get_network_status(deployer_shard).epoch_number + 1
+            start_block = network_providers.proxy.get_network_status(deployer_shard).block_nonce + 10
+            unlock_epoch = network_providers.proxy.get_network_status(deployer_shard).current_epoch + 1
             phase_time = 50
 
             launched_token = self.tokens[config_pd_pool['launched_token']]

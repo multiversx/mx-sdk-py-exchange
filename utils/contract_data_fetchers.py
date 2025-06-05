@@ -1,10 +1,9 @@
 import sys
 import traceback
 
-from multiversx_sdk import Address, ContractQueryBuilder, ProxyNetworkProvider
+from multiversx_sdk import Address, ProxyNetworkProvider, SmartContractController, Token
 
 from utils.logger import get_logger
-from utils.utils_chain import base64_to_hex
 from typing import List, Any
 
 logger = get_logger(__name__)
@@ -24,60 +23,60 @@ class DataFetcher:
             raise ValueError(f"View name not registered in {type(self).__name__}")
 
     def _query_contract(self, view_name: str, attrs: List[Any] = []):
-        builder = ContractQueryBuilder(
+        controller = SmartContractController(self.proxy.get_network_config().chain_id,self.proxy)
+        query = controller.create_query(
             contract=self.contract_address,
             function=view_name,
-            call_arguments=attrs
+            arguments=attrs
         )
-        query = builder.build()
-        return self.proxy.query_contract(query)
+        return controller.run_query(query)
 
     def _get_int_view(self, view_name: str, attrs: List[Any]) -> int:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            if len(result.return_data) == 0 or result.return_data[0] == "":
+            if len(result.return_data_parts) == 0 or not result.return_data_parts[0]:
                 return 0
-            return int(base64_to_hex(result.return_data[0]), base=16)
+            return int(result.return_data_parts[0].hex(), base=16)
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
             if result:
-                logger.debug(f"Response content: {result.to_dictionary()}")
+                logger.debug(f"Response content: {result.__dict__}")
         return -1
 
     def _get_int_list_view(self, view_name: str, attrs: List[Any]) -> List[int]:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            return [int(base64_to_hex(elem), base=16) for elem in result.return_data]
+            return [int(elem.hex(), base=16) for elem in result.return_data_parts]
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
             if result:
-                logger.debug(f"Response content: {result.to_dictionary()}")
+                logger.debug(f"Response content: {result.__dict__}")
         return []
 
     def _get_hex_view(self, view_name: str, attrs: List[Any]) -> str:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            if len(result.return_data) == 0 or result.return_data[0] == "":
+            if len(result.return_data_parts) == 0 or not result.return_data_parts[0]:
                 return ""
-            return base64_to_hex(result.return_data[0])
+            return result.return_data_parts[0].hex()
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
             if result:
-                logger.debug(f"Response content: {result.to_dictionary()}")
+                logger.debug(f"Response content: {result.__dict__}")
         return ""
 
     def _get_hex_list_view(self, view_name: str, attrs: List[Any]) -> List[str]:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            return [base64_to_hex(elem) for elem in result.return_data]
+            return [elem.hex() for elem in result.return_data_parts]
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
             if result:
-                logger.debug(f"Response content: {result.to_dictionary()}")
+                logger.debug(f"Response content: {result.__dict__}")
         return []
 
 
@@ -155,8 +154,9 @@ class PriceDiscoveryContractDataFetcher(DataFetcher):
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
-        data = self.proxy.get_fungible_token_of_account(self.contract_address, token_ticker)
-        return data.balance
+        token = Token(token_ticker)
+        data = self.proxy.get_token_of_account(self.contract_address, token)
+        return data.amount
 
 
 class FarmContractDataFetcher(DataFetcher):
@@ -218,8 +218,9 @@ class PairContractDataFetcher(DataFetcher):
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
-        data = self.proxy.get_fungible_token_of_account(self.contract_address, token_ticker)
-        return data.balance
+        token = Token(token_ticker)
+        data = self.proxy.get_token_of_account(self.contract_address, token)
+        return data.amount
 
 
 class FeeCollectorContractDataFetcher(DataFetcher):
@@ -243,8 +244,9 @@ class FeeCollectorContractDataFetcher(DataFetcher):
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
-        data = self.proxy.get_fungible_token_of_account(self.contract_address, token_ticker)
-        return data.balance
+        token = Token(token_ticker)
+        data = self.proxy.get_token_of_account(self.contract_address, token)
+        return data.amount
 
 
 class StakingContractDataFetcher(DataFetcher):
@@ -380,7 +382,7 @@ class ChainDataFetcher:
             return 0
         try:
             response = self.proxy.get_transaction(txhash)
-            return response.block_nonce
+            return response.nonce
 
         except Exception as ex:
             print("Exception encountered:", ex)
@@ -390,7 +392,7 @@ class ChainDataFetcher:
     def get_current_block_nonce(self) -> int:
         try:
             response = self.proxy.get_network_status(1)
-            return response.highest_final_nonce
+            return response.block_nonce
         except Exception as ex:
             print("Exception encountered:", ex)
             traceback.print_exception(*sys.exc_info())

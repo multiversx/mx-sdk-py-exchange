@@ -30,17 +30,17 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
     for address in contract_addresses:
         contract_addr = Address.new_from_bech32(address)
         account_data = proxy.get_account(contract_addr)
-        if not account_data.code_hash:
+        if not account_data.contract_code_hash:
             print(f"Account data not found for {contract_label} {address}")
             continue
-        code_hash = base64_to_hex(account_data.code_hash)
+        code_hash = account_data.contract_code_hash.hex()
 
         if code_hash not in pairs_data:
             pairs_data[code_hash] = {
                 contract_label: [],
-                "code": account_data.code.hex()
+                "code": account_data.contract_code.hex()
             }
-            save_wasm(account_data.code.hex(), code_hash)
+            save_wasm(account_data.contract_code.hex(), code_hash)
         pairs_data[code_hash][contract_label].append(contract_addr.bech32())
 
     ensure_folder(save_path.parent)
