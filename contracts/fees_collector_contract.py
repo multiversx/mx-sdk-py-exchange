@@ -346,10 +346,42 @@ class FeesCollectorContract(BaseBoostedContract):
         gas_limit = 80000000
 
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "swapTokenToBaseToken", sc_args, abi = abi)
-
+    
+    def get_reward_tokens(self, proxy: ProxyNetworkProvider) -> list[str]:
+        """Query the contract for the list of reward tokens.
+        
+        Returns:
+            list[str]: List of reward token addresses
+        """
+        from utils.contract_data_fetchers import FeeCollectorContractDataFetcher
+        from utils.utils_chain import hex_to_string
+        
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        hex_results = data_fetcher.get_data("getRewardTokens")
+        if not hex_results:
+            return []
+            
+        return [hex_to_string(token) for token in hex_results]
+    
+    def get_known_contracts(self, proxy: ProxyNetworkProvider) -> list[str]:
+        """Query the contract for the list of reward tokens.
+        
+        Returns:
+            list[str]: List of known contract addresses
+        """
+        from utils.contract_data_fetchers import FeeCollectorContractDataFetcher
+        from utils.utils_chain import hex_to_string
+        
+        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
+        hex_results = data_fetcher.get_data("getAllKnownContracts")
+        if not hex_results:
+            return []
+            
+        return [Address.from_hex(address).to_bech32() for address in hex_results]
     
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass
 
     def print_contract_info(self):
         log_step_pass(f"Deployed fees collector contract: {self.address}")
+

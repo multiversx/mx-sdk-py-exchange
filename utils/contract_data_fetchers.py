@@ -240,7 +240,8 @@ class FeeCollectorContractDataFetcher(DataFetcher):
             "getLockEpochs": self._get_int_view,
             "getEnergyFactoryAddress": self._get_hex_view,
             "getFirstWeekStartEpoch": self._get_int_view,
-
+            "getRewardTokens": self._get_hex_list_view,
+            "getAllKnownContracts": self._get_hex_list_view,
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:

@@ -30,6 +30,7 @@ GENERATE_BLOCKS_URL = f"{SIMULATOR_URL}/simulator/generate-blocks/"
 SET_STATE_URL = f"{SIMULATOR_URL}/simulator/set-state"
 SEND_USER_FUNDS_URL = f"{SIMULATOR_URL}/transaction/send-user-funds"
 STATES_FOLDER = "states"
+BLOCKS_PER_EPOCH = 20
 
 
 def is_valid_address(address: str) -> bool:
@@ -117,7 +118,7 @@ def get_all_sc_states_in_folder(state_folder: Path) -> list[str]:
     
 
 class ChainSimulator:
-    def __init__(self, docker_path: Path):
+    def __init__(self, docker_path: Path = None):
         self.docker_path = docker_path
         self.proxy_url = SIMULATOR_URL
         self.api_url = API_URL
@@ -141,9 +142,13 @@ class ChainSimulator:
         p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
         p.wait()
 
-    def apply_states(self, states: list[dict[str, Any]]):
+    def apply_states(self, states: list[list[dict[str, Any]]]):
         for state in states:
-            requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
+            response = requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
+            if response.status_code != 200:
+                logger.error(f"Failed to apply states: {response.text}")
+                return False
+        return True
 
     def init_state_from_folder(self, state_folder: Path) -> list[str]:
         all_sc_states = get_all_sc_states_in_folder(state_folder)
@@ -167,8 +172,15 @@ class ChainSimulator:
         return response.json()
     
     def advance_epochs(self, number_of_epochs: int):
-        blocks_per_epoch = 20
-        blocks_to_advance = blocks_per_epoch * number_of_epochs
+        blocks_to_advance = BLOCKS_PER_EPOCH * number_of_epochs
+        return self.advance_blocks(blocks_to_advance)
+    
+    def advance_epochs_to_epoch(self, target_epoch: int):
+        proxy = ProxyNetworkProvider(self.proxy_url)
+        current_epoch = proxy.get_network_status().current_epoch
+        if current_epoch >= target_epoch:
+            return
+        blocks_to_advance = (target_epoch - current_epoch) * BLOCKS_PER_EPOCH
         return self.advance_blocks(blocks_to_advance)
 
     def _update_docker_compose(self, block: int, round: int, epoch: int):
