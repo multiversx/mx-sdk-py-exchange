@@ -106,7 +106,7 @@ def _create_request_signature(account: Account, contract_address: Address, reque
     raw_data_to_sign = f"{contract_address.to_bech32()}{hashed_payload}"
 
     signature_hex = account.sign_message(raw_data_to_sign.encode())
-    signature = bytes.fromhex(signature_hex)
+    signature = signature_hex
 
     return signature
 
