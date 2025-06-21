@@ -149,6 +149,9 @@ class Context:
     def get_fee_collector_contract(self, index: int):
         return self.deploy_structure.get_deployed_contract_by_index(config.FEES_COLLECTORS, index)
 
+    def get_mex_governance_contract(self, index: int):
+        return self.deploy_structure.get_deployed_contract_by_index(config.MEX_GOVERNANCE, index)
+
     def get_unlocked_farm_contract(self, index: int):
         return self.deploy_structure.get_deployed_contract_by_index(config.FARMS_UNLOCKED, index)
 

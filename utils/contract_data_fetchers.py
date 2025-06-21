@@ -89,6 +89,17 @@ class LockedAssetContractDataFetcher(DataFetcher):
         }
 
 
+class MEXGovernanceContractDataFetcher(DataFetcher):
+    def __init__(self, contract_address: Address, proxy_url: str):
+        super().__init__(contract_address, proxy_url)
+        self.view_handler_map = {
+            "getAllWeekEmissions": self._get_int_view,
+            "getEnergyFactoryAddress": self._get_hex_view,
+            "getCurrentWeek": self._get_int_view,
+            "getFirstWeekStartEpoch": self._get_int_view
+        }
+
+
 class ProxyContractDataFetcher(DataFetcher):
     def __init__(self, contract_address: Address, proxy_url: str):
         super().__init__(contract_address, proxy_url)
