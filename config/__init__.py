@@ -1,33 +1,45 @@
 from pathlib import Path
+import os
+
+# Environment configuration
+from config.environments import Environment, get_environment_config
+
+# Get environment from environment variable, default to DEVNET
+ENV_NAME = os.getenv("MX_DEX_ENV", "devnet").upper()
+CURRENT_ENV = Environment[ENV_NAME]
+
+# Load environment-specific configuration
+env_config = get_environment_config(CURRENT_ENV)
 
 HOME = Path().home()
 DEFAULT_WORKSPACE = Path(__file__).parent
 
 # ------------ For normal operation, modify below ------------ #
-# Used net
-DEFAULT_PROXY = "https://devnet-gateway.multiversx.com"                     # Proxy to be used for ALL operations
-DEFAULT_API = "https://devnet-api.multiversx.com"                           # API to be used for ALL operations
-GRAPHQL = 'https://graph.xexchange.com/graphql'                              # GraphQL service; only needed for the upgrader scripts
-HISTORY_PROXY = ""                                                          # Proxy to be used for history operations; not used for the moment
+# Used net - Load from environment configuration
+DEFAULT_PROXY = env_config["DEFAULT_PROXY"]
+DEFAULT_API = env_config["DEFAULT_API"]
+GRAPHQL = env_config["GRAPHQL"]
+HISTORY_PROXY = env_config["HISTORY_PROXY"]
 # TODO: try to override the default issue token price with testnet definition to tidy code up
-DEFAULT_ISSUE_TOKEN_PRICE = 50000000000000000                               # 0.05 EGLD - change only if different setup on nets
+DEFAULT_ISSUE_TOKEN_PRICE = env_config["DEFAULT_ISSUE_TOKEN_PRICE"]
 
-# Operation wallets
-DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / "wallets" / "C10.pem"     # Accounts to be used for user operations
-DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"         # DEX owner address
-DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / "wallets" / "C1.pem"       # DEX admin address
+# Operation wallets - Load from environment configuration
+DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_ACCOUNTS"]
+DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_OWNER"]
+DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_ADMIN"]
+DEFAULT_MULTISIG_ADDRESS = env_config["DEFAULT_MULTISIG_ADDRESS"]
 
-# SF related configuration
-SF_DEX_REFERENCE_ADDRESS = "erd1qqqqqqqqqqqqqpgqq66xk9gfr4esuhem3jru86wg5hvp33a62jps2fy57p"
-DEX_OWNER_ADDRESS = ""  # Only needed for shadowforks; will be used if reference address not set
-DEX_ADMIN_ADDRESS = ""  # Only needed for shadowforks; will be used if reference address not set
-SHADOWFORK_FUNDING_ADDRESS = ""  # Only needed for shadowforks
+# SF related configuration - Load from environment configuration
+SF_DEX_REFERENCE_ADDRESS = env_config["SF_DEX_REFERENCE_ADDRESS"]
+DEX_OWNER_ADDRESS = env_config["DEX_OWNER_ADDRESS"]
+DEX_ADMIN_ADDRESS = env_config["DEX_ADMIN_ADDRESS"]
+SHADOWFORK_FUNDING_ADDRESS = env_config["SHADOWFORK_FUNDING_ADDRESS"]
 
-# Used DEX deploy configuration
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / "deploy" / "configs-mainnet"   # Deploy configuration folder
-DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / "deploy_structure.json"  # Deploy structure - change only if needed
+# Used DEX deploy configuration - Load from environment configuration
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_CONFIG_SAVE_PATH"]
+DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / env_config["DEPLOY_STRUCTURE_JSON"]
 
-FORCE_CONTINUE_PROMPT = False                                               # Force continue prompt for all operations
+FORCE_CONTINUE_PROMPT = env_config["FORCE_CONTINUE_PROMPT"]
 
 # DEX contract bytecode paths
 EGLD_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "egld-wrap.wasm"
