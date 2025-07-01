@@ -91,6 +91,46 @@ class TestEnvironmentConfig(unittest.TestCase):
         
         self.assertIn("configs-mainnet", str(config.DEFAULT_CONFIG_SAVE_PATH))
 
+    def test_envars_override(self):
+        """Test that environment variables override config values."""
+        os.environ["DEFAULT_PROXY"] = "https://envvar-gateway.example.com"
+        import importlib
+        import config
+        importlib.reload(config)
+        
+        self.assertEqual(config.DEFAULT_PROXY, "https://envvar-gateway.example.com")
+        
+        # Clean up
+        del os.environ["DEFAULT_PROXY"]
+    
+    def test_env_file_override(self):
+        """Test that .env file overrides config values."""
+        with open(".env", "w") as f:
+            f.write("DEFAULT_PROXY=https://env-file-gateway.example.com")
+        import importlib
+        import config
+        importlib.reload(config)
+
+        self.assertEqual(config.DEFAULT_PROXY, "https://env-file-gateway.example.com")
+        
+        # Clean up
+        os.remove(".env")
+
+    def test_envars_priority_override(self):
+        """Test that environment variables and .env file override config values."""
+        os.environ["DEFAULT_PROXY"] = "https://envvar-gateway.example.com"
+        with open(".env", "w") as f:
+            f.write("DEFAULT_PROXY=https://env-file-gateway.example.com")
+        import importlib
+        import config
+        importlib.reload(config)
+
+        self.assertEqual(config.DEFAULT_PROXY, "https://envvar-gateway.example.com")
+        
+        # Clean up
+        os.remove(".env")
+        del os.environ["DEFAULT_PROXY"]
+
 def run_tests():
     """Run the test suite."""
     unittest.main(verbosity=2)
