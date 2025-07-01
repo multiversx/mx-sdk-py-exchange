@@ -1,13 +1,9 @@
 from pathlib import Path
+from .environments import EnvironmentSelector
 
-# Environment configuration
-from .environments import Environment, EnvironmentSelector, get_environment_settings
-
-# Get environment from environment variable/.env, default to DEVNET
-CURRENT_ENV = Environment[EnvironmentSelector().MX_DEX_ENV.upper()]
-
-# Load Pydantic settings instance
-env_config = get_environment_settings(CURRENT_ENV)
+# Get environment settings from environment variable/.env, default to DEVNET
+CURRENT_ENV = EnvironmentSelector().get_environment()   # only used for reporting purposes
+env_config = EnvironmentSelector().get_environment_settings()
 
 HOME = Path().home()
 DEFAULT_WORKSPACE = Path(__file__).parent.parent

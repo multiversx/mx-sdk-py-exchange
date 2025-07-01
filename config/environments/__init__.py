@@ -6,6 +6,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .base import BaseEnvironmentSettings
 
 
+class Environment(Enum):
+    MAINNET = "mainnet"
+    DEVNET = "devnet"
+    TESTNET = "testnet"
+    SHADOWFORK4 = "shadowfork4"
+    CHAINSIM = "chainsim"
+    CUSTOM = "custom"
+
+
 class EnvironmentSelector(BaseSettings):
     
     model_config = SettingsConfigDict(
@@ -20,35 +29,29 @@ class EnvironmentSelector(BaseSettings):
         description="Environment name"
     )
 
+    def get_environment(self) -> Environment:
+        return Environment[self.MX_DEX_ENV.upper()]
 
-class Environment(Enum):
-    MAINNET = "mainnet"
-    DEVNET = "devnet"
-    TESTNET = "testnet"
-    SHADOWFORK4 = "shadowfork4"
-    CHAINSIM = "chainsim"
-    CUSTOM = "custom"
-
-
-def get_environment_settings(env: Environment) -> BaseEnvironmentSettings:
-    """Get environment-specific Pydantic settings instance."""
-    if env == Environment.MAINNET:
-        from .mainnet import MainnetSettings
-        return MainnetSettings()
-    elif env == Environment.DEVNET:
-        from .devnet import DevnetSettings
-        return DevnetSettings()
-    elif env == Environment.TESTNET:
-        from .testnet import TestnetSettings
-        return TestnetSettings()
-    elif env == Environment.SHADOWFORK4:
-        from .shadowfork4 import Shadowfork4Settings
-        return Shadowfork4Settings()
-    elif env == Environment.CHAINSIM:
-        from .chainsim import ChainSimSettings
-        return ChainSimSettings()
-    elif env == Environment.CUSTOM:
-        from .custom import CustomSettings
-        return CustomSettings()
-    else:
-        raise ValueError(f"Unknown environment: {env}") 
+    def get_environment_settings(self) -> BaseEnvironmentSettings:
+        """Get environment-specific Pydantic settings instance."""
+        env = self.get_environment()
+        if env == Environment.MAINNET:
+            from .mainnet import MainnetSettings
+            return MainnetSettings()
+        elif env == Environment.DEVNET:
+            from .devnet import DevnetSettings
+            return DevnetSettings()
+        elif env == Environment.TESTNET:
+            from .testnet import TestnetSettings
+            return TestnetSettings()
+        elif env == Environment.SHADOWFORK4:
+            from .shadowfork4 import Shadowfork4Settings
+            return Shadowfork4Settings()
+        elif env == Environment.CHAINSIM:
+            from .chainsim import ChainSimSettings
+            return ChainSimSettings()
+        elif env == Environment.CUSTOM:
+            from .custom import CustomSettings
+            return CustomSettings()
+        else:
+            raise ValueError(f"Unknown environment: {env}") 
