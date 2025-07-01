@@ -95,24 +95,3 @@ class BaseEnvironmentSettings(BaseSettings):
         default=50000000000000000,
         description="Default token issue price in wei"
     )
-    
-    def to_dict(self) -> dict:
-        """Convert settings to dictionary format for backward compatibility."""
-        return {
-            "DEFAULT_PROXY": self.DEFAULT_PROXY,
-            "DEFAULT_API": self.DEFAULT_API,
-            "GRAPHQL": self.GRAPHQL,
-            "HISTORY_PROXY": self.HISTORY_PROXY,
-            "DEFAULT_OWNER": self.DEFAULT_OWNER,
-            "DEFAULT_ADMIN": self.DEFAULT_ADMIN,
-            "DEFAULT_ACCOUNTS": self.DEFAULT_ACCOUNTS,
-            "DEFAULT_MULTISIG_ADDRESS": self.DEFAULT_MULTISIG_ADDRESS,
-            "SF_DEX_REFERENCE_ADDRESS": self.SF_DEX_REFERENCE_ADDRESS,
-            "DEX_OWNER_ADDRESS": self.DEX_OWNER_ADDRESS,
-            "DEX_ADMIN_ADDRESS": self.DEX_ADMIN_ADDRESS,
-            "SHADOWFORK_FUNDING_ADDRESS": self.SHADOWFORK_FUNDING_ADDRESS,
-            "DEFAULT_CONFIG_SAVE_PATH": self.DEFAULT_CONFIG_SAVE_PATH,
-            "DEPLOY_STRUCTURE_JSON": self.DEPLOY_STRUCTURE_JSON,
-            "FORCE_CONTINUE_PROMPT": self.FORCE_CONTINUE_PROMPT,
-            "DEFAULT_ISSUE_TOKEN_PRICE": self.DEFAULT_ISSUE_TOKEN_PRICE,
-        } 
