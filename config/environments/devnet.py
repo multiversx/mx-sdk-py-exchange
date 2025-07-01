@@ -13,7 +13,3 @@ class DevnetSettings(BaseEnvironmentSettings):
     DEFAULT_ADMIN: str = "wallets/devnet-dex-owner.pem"
 
     DEFAULT_CONFIG_SAVE_PATH: str = "deploy/configs-devnet"
-
-
-# Create instance for backward compatibility
-config = DevnetSettings().to_dict() 

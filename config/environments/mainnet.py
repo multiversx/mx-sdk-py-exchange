@@ -10,7 +10,3 @@ class MainnetSettings(BaseEnvironmentSettings):
     GRAPHQL: str = "https://graph.xexchange.com/graphql"
     
     DEFAULT_CONFIG_SAVE_PATH: str = "deploy/configs-mainnet"
-
-
-# Create instance for backward compatibility
-config = MainnetSettings().to_dict() 

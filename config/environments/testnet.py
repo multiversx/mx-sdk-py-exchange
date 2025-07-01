@@ -13,7 +13,3 @@ class TestnetSettings(BaseEnvironmentSettings):
     DEFAULT_ADMIN: str = "wallets/testnet-dex-owner.pem"
 
     DEFAULT_CONFIG_SAVE_PATH: str = "deploy/configs-testnet"
-
-
-# Create instance for backward compatibility
-config = TestnetSettings().to_dict() 

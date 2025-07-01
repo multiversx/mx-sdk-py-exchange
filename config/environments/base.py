@@ -27,7 +27,7 @@ class BaseEnvironmentSettings(BaseSettings):
     )
     HISTORY_PROXY: str = Field(
         default="",
-        description="History proxy URL"
+        description="DeepHistory proxy URL (optional)"
     )
     
     # Wallet configuration
@@ -45,7 +45,7 @@ class BaseEnvironmentSettings(BaseSettings):
     )
     DEFAULT_MULTISIG_ADDRESS: str = Field(
         default="",
-        description="Multisig address"
+        description="Multisig context address"
     )
     
     # DEX configuration
@@ -93,5 +93,5 @@ class BaseEnvironmentSettings(BaseSettings):
 
     DEFAULT_ISSUE_TOKEN_PRICE: int = Field(
         default=50000000000000000,
-        description="Default token issue price in wei"
+        description="Default token issue price"
     )
