@@ -1,5 +1,25 @@
 from enum import Enum
-from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .base import BaseEnvironmentSettings
+
+
+class EnvironmentSelector(BaseSettings):
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    MX_DEX_ENV: str = Field(
+        default="devnet",
+        description="Environment name"
+    )
+
 
 class Environment(Enum):
     MAINNET = "mainnet"
@@ -9,20 +29,26 @@ class Environment(Enum):
     CHAINSIM = "chainsim"
     CUSTOM = "custom"
 
-def get_environment_config(env: Environment):
-    """Get environment-specific configuration based on the environment enum."""
+
+def get_environment_settings(env: Environment) -> BaseEnvironmentSettings:
+    """Get environment-specific Pydantic settings instance."""
     if env == Environment.MAINNET:
-        from .mainnet import config
+        from .mainnet import MainnetSettings
+        return MainnetSettings()
     elif env == Environment.DEVNET:
-        from .devnet import config
+        from .devnet import DevnetSettings
+        return DevnetSettings()
     elif env == Environment.TESTNET:
-        from .testnet import config
+        from .testnet import TestnetSettings
+        return TestnetSettings()
     elif env == Environment.SHADOWFORK4:
-        from .shadowfork4 import config
+        from .shadowfork4 import Shadowfork4Settings
+        return Shadowfork4Settings()
     elif env == Environment.CHAINSIM:
-        from .chainsim import config
+        from .chainsim import ChainSimSettings
+        return ChainSimSettings()
     elif env == Environment.CUSTOM:
-        from .custom import config
+        from .custom import CustomSettings
+        return CustomSettings()
     else:
-        raise ValueError(f"Unknown environment: {env}")
-    return config 
+        raise ValueError(f"Unknown environment: {env}") 

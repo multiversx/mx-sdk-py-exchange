@@ -1,26 +1,19 @@
-"""Devnet environment configuration."""
+from .base import BaseEnvironmentSettings
 
-config = {
-    "DEFAULT_PROXY": "https://devnet-gateway.multiversx.com",
-    "DEFAULT_API": "https://devnet-api.multiversx.com",
-    "GRAPHQL": "https://devnet-graph.xexchange.com/graphql",
-    "HISTORY_PROXY": "",
+
+class DevnetSettings(BaseEnvironmentSettings):
+    """Devnet environment settings."""
     
-    "DEFAULT_OWNER": "wallets/devnet-dex-owner.pem",
-    "DEFAULT_ADMIN": "wallets/devnet-dex-owner.pem",
-    "DEFAULT_ACCOUNTS": "wallets/C10.pem",
-
-    "DEFAULT_MULTISIG_ADDRESS": "",
-
-    "SF_DEX_REFERENCE_ADDRESS": "",
-    "DEX_OWNER_ADDRESS": "",
-    "DEX_ADMIN_ADDRESS": "",
-    "SHADOWFORK_FUNDING_ADDRESS": "",
-
-    "DEFAULT_CONFIG_SAVE_PATH": "deploy/configs-devnet",
-    "DEPLOY_STRUCTURE_JSON": "deploy_structure.json",
+    # Override defaults for devnet
+    DEFAULT_PROXY: str = "https://devnet-gateway.multiversx.com"
+    DEFAULT_API: str = "https://devnet-api.multiversx.com"
+    GRAPHQL: str = "https://devnet-graph.xexchange.com/graphql"
     
-    "FORCE_CONTINUE_PROMPT": False,
-    
-    "DEFAULT_ISSUE_TOKEN_PRICE": 50000000000000000,
-} 
+    DEFAULT_OWNER: str = "wallets/devnet-dex-owner.pem"
+    DEFAULT_ADMIN: str = "wallets/devnet-dex-owner.pem"
+
+    DEFAULT_CONFIG_SAVE_PATH: str = "deploy/configs-devnet"
+
+
+# Create instance for backward compatibility
+config = DevnetSettings().to_dict() 

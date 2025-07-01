@@ -19,7 +19,7 @@ def show_config_status():
         print("Configuration Status")
         print("=" * 50)
         print(f"Current Environment: {config.CURRENT_ENV.value.upper()}")
-        print(f"Environment Variable MX_DEX_ENV: {os.getenv('MX_DEX_ENV', 'Not set (defaults to mainnet)')}")
+        print(f"Environment Variable MX_DEX_ENV: {os.getenv('MX_DEX_ENV', f'Not set (defaults to {config.CURRENT_ENV.value.upper()})')}")
         print()
         
         print("Network Configuration:")
@@ -46,7 +46,7 @@ def show_config_status():
         print()
         print("To switch environments, set the MX_DEX_ENV environment variable:")
         print("  export MX_DEX_ENV=devnet")
-        print("  export MX_DEX_ENV=localnet")
+        print("  export MX_DEX_ENV=chainsim")
         print("  export MX_DEX_ENV=mainnet")
         
     except ImportError as e:

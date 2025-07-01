@@ -1,45 +1,43 @@
 from pathlib import Path
-import os
 
 # Environment configuration
-from config.environments import Environment, get_environment_config
+from .environments import Environment, EnvironmentSelector, get_environment_settings
 
-# Get environment from environment variable, default to DEVNET
-ENV_NAME = os.getenv("MX_DEX_ENV", "devnet").upper()
-CURRENT_ENV = Environment[ENV_NAME]
+# Get environment from environment variable/.env, default to DEVNET
+CURRENT_ENV = Environment[EnvironmentSelector().MX_DEX_ENV.upper()]
 
-# Load environment-specific configuration
-env_config = get_environment_config(CURRENT_ENV)
+# Load Pydantic settings instance
+env_config = get_environment_settings(CURRENT_ENV)
 
 HOME = Path().home()
-DEFAULT_WORKSPACE = Path(__file__).parent
+DEFAULT_WORKSPACE = Path(__file__).parent.parent
 
 # ------------ For normal operation, modify below ------------ #
 # Used net - Load from environment configuration
-DEFAULT_PROXY = env_config["DEFAULT_PROXY"]
-DEFAULT_API = env_config["DEFAULT_API"]
-GRAPHQL = env_config["GRAPHQL"]
-HISTORY_PROXY = env_config["HISTORY_PROXY"]
+DEFAULT_PROXY = env_config.DEFAULT_PROXY
+DEFAULT_API = env_config.DEFAULT_API
+GRAPHQL = env_config.GRAPHQL
+HISTORY_PROXY = env_config.HISTORY_PROXY
 # TODO: try to override the default issue token price with testnet definition to tidy code up
-DEFAULT_ISSUE_TOKEN_PRICE = env_config["DEFAULT_ISSUE_TOKEN_PRICE"]
+DEFAULT_ISSUE_TOKEN_PRICE = env_config.DEFAULT_ISSUE_TOKEN_PRICE
 
 # Operation wallets - Load from environment configuration
-DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_ACCOUNTS"]
-DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_OWNER"]
-DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_ADMIN"]
-DEFAULT_MULTISIG_ADDRESS = env_config["DEFAULT_MULTISIG_ADDRESS"]
+DEFAULT_ACCOUNTS = DEFAULT_WORKSPACE.absolute() / env_config.DEFAULT_ACCOUNTS
+DEFAULT_OWNER = DEFAULT_WORKSPACE.absolute() / env_config.DEFAULT_OWNER
+DEFAULT_ADMIN = DEFAULT_WORKSPACE.absolute() / env_config.DEFAULT_ADMIN
+DEFAULT_MULTISIG_ADDRESS = env_config.DEFAULT_MULTISIG_ADDRESS
 
 # SF related configuration - Load from environment configuration
-SF_DEX_REFERENCE_ADDRESS = env_config["SF_DEX_REFERENCE_ADDRESS"]
-DEX_OWNER_ADDRESS = env_config["DEX_OWNER_ADDRESS"]
-DEX_ADMIN_ADDRESS = env_config["DEX_ADMIN_ADDRESS"]
-SHADOWFORK_FUNDING_ADDRESS = env_config["SHADOWFORK_FUNDING_ADDRESS"]
+SF_DEX_REFERENCE_ADDRESS = env_config.SF_DEX_REFERENCE_ADDRESS
+DEX_OWNER_ADDRESS = env_config.DEX_OWNER_ADDRESS
+DEX_ADMIN_ADDRESS = env_config.DEX_ADMIN_ADDRESS
+SHADOWFORK_FUNDING_ADDRESS = env_config.SHADOWFORK_FUNDING_ADDRESS
 
 # Used DEX deploy configuration - Load from environment configuration
-DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / env_config["DEFAULT_CONFIG_SAVE_PATH"]
-DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / env_config["DEPLOY_STRUCTURE_JSON"]
+DEFAULT_CONFIG_SAVE_PATH = DEFAULT_WORKSPACE.absolute() / env_config.DEFAULT_CONFIG_SAVE_PATH
+DEPLOY_STRUCTURE_JSON = DEFAULT_CONFIG_SAVE_PATH / env_config.DEPLOY_STRUCTURE_JSON
 
-FORCE_CONTINUE_PROMPT = env_config["FORCE_CONTINUE_PROMPT"]
+FORCE_CONTINUE_PROMPT = env_config.FORCE_CONTINUE_PROMPT
 
 # DEX contract bytecode paths
 EGLD_WRAP_BYTECODE_PATH = DEFAULT_WORKSPACE.absolute() / "wasm" / "egld-wrap.wasm"
@@ -128,10 +126,14 @@ LK_WRAPS = "lk_wraps"
 COMPOSABLE_TASKS = "composable_tasks"
 PERMISSIONS_HUBS = "permissions_hubs"
 
+# ------------ Logging configuration ------------ #
+LOG_LEVEL = env_config.LOG_LEVEL
+LOG_FILE = DEFAULT_WORKSPACE.absolute() / env_config.LOG_FILE
+
 
 def get_default_tokens_file():
     return DEFAULT_CONFIG_SAVE_PATH / "tokens.json"
 
 
 def get_default_log_file():
-    return DEFAULT_WORKSPACE / "logs" / "trace.log"
+    return LOG_FILE

@@ -1,26 +1,19 @@
-"""Devnet environment configuration."""
+from .base import BaseEnvironmentSettings
 
-config = {
-    "DEFAULT_PROXY": "https://testnet-gateway.multiversx.com",
-    "DEFAULT_API": "https://testnet-api.multiversx.com",
-    "GRAPHQL": "https://testnet-graph.xexchange.com/graphql",
-    "HISTORY_PROXY": "",
 
-    "DEFAULT_OWNER": "wallets/testnet-dex-owner.pem",
-    "DEFAULT_ADMIN": "wallets/testnet-dex-owner.pem",
-    "DEFAULT_ACCOUNTS": "wallets/C10.pem",
-
-    "DEFAULT_MULTISIG_ADDRESS": "",
-
-    "SF_DEX_REFERENCE_ADDRESS": "",
-    "DEX_OWNER_ADDRESS": "",
-    "DEX_ADMIN_ADDRESS": "",
-    "SHADOWFORK_FUNDING_ADDRESS": "",
+class TestnetSettings(BaseEnvironmentSettings):
+    """Testnet environment settings."""
     
-    "DEFAULT_CONFIG_SAVE_PATH": "deploy/configs-testnet",
-    "DEPLOY_STRUCTURE_JSON": "deploy_structure.json",
+    # Override defaults for testnet
+    DEFAULT_PROXY: str = "https://testnet-gateway.multiversx.com"
+    DEFAULT_API: str = "https://testnet-api.multiversx.com"
+    GRAPHQL: str = "https://testnet-graph.xexchange.com/graphql"
+    
+    DEFAULT_OWNER: str = "wallets/testnet-dex-owner.pem"
+    DEFAULT_ADMIN: str = "wallets/testnet-dex-owner.pem"
 
-    "FORCE_CONTINUE_PROMPT": False,
+    DEFAULT_CONFIG_SAVE_PATH: str = "deploy/configs-testnet"
 
-    "DEFAULT_ISSUE_TOKEN_PRICE": 50000000000000000,
-} 
+
+# Create instance for backward compatibility
+config = TestnetSettings().to_dict() 

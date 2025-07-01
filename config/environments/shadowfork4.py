@@ -1,26 +1,24 @@
-"""Mainnet environment configuration."""
+from .base import BaseEnvironmentSettings
 
-config = {
-    "DEFAULT_PROXY": "https://proxy-shadowfork-four.elrond.ro",
-    "DEFAULT_API": "https://express-api-shadowfork-four.elrond.ro",
-    "GRAPHQL": "https://graph.xexchange.com/graphql",
-    "HISTORY_PROXY": "",
 
-    "DEFAULT_OWNER": "wallets/C1.pem",
-    "DEFAULT_ADMIN": "wallets/C1.pem",
-    "DEFAULT_ACCOUNTS": "wallets/C10.pem",
-
-    "DEFAULT_MULTISIG_ADDRESS": "",
-
-    "SF_DEX_REFERENCE_ADDRESS": "erd1qqqqqqqqqqqqqpgqq66xk9gfr4esuhem3jru86wg5hvp33a62jps2fy57p",
-    "DEX_OWNER_ADDRESS": "erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97",
-    "DEX_ADMIN_ADDRESS": "erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97",
-    "SHADOWFORK_FUNDING_ADDRESS": "erd1rf4hv70arudgzus0ymnnsnc4pml0jkywg2xjvzslg0mz4nn2tg7q7k0t6p",
-
-    "DEFAULT_CONFIG_SAVE_PATH": "deploy/configs-mainnet",
-    "DEPLOY_STRUCTURE_JSON": "deploy_structure.json",
-
-    "FORCE_CONTINUE_PROMPT": False,
+class Shadowfork4Settings(BaseEnvironmentSettings):
+    """Shadowfork4 environment settings."""
     
-    "DEFAULT_ISSUE_TOKEN_PRICE": 50000000000000000,
-} 
+    # Override defaults for shadowfork4
+    DEFAULT_PROXY: str = "https://proxy-shadowfork-four.elrond.ro"
+    DEFAULT_API: str = "https://express-api-shadowfork-four.elrond.ro"
+    GRAPHQL: str = "https://graph.xexchange.com/graphql"
+    
+    DEFAULT_OWNER: str = "wallets/C1.pem"
+    DEFAULT_ADMIN: str = "wallets/C1.pem"
+
+    DEFAULT_CONFIG_SAVE_PATH: str = "deploy/configs-mainnet"
+
+    SF_DEX_REFERENCE_ADDRESS: str = "erd1qqqqqqqqqqqqqpgqq66xk9gfr4esuhem3jru86wg5hvp33a62jps2fy57p"
+    DEX_OWNER_ADDRESS: str = "erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97"
+    DEX_ADMIN_ADDRESS: str = "erd1ss6u80ruas2phpmr82r42xnkd6rxy40g9jl69frppl4qez9w2jpsqj8x97"
+    SHADOWFORK_FUNDING_ADDRESS: str = "erd1rf4hv70arudgzus0ymnnsnc4pml0jkywg2xjvzslg0mz4nn2tg7q7k0t6p"
+
+
+# Create instance for backward compatibility
+config = Shadowfork4Settings().to_dict() 
