@@ -6,6 +6,7 @@
 /tools/notebooks/env.py
 /tools/notebooks/*.log
 .venv
+.env
 __pycache__
 /deploy/*/tokens.json
 /deploy/*/deployed_*.json

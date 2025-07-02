@@ -5,3 +5,5 @@ debugpy
 wget
 pyyaml
 multiversx-sdk==1.5.2
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
