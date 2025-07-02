@@ -7,7 +7,7 @@ from utils.contract_data_fetchers import FarmContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
+from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes, get_all_token_nonces_details_for_account, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
@@ -180,6 +180,16 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         ]
         return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
                                         Address(self.address), "compoundRewards", sc_args)
+
+    def collectUndistributedRewards(self, network_provider: NetworkProviders, user: Account, weeks: list) -> str:
+        function_purpose = f"collectUndistributedBoostedRewards"
+        logger.info(function_purpose)
+        logger.debug(f"Account: {user.address}")
+
+        gas_limit = 50000000
+        sc_args = []
+        return endpoint_call(network_provider.proxy, gas_limit, user,
+                                        Address(self.address), "collectUndistributedBoostedRewards", weeks)
 
     def migratePosition(self, network_provider: NetworkProviders, user: Account, event: MigratePositionFarmEvent) -> str:
         function_purpose = f"migratePosition"
@@ -510,6 +520,24 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         all_stats.update(self.get_all_farm_global_stats(proxy))
         all_stats.update(self.get_all_boosted_global_stats(proxy, week))
         return all_stats
+
+    def get_user_farm_token_stats(self, user: Account, proxy: ProxyNetworkProvider):
+        tokens_in_account = get_all_token_nonces_details_for_account(self.farmingToken, user.address.bech32(), proxy)
+        print(f'Account: {user.address.bech32()}')
+        print(f'Looking for {self.farmingToken} and {self.farmToken} tokens')
+        print(f'Farming Tokens in account:')
+        for token in tokens_in_account:
+            print(f'\t{token}')
+        tokens_in_account = get_all_token_nonces_details_for_account(self.farmToken, user.address.bech32(), proxy)
+        print(f'Farm Tokens in account:')
+        all_decoded_attributes = []
+        for token in tokens_in_account:
+            print(f'\t{token}')
+            decoded_attributes = decode_merged_attributes(base64_to_hex(token["attributes"]), decoding_structures.FARM_TOKEN_ATTRIBUTES)
+            print(f'\t\t{decoded_attributes}')
+            all_decoded_attributes.append(decoded_attributes)
+            
+        return all_decoded_attributes
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.start_produce_rewards(deployer, proxy)
