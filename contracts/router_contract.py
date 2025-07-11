@@ -4,6 +4,7 @@ from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, get_deployed_address_from_tx, endpoint_call
 from utils.utils_generic import log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
+from utils.contract_data_fetchers import RouterContractDataFetcher
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
@@ -160,27 +161,18 @@ class RouterContract(DEXContractInterface):
         """ Expected as args:
         type[str]: first token id
         type[str]: second token id
-        type[int]: total fee percent
-        type[int]: special fee percent
-        type[str]: initial liquidity adder
         """
         function_purpose = f"Upgrade pair contract"
         logger.info(function_purpose)
 
         tx_hash = ""
 
-        if len(args) < 4:
+        if len(args) < 2:
             log_unexpected_args(function_purpose, args)
             return tx_hash
 
         gas_limit = 200000000
-        sc_args = [
-            args[0],
-            args[1],
-            args[4],
-            args[2],
-            args[3]
-        ]
+        sc_args = args
 
         tx_hash = endpoint_call(proxy, gas_limit, deployer, Address(self.address), "upgradePair", sc_args)
 
@@ -310,6 +302,47 @@ class RouterContract(DEXContractInterface):
             1 if args[0] else 0
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPairCreationEnabled", sc_args)
+    
+    def claim_developer_rewards_pairs(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contracts: list[str]):
+        function_purpose = f"Claim developer rewards for pairs"
+        logger.info(function_purpose)
+
+        gas_limit = 200000000
+        sc_args = []
+        for pair_contract in pair_contracts:
+            sc_args.append(Address(pair_contract))
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "claimDeveloperRewardsPairs", sc_args)
+    
+    def withdraw_egld(self, deployer: Account, proxy: ProxyNetworkProvider):
+        function_purpose = f"Withdraw EGELD from router contract"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "withdrawEgld", [])
+    
+    def set_safe_price_round_save_interval(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+        """ Expected as args:
+            type[str]: pair address
+            type[int]: interval
+        """
+        function_purpose = f"Set safe price round save interval"
+        logger.info(function_purpose)
+
+        if len(args) != 2:
+            log_unexpected_args(function_purpose, args)
+            return ""
+
+        gas_limit = 10000000
+        sc_args = [
+            Address(args[0]),
+            args[1]
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setSafePriceRoundSaveInterval", sc_args)
+    
+    def get_pair_template_address(self, proxy: ProxyNetworkProvider):
+        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
+        template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
+        return template_pair_address
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
