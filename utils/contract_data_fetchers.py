@@ -214,7 +214,8 @@ class PairContractDataFetcher(DataFetcher):
             "getState": self._get_int_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
             "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
-            "getPriceObservation": self._get_hex_list_view
+            "getPriceObservation": self._get_hex_list_view,
+            "getSafePriceRoundSaveInterval": self._get_int_view,
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
