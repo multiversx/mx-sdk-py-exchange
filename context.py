@@ -15,6 +15,9 @@ from trackers.staking_economics_tracking import StakingEconomics
 from trackers.metastaking_economics_tracking import MetastakingEconomics
 from trackers.concrete_observer import Observable
 from utils.utils_chain import Account, BunchOfAccounts, WrapperAddress as Address
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class Context:
@@ -84,6 +87,9 @@ class Context:
 
         self.observable = Observable()
         # self.init_observers()     # call should be parameterized so that observers can be disabled programmatically
+
+        logger.info(f"Using proxy: {self.network_provider.proxy.url}")
+        logger.info(f"Using owner: {self.deployer_account.address.bech32()}")
 
     def init_observers(self):
 
