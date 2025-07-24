@@ -12,7 +12,8 @@ import toml
 from enum import Enum
 from pathlib import Path
 from utils.logger import get_logger
-from typing import Any, List, Union, Optional, cast, IO, Dict
+from concurrent.futures import ThreadPoolExecutor, Future
+from typing import Any, Callable, Iterable, List, Union, Optional, cast, IO, Dict
 
 
 logger = get_logger(__name__)
@@ -40,6 +41,26 @@ class BasicEncoder(json.JSONEncoder):
         if isinstance(o, ISerializable):
             return o.to_dictionary()
         return json.JSONEncoder.default(self, o)
+    
+
+def execute_parallel(func: Callable, iterable: Iterable[Any], max_workers: int = 10) -> List[Any]:
+    processed = 0
+    total = len(iterable)
+
+    def update_progress(future: Future):
+        nonlocal processed
+        processed += 1
+        if processed % 100 == 0:
+            print(f"Processed {processed}/{total} items", end="\r")
+    
+    futures = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for item in iterable:
+            future = executor.submit(func, item)
+            future.add_done_callback(update_progress)
+            futures.extend([future])
+
+    return [future.result() for future in futures]
 
 
 def split_to_chunks(items: Any, chunk_size: int):
