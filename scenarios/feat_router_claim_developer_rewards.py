@@ -84,6 +84,7 @@ def test_claim_developer_rewards(env):
     #     chain_sim.advance_blocks(1)
     
     # calculate total paid fee
+    sleep(6)    # wait for the tx to be processed
     total_paid_fee = 0
     for hash in hashes:
         total_paid_fee += int(context.network_provider.proxy.get_transaction(hash).raw["fee"])

@@ -322,8 +322,8 @@ class RouterContract(DEXContractInterface):
     
     def set_safe_price_round_save_interval(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
-            type[str]: pair address
             type[int]: interval
+            type[list[str]]: pair addresses
         """
         function_purpose = f"Set safe price round save interval"
         logger.info(function_purpose)
@@ -334,9 +334,14 @@ class RouterContract(DEXContractInterface):
 
         gas_limit = 10000000
         sc_args = [
-            Address(args[0]),
-            args[1]
+            args[0]
         ]
+
+        if type(args[1]) != list:
+            log_unexpected_args(function_purpose, args)
+            return ""
+        sc_args.extend([Address(address) for address in args[1]])
+
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setSafePriceRoundSaveInterval", sc_args)
     
     def get_pair_template_address(self, proxy: ProxyNetworkProvider):
