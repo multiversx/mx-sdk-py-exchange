@@ -157,7 +157,7 @@ class FeesCollectorContract(BaseBoostedContract):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 20000000
+        gas_limit = 80000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeRewardTokens", args)
 
     def add_admin(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):

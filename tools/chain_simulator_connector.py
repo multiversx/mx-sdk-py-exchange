@@ -137,6 +137,13 @@ class ChainSimulator:
         self.proxy_url = SIMULATOR_URL
         self.api_url = API_URL
         self.process = None
+        
+        try:
+            network_config = ProxyNetworkProvider(self.proxy_url).get_network_config()
+            self.blocks_per_epoch = int(network_config.raw['erd_rounds_per_epoch'])
+        except Exception:
+            self.blocks_per_epoch = BLOCKS_PER_EPOCH
+            logger.warning("Could not get blocks per epoch from network config, using default value.")
 
     def start(self, block: int = 0, round: int = 0, epoch: int = 0):
         p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
@@ -155,6 +162,19 @@ class ChainSimulator:
         # go nuclear on anything that might be running
         p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
         p.wait()
+
+    def is_running(self) -> bool:
+        process_running = self.process is not None and self.process.poll() is None
+        instance_running = False
+        if not process_running:
+            # check if started before creating the instance
+            proxy = ProxyNetworkProvider(self.proxy_url)
+            try:
+                proxy.get_network_status()
+                instance_running = True
+            except Exception:
+                pass
+        return process_running or instance_running
 
     def apply_states(self, states: list[list[dict[str, Any]]]):
         for state in states:
@@ -191,7 +211,7 @@ class ChainSimulator:
         return response.json()
     
     def advance_epochs(self, number_of_epochs: int):
-        blocks_to_advance = BLOCKS_PER_EPOCH * number_of_epochs
+        blocks_to_advance = self.blocks_per_epoch * number_of_epochs
         return self.advance_blocks(blocks_to_advance)
     
     def advance_epochs_to_epoch(self, target_epoch: int):
@@ -199,7 +219,7 @@ class ChainSimulator:
         current_epoch = proxy.get_network_status().current_epoch
         if current_epoch >= target_epoch:
             return
-        blocks_to_advance = (target_epoch - current_epoch) * BLOCKS_PER_EPOCH
+        blocks_to_advance = (target_epoch - current_epoch) * self.blocks_per_epoch
         return self.advance_blocks(blocks_to_advance)
 
     def _update_docker_compose(self, block: int, round: int, epoch: int):
@@ -215,6 +235,7 @@ class ChainSimulator:
             "/bin/bash -c \" sed -i 's|http://localhost:9200|http://elasticsearch:9200|g' ./config/node/config/external.toml "
             "&& sed -i '11i\\    { File = \\\"enableEpochs.toml\\\", Path = \\\"EnableEpochs.StakingV2EnableEpoch\\\", Value = 0},' ./config/nodeOverrideDefault.toml "
             f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
+            # f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch} --rounds-per-epoch=10000\""
         )
         
         # Save the modified docker-compose.yaml file
