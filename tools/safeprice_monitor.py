@@ -75,15 +75,20 @@ def main(cli_args: List[str]):
 
     # add offline models
     offline_models: List[OfflineModel] = []
+    uniswap_models: List[UniswapV2Model] = []
     if args.model_samples:
         for samples in args.model_samples:
             offline_models.append(OfflineModel(samples))
+
+    uniswap_models.append(UniswapV2Model(6, 60000))
 
     csv_header = ["block", "safe_price", "spot_price"]
     if args.view_contract:
         csv_header.extend(["10min_avg_rounds", "20min_avg_timestamp"])
     for offline_model in offline_models:
         csv_header.append(f"{offline_model.avg_samples}_rounds_avg_offline")
+        if len(uniswap_models):
+            csv_header.append(f"{offline_model.avg_samples}_rounds_avg_uniswap")
 
     with open(LOG_FILENAME, 'w') as f:
         file_writer = csv.writer(f)
@@ -134,6 +139,9 @@ def main(cli_args: List[str]):
             model.add_observation(spot_price, last_block)
             print(f"Token: {decoded_attrs['token_identifier']} {model.avg_samples} AVG: {model.last_computed_price.price} ")
 
+        for model in uniswap_models:
+            model.add_observation(spot_price, last_block)
+
         with open(LOG_FILENAME, 'a') as f:
             file_writer = csv.writer(f)
             row_data = [last_block, decoded_attrs['amount'] / 10 ** 18, spot_price / 10 ** 18]
@@ -142,6 +150,9 @@ def main(cli_args: List[str]):
                                  twenty_min_avg / 10 ** 18])
             for model in offline_models:
                 row_data.append(model.last_computed_price.price / 10 ** 18)
+                # also log the same averaging in case we use uniswap models
+                for uniswap_model in uniswap_models:
+                    row_data.append(uniswap_model.compute_averaged_price(model.avg_samples))
             file_writer.writerow(row_data)
 
         query_time = time.time() - query_start_time
@@ -222,6 +233,7 @@ class UniswapV2Model:
                 self.observations.pop(0)
 
     def compute_averaged_price(self, avg_rounds: int):
+        earliest_observation = 0
         for observation in self.observations:
             if observation.round <= self.last_round - avg_rounds:
                 earliest_observation = observation
@@ -230,7 +242,10 @@ class UniswapV2Model:
         if not earliest_observation:
             earliest_observation = self.observations[0]
 
-        return (self.cumulative_price - earliest_observation.price) // (self.last_round - earliest_observation.round)
+        time_elapsed = (self.last_round - earliest_observation.round)
+        if not time_elapsed:
+            return self.cumulative_price
+        return (self.cumulative_price - earliest_observation.price) // time_elapsed
 
 if __name__ == "__main__":
     main(sys.argv[1:])
