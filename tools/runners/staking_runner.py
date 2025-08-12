@@ -403,7 +403,7 @@ def generate_unstake_tokens_transactions(args: Any):
     if not args.all:
         staking_addresses = [staking_address]
 
-    with ThreadPoolExecutor(max_workers=500) as executor:
+    with ThreadPoolExecutor(max_workers=20) as executor:
         exported_accounts = list(executor.map(sync_account_nonce, exported_accounts))
 
     for staking_address in staking_addresses:
@@ -418,7 +418,7 @@ def generate_unstake_tokens_transactions(args: Any):
             print(f"Processing account {accounts_index} / {len(accounts_with_token)}")
 
             account = Account(account_with_token.address, config.DEFAULT_OWNER)
-            account.address = WrapperAddress.from_bech32(account_with_token.address)
+            account.address = WrapperAddress(account_with_token.address)
             account.nonce = account_with_token.nonce
 
             tokens = [
@@ -438,7 +438,7 @@ def generate_unstake_tokens_transactions(args: Any):
                         account.address,
                         Address.new_from_bech32(staking_address),
                         function_name,
-                        13000000,
+                        25000000,
                         [],
                         0,
                         payment_tokens

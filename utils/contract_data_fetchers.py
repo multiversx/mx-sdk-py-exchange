@@ -214,7 +214,8 @@ class PairContractDataFetcher(DataFetcher):
             "getState": self._get_int_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
             "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
-            "getPriceObservation": self._get_hex_list_view
+            "getPriceObservation": self._get_hex_list_view,
+            "getSafePriceRoundSaveInterval": self._get_int_view,
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
@@ -234,6 +235,7 @@ class FeeCollectorContractDataFetcher(DataFetcher):
             "getTokensForGivenPosition": self._get_int_list_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
             "getAccumulatedFees": self._get_int_view,
+            "getTotalRewardsForWeek": self._get_hex_view,
             "getLastLockedTokensAddWeek": self._get_int_view,
             "getLockedTokensPerBlock": self._get_int_view,
             "getLockingScAddress": self._get_hex_view,
@@ -242,6 +244,8 @@ class FeeCollectorContractDataFetcher(DataFetcher):
             "getFirstWeekStartEpoch": self._get_int_view,
             "getRewardTokens": self._get_hex_list_view,
             "getAllKnownContracts": self._get_hex_list_view,
+            "getRewardsClaimed": self._get_int_view,
+            "getTokenAvailableAmount": self._get_int_view,
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
