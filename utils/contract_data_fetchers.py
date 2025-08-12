@@ -245,6 +245,7 @@ class FeeCollectorContractDataFetcher(DataFetcher):
             "getRewardTokens": self._get_hex_list_view,
             "getAllKnownContracts": self._get_hex_list_view,
             "getRewardsClaimed": self._get_int_view,
+            "getTokenAvailableAmount": self._get_int_view,
         }
 
     def get_token_reserve(self, token_ticker: str) -> int:
