@@ -310,6 +310,16 @@ class RouterContract(DEXContractInterface):
             1 if args[0] else 0
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPairCreationEnabled", sc_args)
+    
+    def claim_developer_rewards_pairs(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contracts: list[str]):
+        function_purpose = f"Claim developer rewards for pairs"
+        logger.info(function_purpose)
+
+        gas_limit = 200000000
+        sc_args = []
+        for pair_contract in pair_contracts:
+            sc_args.append(Address(pair_contract))
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "claimDeveloperRewardsPairs", sc_args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
