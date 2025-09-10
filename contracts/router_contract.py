@@ -312,7 +312,7 @@ class RouterContract(DEXContractInterface):
         for pair_contract in pair_contracts:
             sc_args.append(Address(pair_contract))
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "claimDeveloperRewardsPairs", sc_args)
-    
+
     def withdraw_egld(self, deployer: Account, proxy: ProxyNetworkProvider):
         function_purpose = f"Withdraw EGELD from router contract"
         logger.info(function_purpose)
