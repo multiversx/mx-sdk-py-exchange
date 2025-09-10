@@ -119,7 +119,7 @@ class FeesCollectorContract(BaseBoostedContract):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 10000000
+        gas_limit = 10000000 + len(args) * 1000000
         sc_args = args
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeKnownContracts", sc_args)
 
