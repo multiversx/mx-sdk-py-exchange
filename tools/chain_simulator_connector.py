@@ -234,8 +234,8 @@ class ChainSimulator:
         chain_simulator['entrypoint'] = (
             "/bin/bash -c \" sed -i 's|http://localhost:9200|http://elasticsearch:9200|g' ./config/node/config/external.toml "
             "&& sed -i '11i\\    { File = \\\"enableEpochs.toml\\\", Path = \\\"EnableEpochs.StakingV2EnableEpoch\\\", Value = 0},' ./config/nodeOverrideDefault.toml "
-            f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
-            # f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch} --rounds-per-epoch=10000\""
+            # f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
+            f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch} --rounds-per-epoch={BLOCKS_PER_EPOCH}\""
         )
         
         # Save the modified docker-compose.yaml file
