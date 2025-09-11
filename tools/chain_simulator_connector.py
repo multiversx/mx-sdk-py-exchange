@@ -60,7 +60,7 @@ def get_sc_states_files_in_folder(state_folder: Path) -> str | None:
     return all_keys_file
 
 
-def get_user_states_in_folder(state_folder: Path, addresses: list[str]) -> list[dict[str, Any]] | None:
+def get_address_states_in_folder(state_folder: Path, addresses: list[str]) -> list[dict[str, Any]] | None:
     states = []
     
     for address in addresses:
@@ -87,18 +87,32 @@ def get_user_states_in_folder(state_folder: Path, addresses: list[str]) -> list[
             
     return states
 
-def get_users_in_folder(state_folder: Path) -> list[str]:
+def get_standalone_addresses_in_folder(state_folder: Path) -> tuple[list[str], list[str]]:
     state_files = list(state_folder.iterdir())
     users = []
+    contracts = []
     for file in state_files:
         if "_chain_config_state.json" in file.name:
-            # only for users. Smart contracts are already in all_all_keys.json
+            # Smart contracts are already in all_all_keys.json, except the manually fetched ones + user addresses
             filename_no_ext = file.stem
             potential_address = filename_no_ext.split("_")[1]
-            if is_valid_address(potential_address) and not is_smart_contract(potential_address):
+            if is_valid_address(potential_address) and not is_smart_contract(potential_address): 
                 users.append(potential_address)
-    return users
+            elif is_valid_address(potential_address) and is_smart_contract(potential_address): 
+                contracts.append(potential_address)
+    return users, contracts
 
+
+def get_standalone_contracts_in_folder(state_folder: Path) -> list[str]:
+    state_files = list(state_folder.iterdir())
+    contracts = []
+    for file in state_files:
+        if "_chain_config_state.json" in file.name:
+            filename_no_ext = file.stem
+            potential_address = filename_no_ext.split("_")[1]
+            if is_valid_address(potential_address) and is_smart_contract(potential_address): 
+                contracts.append(potential_address)
+    return contracts
 
 def get_shard_chronology_in_folder(state_folder: Path) -> dict[str, int] | None:
     state_files = list(state_folder.iterdir())
@@ -123,6 +137,13 @@ class ChainSimulator:
         self.proxy_url = SIMULATOR_URL
         self.api_url = API_URL
         self.process = None
+        
+        try:
+            network_config = ProxyNetworkProvider(self.proxy_url).get_network_config()
+            self.blocks_per_epoch = int(network_config.raw['erd_rounds_per_epoch'])
+        except Exception:
+            self.blocks_per_epoch = BLOCKS_PER_EPOCH
+            logger.warning("Could not get blocks per epoch from network config, using default value.")
 
     def start(self, block: int = 0, round: int = 0, epoch: int = 0):
         p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
@@ -142,6 +163,19 @@ class ChainSimulator:
         p = subprocess.Popen(["docker", "compose", "down"], cwd = self.docker_path)
         p.wait()
 
+    def is_running(self) -> bool:
+        process_running = self.process is not None and self.process.poll() is None
+        instance_running = False
+        if not process_running:
+            # check if started before creating the instance
+            proxy = ProxyNetworkProvider(self.proxy_url)
+            try:
+                proxy.get_network_status()
+                instance_running = True
+            except Exception:
+                pass
+        return process_running or instance_running
+
     def apply_states(self, states: list[list[dict[str, Any]]]):
         for state in states:
             response = requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
@@ -152,19 +186,24 @@ class ChainSimulator:
 
     def init_state_from_folder(self, state_folder: Path) -> list[str]:
         all_sc_states = get_all_sc_states_in_folder(state_folder)
-        addresses = get_users_in_folder(state_folder)
-        all_user_states = get_user_states_in_folder(state_folder, addresses)
+        user_addresses, contract_addresses = get_standalone_addresses_in_folder(state_folder)
+        all_user_states = get_address_states_in_folder(state_folder, user_addresses)
+        all_standalone_contract_states = get_address_states_in_folder(state_folder, contract_addresses)
 
         if all_sc_states:
             self.apply_states(all_sc_states)
             logger.info("Smart contracts states applied.")
+
+        if all_standalone_contract_states:
+            self.apply_states(all_standalone_contract_states)
+            logger.info("Standalone contract states applied.")
 
         if all_user_states:
             self.apply_states(all_user_states)
             logger.info("User states applied.") 
 
         # return found user addresses
-        return addresses
+        return user_addresses
 
     def advance_blocks(self, number_of_blocks: int):
         url = f"{self.proxy_url}/simulator/generate-blocks/{number_of_blocks}"
@@ -172,7 +211,7 @@ class ChainSimulator:
         return response.json()
     
     def advance_epochs(self, number_of_epochs: int):
-        blocks_to_advance = BLOCKS_PER_EPOCH * number_of_epochs
+        blocks_to_advance = self.blocks_per_epoch * number_of_epochs
         return self.advance_blocks(blocks_to_advance)
     
     def advance_epochs_to_epoch(self, target_epoch: int):
@@ -180,7 +219,7 @@ class ChainSimulator:
         current_epoch = proxy.get_network_status().current_epoch
         if current_epoch >= target_epoch:
             return
-        blocks_to_advance = (target_epoch - current_epoch) * BLOCKS_PER_EPOCH
+        blocks_to_advance = (target_epoch - current_epoch) * self.blocks_per_epoch
         return self.advance_blocks(blocks_to_advance)
 
     def _update_docker_compose(self, block: int, round: int, epoch: int):
@@ -195,7 +234,8 @@ class ChainSimulator:
         chain_simulator['entrypoint'] = (
             "/bin/bash -c \" sed -i 's|http://localhost:9200|http://elasticsearch:9200|g' ./config/node/config/external.toml "
             "&& sed -i '11i\\    { File = \\\"enableEpochs.toml\\\", Path = \\\"EnableEpochs.StakingV2EnableEpoch\\\", Value = 0},' ./config/nodeOverrideDefault.toml "
-            f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
+            # f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
+            f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch} --rounds-per-epoch={BLOCKS_PER_EPOCH}\""
         )
         
         # Save the modified docker-compose.yaml file

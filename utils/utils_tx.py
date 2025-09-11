@@ -271,8 +271,8 @@ class NetworkProviders:
             status = self.proxy.get_network_status()
             time.sleep(idle_time)
 
-    def get_round(self) -> int:
-        status = self.proxy.get_network_status(0)
+    def get_round(self, shard_id: int = 1) -> int:
+        status = self.proxy.get_network_status(shard_id)
         return status.current_round
 
 
