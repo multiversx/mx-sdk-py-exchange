@@ -103,7 +103,7 @@ def sync_account_nonce(exported_account: ExportedAccount) -> ExportedAccount:
     """Sync account nonce"""
     network_providers = NetworkProviders(API, PROXY)
     account = Account(exported_account.address, config.DEFAULT_OWNER)
-    account.address = WrapperAddress.from_bech32(exported_account.address)
+    account.address = WrapperAddress(exported_account.address)
     
     reattempts = 0
     while True:
@@ -145,7 +145,7 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
     chain_id = network_providers.proxy.get_network_config().chain_id
     tx_config = TransactionsFactoryConfig(chain_id=chain_id)
     funding_account = Account(address=None, pem_file=config.DEFAULT_OWNER)
-    funding_account.address = WrapperAddress.new_from_bech32(config.SHADOWFORK_FUNDING_ADDRESS)
+    funding_account.address = WrapperAddress(config.SHADOWFORK_FUNDING_ADDRESS)
     funding_account.sync_nonce(network_providers.proxy)
     signature = get_default_signature()
 
@@ -160,7 +160,7 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
         transaction = factory.create_transaction_for_native_token_transfer(
             sender=funding_account.address,
             receiver=Address.new_from_bech32(account.address),
-            native_amount=0.01,
+            native_amount=10 ** 16,
         )
         transaction.nonce = funding_account.nonce
         transaction.signature = signature
@@ -171,7 +171,8 @@ def fund_shadowfork_accounts(accounts: List[ExportedAccount]) -> None:
 
     transactions_chunks = split_to_chunks(transactions, 100)
     for transactions_chunk in transactions_chunks:
-        network_providers.proxy.send_transactions(transactions_chunk)
+        num_sent, _ = network_providers.proxy.send_transactions(transactions_chunk)
+        print(f"Sent {num_sent}/{len(transactions_chunk)} transactions")
 
     print(f"Funded {index} accounts!")
 

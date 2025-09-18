@@ -27,19 +27,19 @@ class ScreenFormatter(logging.Formatter):
 
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(config.LOG_LEVEL)
 
     # console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(config.LOG_LEVEL)
     console_handler.setFormatter(ScreenFormatter())
 
     # file handler
     logs_path = config.get_default_log_file()
     if not logs_path.exists():
         logs_path.parent.mkdir(parents=True, exist_ok=True)
-    file_handler = logging.FileHandler(config.get_default_log_file())
-    file_handler.setLevel(logging.DEBUG)
+    file_handler = logging.FileHandler(logs_path) 
+    file_handler.setLevel(config.LOG_LEVEL)
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s : %(message)s")
     file_handler.setFormatter(formatter)
 

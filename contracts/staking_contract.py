@@ -367,6 +367,16 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setMaxApr",
                              sc_args)
+    
+    def set_unbond_epochs(self, deployer: Account, proxy: ProxyNetworkProvider, epochs: int):
+        function_purpose = "Set unbond epochs"
+        logger.info(function_purpose)
+
+        gas_limit = 7000000
+        sc_args = [epochs]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setMinUnbondEpochs",
+                             sc_args)
 
     def resume(self, deployer: Account, proxy: ProxyNetworkProvider):
         function_purpose = f"Resume stake contract"

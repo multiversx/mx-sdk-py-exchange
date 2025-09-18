@@ -109,6 +109,7 @@ class ContractStructure:
         log_step_pass(f"{self.label}:")
         for contract in self.deployed_contracts:
             contract.print_contract_info()
+        log_step_pass("--------------------------------")
 
 
 class DeployStructureArguments:
@@ -328,9 +329,9 @@ class DeployStructure:
 
     def print_deployed_contracts(self):
         log_step_pass(f"Deployed contracts below:")
+        log_step_pass("--------------------------------")
         for contracts in self.contracts.values():
             contracts.print_deployed_contracts()
-            print("")
 
     # main entry method to deploy the DEX contract structure (either fresh deploy or loading existing ones)
     def deploy_structure(self, deployer_account: Account, network_provider: NetworkProviders,
