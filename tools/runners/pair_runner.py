@@ -330,6 +330,9 @@ def update_fees_percentage(_):
         total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
         special_fee_percentage = 100
 
+        if pair_contract is None:
+            continue
+
         pair_contract.version = PairContractVersion.V2
         tx_hash = pair_contract.set_fees_percents(dex_owner, network_providers.proxy,
                                                   [total_fee_percentage, special_fee_percentage])
@@ -354,9 +357,16 @@ def generate_volumes(args: Any):
     pair_address = args.address
     network_provider = NetworkProviders(API, PROXY)
 
-    user_account = Account.from_file(config.DEFAULT_ACCOUNTS)
+    user_account = Account.from_file(config.DEFAULT_ACCOUNTS.as_uri())
+    if user_account is None:
+        print('Invalid account file')
+        return
 
     pair_contract = PairContract.load_contract_by_address(pair_address, PairContractVersion.V2)
+
+    if pair_contract is None:
+        return
+
     swap_first_token_event = SwapFixedInputEvent(
         pair_contract.firstToken,
         int(args.firstTokenAmount),
