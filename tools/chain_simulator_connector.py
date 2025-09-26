@@ -244,7 +244,47 @@ class ChainSimulator:
         
         logger.info(f"Updated {self.docker_path / 'docker-compose.yaml'} with block {block}, round {round}, epoch {epoch}.")
 
-    
+    def fund_users_w_egld(self, users: list[str], amount: int):
+        for user in users:
+            self.apply_states([[{
+                    "address": user,
+                    "balance": str(amount),
+                }]])
+        logger.debug(f'Funded {len(users)} users with {amount} EGLD')
+        
+    def fund_users_w_esdt_from_mainnet(self, users: list[str], esdt: str, amount: int):
+        from utils.utils_chain import dec_to_padded_hex
+        from multiversx_sdk import ApiNetworkProvider, ProxyNetworkProvider
+        mainnet_proxy = ProxyNetworkProvider("https://gateway.multiversx.com")
+        mainnet_api = ApiNetworkProvider("https://api.multiversx.com")
+
+        # find holder account on mainnet
+        holder_accounts = mainnet_api.do_get_generic(f"tokens/{esdt}/accounts")
+        holder_account = None
+        for account in holder_accounts:
+            address = account.get("address")
+            if WrapperAddress(address).is_smart_contract():
+                continue
+            holder_account = address
+            break
+        if not holder_account:
+            raise Exception("No holder account found")
+
+        # fund users on chain simulator
+        current_entry = mainnet_proxy.get_account_storage_entry(WrapperAddress(holder_account), f"ELRONDesdt{esdt}")
+        if not current_entry:
+            raise Exception("No entry found")
+        header = current_entry.value.hex()[:2]
+        new_entry = f"{header}{dec_to_padded_hex(len(dec_to_padded_hex(amount)) // 2 + 1)}{'00'}{dec_to_padded_hex(amount)}"
+
+        for user in users:
+            self.apply_states([[{
+                    "address": user,
+                    "pairs": {
+                        current_entry.key.encode().hex(): new_entry
+                    }
+                }]])
+        logger.debug(f'Funded {len(users)} users with {amount} {esdt}')
 
 def get_retrieve_block(proxy: ProxyNetworkProvider, shard: int, block: int) -> int:
     block_number = block
