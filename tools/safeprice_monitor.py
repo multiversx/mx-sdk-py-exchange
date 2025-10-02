@@ -6,7 +6,7 @@ import config
 from argparse import ArgumentParser
 from multiversx_sdk import Address, SmartContractController
 from multiversx_sdk.abi import AddressValue, U64Value, TokenIdentifierValue, BigUIntValue, Abi
-from typing import List
+from typing import List, Any
 from context import Context
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_padded_hex
@@ -39,6 +39,7 @@ zero_esdt_token_result = {
 
 
 def get_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pair_contract: PairContract, offset: int, token: str, reference_amount: int) -> tuple[int, str]:
+    """ Returns the amount and token identifier of the safe price of the given token at the given offset """
     safe_price_view_contract = context.get_contracts(config.PAIRS_VIEW)[0]
     view_controller = SmartContractController(context.network_provider.proxy.get_network_config().chain_id, context.network_provider.proxy, abi)
     
@@ -49,6 +50,25 @@ def get_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pai
     if response:
         return view_controller.parse_query_response(response)[0].amount, view_controller.parse_query_response(response)[0].token_identifier
     return 0, ""
+
+
+def get_lp_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pair_contract: PairContract, 
+                                offset: int, reference_amount: int) -> list[Any]:
+    """ Returns a list of namespaces containing the two tokens underlying the given lp reference amount.
+        Each namespace contains:
+        - token_identifier
+        - nonce
+        - amount"""
+    safe_price_view_contract = context.get_contracts(config.PAIRS_VIEW)[0]
+    view_controller = SmartContractController(context.network_provider.proxy.get_network_config().chain_id, context.network_provider.proxy, abi)
+    
+    endpoint = f"getLpTokensSafePriceBy{timebase.value}Offset"
+    query = view_controller.create_query(Address.new_from_bech32(safe_price_view_contract.address), endpoint, 
+                                                 [pair_contract.address, offset, reference_amount])
+    response = view_controller.run_query(query)
+    if response:
+        return view_controller.parse_query_response(response)
+    return []
 
 
 def get_safe_price_legacy(context: Context, abi: Abi, pair_contract: PairContract, token: str, reference_amount: int) -> tuple[int, str]:
@@ -105,11 +125,11 @@ def main(cli_args: List[str]):
         for samples in args.model_samples:
             offline_models.append(OfflineModel(samples))
 
-    uniswap_models.append(UniswapV2Model(6, 60000))
+    # uniswap_models.append(UniswapV2Model(6, 60000))
 
     csv_header = ["block", "safe_price", "spot_price"]
     if args.view_contract:
-        csv_header.extend(["10min_avg_rounds", "20min_avg_timestamp"])
+        csv_header.extend(["10min_avg_rounds", "10min_avg_timestamp", "20min_avg_timestamp"])
     for offline_model in offline_models:
         csv_header.append(f"{offline_model.avg_samples}_rounds_avg_offline")
         if len(uniswap_models):
@@ -154,6 +174,7 @@ def main(cli_args: List[str]):
             row_data = [last_block, safe_price / 10 ** 18, spot_price / 10 ** 18]
             if args.view_contract:
                 row_data.extend([ten_min_avg / 10 ** 18,
+                                 ten_min_avg_2 / 10 ** 18,
                                  twenty_min_avg / 10 ** 18])
             for model in offline_models:
                 row_data.append(model.last_computed_price.price / 10 ** 18)
