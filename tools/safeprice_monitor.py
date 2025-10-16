@@ -129,12 +129,12 @@ def main(cli_args: List[str]):
 
     # uniswap_models.append(UniswapV2Model(6, 60000))
 
-    csv_header = ["block", "safe_price", "spot_price"]
+    csv_header = ["block", "updateAndGetSafePrice", "spot_price"]
     if args.view_contract:
         for samples in args.model_samples:
             samples_to_timestamp = samples * ms_per_round // 1000
-            csv_header.append(f"{samples}_rounds_avg_online")
-            csv_header.append(f"{samples_to_timestamp}s_timestamp_avg_online")
+            csv_header.append(f"getSafePriceByRoundOffset({samples})")
+            csv_header.append(f"getSafePriceByTimestampOffset({samples_to_timestamp})")
     for offline_model in offline_models:
         csv_header.append(f"{offline_model.avg_samples}_rounds_avg_offline")
         if len(uniswap_models):
