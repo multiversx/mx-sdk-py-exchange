@@ -18,7 +18,7 @@ from pathlib import Path
 from tools.scripts.es_scroller import get_contracts
 
 # Configuration
-API_BASE_URL = "https://api.multiversx.com"
+API_BASE_URL = "https://partners-api.multiversx.com"
 APPLICATIONS_ENDPOINT = f"{API_BASE_URL}/applications"
 ACCOUNTS_ENDPOINT = f"{API_BASE_URL}/accounts"
 
@@ -38,7 +38,7 @@ SEARCH_FUNCTIONS = [
     "getLpTokensSafePrice",
     "getSafePriceByDefaultOffset",
     "getSafePriceByRoundOffset",
-    "getSafePriceByTimestampOffset"
+    "getSafePriceByTimestampOffset",
     "getSafePrice",
     "getPriceObservation",
     "getSafePriceCurrentIndex"
