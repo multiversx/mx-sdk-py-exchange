@@ -307,7 +307,7 @@ class RouterContract(DEXContractInterface):
         function_purpose = f"Claim developer rewards for pairs"
         logger.info(function_purpose)
 
-        gas_limit = 200000000
+        gas_limit = 9000000 * len(pair_contracts)
         sc_args = []
         for pair_contract in pair_contracts:
             sc_args.append(Address(pair_contract))
