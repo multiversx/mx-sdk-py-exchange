@@ -38,7 +38,7 @@ zero_esdt_token_result = {
 }
 
 
-def get_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pair_contract: PairContract, offset: int, token: str, reference_amount: int) -> tuple[int, str]:
+def get_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pair_contract: PairContract, offset: int, token: str, reference_amount: int) -> tuple[int, str, Any, Any]:
     """ Returns the amount and token identifier of the safe price of the given token at the given offset """
     safe_price_view_contract = context.get_contracts(config.PAIRS_VIEW)[0]
     view_controller = SmartContractController(context.network_provider.proxy.get_network_config().chain_id, context.network_provider.proxy, abi)
@@ -48,8 +48,9 @@ def get_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pai
                                                  [pair_contract.address, offset, [token, 0, reference_amount]])
     response = view_controller.run_query(query)
     if response:
-        return view_controller.parse_query_response(response)[0].amount, view_controller.parse_query_response(response)[0].token_identifier
-    return 0, ""
+        payment, obs_start, obs_end = view_controller.parse_query_response(response)[0]
+        return payment.amount, payment.token_identifier, obs_start, obs_end
+    return 0, "", None, None
 
 
 def get_lp_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pair_contract: PairContract, 
@@ -107,13 +108,18 @@ def main(cli_args: List[str]):
     parser.add_argument("--model-samples", required=True, type=int, nargs='+',
                         help='Number of round samples to use for both online and offline models')
     parser.add_argument("--offline-models", action="store_true", required=False, default=False)
+    parser.add_argument("--log-timing", action="store_true", required=False, default=False)
     args = parser.parse_args(cli_args)
 
     global LOG_FILENAME
+    global LOG_FILENAME_TIMING
     LOG_FILENAME = f"dump/safe_price_observations_{args.file_suffix}.csv"
+    LOG_FILENAME_TIMING = f"dump/safe_price_observations_timing_{args.file_suffix}.csv"
 
     if Path(LOG_FILENAME).parent.exists() is False:
         Path(LOG_FILENAME).parent.mkdir(parents=True, exist_ok=True)
+    if args.log_timing and Path(LOG_FILENAME_TIMING).parent.exists() is False:
+        Path(LOG_FILENAME_TIMING).parent.mkdir(parents=True, exist_ok=True)
 
     context = Context()
     pair_contract = context.get_pair_v2_contract(0)
@@ -130,11 +136,21 @@ def main(cli_args: List[str]):
     # uniswap_models.append(UniswapV2Model(6, 60000))
 
     csv_header = ["block", "updateAndGetSafePrice", "spot_price"]
+    csv_header_timing = ["block"]
     if args.view_contract:
         for samples in args.model_samples:
             samples_to_timestamp = samples * ms_per_round // 1000
             csv_header.append(f"getSafePriceByRoundOffset({samples})")
             csv_header.append(f"getSafePriceByTimestampOffset({samples_to_timestamp})")
+
+            csv_header_timing.append(f"rnd_obs_start_rnd")
+            csv_header_timing.append(f"rnd_obs_end_rnd")
+            csv_header_timing.append(f"rnd_obs_start_ts")
+            csv_header_timing.append(f"rnd_obs_end_ts")
+            csv_header_timing.append(f"ts_obs_start_rnd")
+            csv_header_timing.append(f"ts_obs_end_rnd")
+            csv_header_timing.append(f"ts_obs_start_ts")
+            csv_header_timing.append(f"ts_obs_end_ts")
     for offline_model in offline_models:
         csv_header.append(f"{offline_model.avg_samples}_rounds_avg_offline")
         if len(uniswap_models):
@@ -143,6 +159,11 @@ def main(cli_args: List[str]):
     with open(LOG_FILENAME, 'w') as f:
         file_writer = csv.writer(f)
         file_writer.writerow(csv_header)
+
+    if args.log_timing:
+        with open(LOG_FILENAME_TIMING, 'w') as f:
+            file_writer = csv.writer(f)
+            file_writer.writerow(csv_header_timing)
 
     abi = Abi.load(ABI_PATH)
 
@@ -159,14 +180,19 @@ def main(cli_args: List[str]):
         print(f"Online legacy safe price: {safe_price} {other_token}")
 
         online_averages = []
+        timing_data = []
         if args.view_contract:
             for samples in args.model_samples:
                 samples_to_timestamp = samples * ms_per_round // 1000
                 
-                round_safe_price, _ = get_safe_price_by_offset(Timebase.ROUND, context, abi, pair_contract, samples, pair_contract.firstToken, reference_amount)
-                timestamp_safe_price, _ = get_safe_price_by_offset(Timebase.TIMESTAMP, context, abi, pair_contract, samples_to_timestamp, pair_contract.firstToken, reference_amount)
+                round_safe_price, _, rnd_obs_start, rnd_obs_end = get_safe_price_by_offset(Timebase.ROUND, context, abi, pair_contract, samples, pair_contract.firstToken, reference_amount)
+                timestamp_safe_price, _, ts_obs_start, ts_obs_end = get_safe_price_by_offset(Timebase.TIMESTAMP, context, abi, pair_contract, samples_to_timestamp, pair_contract.firstToken, reference_amount)
                 
                 online_averages.extend([round_safe_price, timestamp_safe_price])
+                timing_data.extend([rnd_obs_start.recording_round, rnd_obs_end.recording_round, 
+                                    rnd_obs_start.recording_timestamp, rnd_obs_end.recording_timestamp, 
+                                    ts_obs_start.recording_round, ts_obs_end.recording_round, 
+                                    ts_obs_start.recording_timestamp, ts_obs_end.recording_timestamp])
                 
                 print(f"{samples} online round safe price: {round_safe_price} {other_token}")
                 print(f"{samples_to_timestamp}s online timestamp safe price: {timestamp_safe_price} {other_token}")
@@ -189,6 +215,14 @@ def main(cli_args: List[str]):
                 for uniswap_model in uniswap_models:
                     row_data.append(uniswap_model.compute_averaged_price(model.avg_samples))
             file_writer.writerow(row_data)
+
+        if args.log_timing:
+            with open(LOG_FILENAME_TIMING, 'a') as f:
+                file_writer = csv.writer(f)
+                row_data = [last_block]
+                if args.view_contract:
+                    row_data.extend(timing_data)
+                file_writer.writerow(row_data)
 
         query_time = time.time() - query_start_time
         time.sleep(max(0, SAMPLE_INTERVAL - query_time))
