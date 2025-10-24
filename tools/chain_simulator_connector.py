@@ -338,9 +338,9 @@ def get_context_used_tokens(context: Context) -> List[str]:
 
 def fetch_account_state(address: str, proxy: ProxyNetworkProvider, block_number: int,
                         file_label: str, file_index: int) -> dict[str, Any]:
-    keys_file = f"{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_state.json"
-    data_file = f"{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_data.json"
-    chain_config_file = f"{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_chain_config_state.json"
+    keys_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_state.json"
+    data_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_data.json"
+    chain_config_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_chain_config_state.json"
     keys = get_account_keys_online(address, proxy.url, block_number, keys_file)
     data = get_account_data_online(address, proxy.url, block_number, data_file)
     data.pop("rootHash", None) # remove rootHash from data
@@ -401,9 +401,10 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
     for token in user_tokens:
         print(f"\rProcessing token {user_tokens.index(token) + 1}/{len(user_tokens)}", end="", flush=True) # this can take a while depending on the number of tokens
 
-        if not token.token.identifier in context_tokens:
+        temp_token = ESDTToken.from_full_token_name(token.token.identifier)
+        if not temp_token.token_id in context_tokens:
             continue
-        sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, ESDTToken.from_amount_on_network(token), block_number)
+        sys_account_token_attributes = fetch_token_nonce_system_account_attributes(proxy, temp_token, block_number)
         sys_account_keys.update(sys_account_token_attributes)
     print() # new line after progress bar
 
@@ -413,7 +414,7 @@ def fetch_context_system_account_state_from_account(proxy: ProxyNetworkProvider,
     }
 
     # save system account state to file
-    sys_account_state_file = f"{STATES_FOLDER}/{block_number}_system_account_state_{address}.json"
+    sys_account_state_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_system_account_state_{address}.json"
     with open(sys_account_state_file, 'w', encoding="UTF-8") as state_writer:
         json.dump([sys_account_state], state_writer, indent=4)
     logger.info(f"System account state for tokens in {address} has been saved to {sys_account_state_file}.")
@@ -434,7 +435,7 @@ def fetch_system_account_state_from_token(token: str, proxy: ProxyNetworkProvide
     }
 
     # save system account state to file
-    sys_account_state_file = f"{STATES_FOLDER}/{block_number}_system_account_state_{token}.json"
+    sys_account_state_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_system_account_state_{token}.json"
     with open(sys_account_state_file, 'w', encoding="UTF-8") as state_writer:
         json.dump([sys_account_state], state_writer, indent=4)
     logger.info(f"System account state for {token} has been saved to {sys_account_state_file}.")
@@ -512,7 +513,7 @@ def fetch_contract_states(context: Context, args, proxy: ProxyNetworkProvider, b
         all_keys.append(account_state)
 
     # dump all keys to a file
-    all_keys_file = f"{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"
+    all_keys_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_{args.contracts}_all_keys.json"
     with open(all_keys_file, 'w', encoding="UTF-8") as state_writer:
         json.dump(all_keys, state_writer, indent=4)
     logger.info(f"State for {args.contracts} contracts has been retrieved and saved to {all_keys_file}.")
@@ -520,7 +521,7 @@ def fetch_contract_states(context: Context, args, proxy: ProxyNetworkProvider, b
     chronology = get_current_shard_chronology(proxy, contracts_shard)
     logger.info(f"Current shard chronology: {chronology}")
     # save chronology to file
-    chronology_file = f"{STATES_FOLDER}/{block_number}_shard_chronology.json"
+    chronology_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_shard_chronology.json"
     with open(chronology_file, 'w', encoding="UTF-8") as chronology_writer:
         json.dump(chronology, chronology_writer, indent=4)
     logger.info(f"Shard chronology has been saved to {chronology_file}.")
@@ -539,7 +540,7 @@ def fetch_user_state_with_tokens(user_address: str, context: Context, proxy: Pro
 
 
 def retrieve_handler(args: Any):
-    if not args.gateway:
+    if not hasattr(args, 'gateway') or not args.gateway:
         log_step_fail("Gateway is required. Please provide a gateway address.")
         return
     
@@ -547,9 +548,12 @@ def retrieve_handler(args: Any):
     proxy = ProxyNetworkProvider(args.gateway)
     # if block is not empty, use it to retrieve all state from that specific block
     contracts_shard = WrapperAddress(context.get_contracts(config.ROUTER_V2)[0].address).get_shard()
-    block_number = get_retrieve_block(proxy, contracts_shard, int(args.block)) if args.block else 0
+    if hasattr(args, 'block') and args.block:
+        block_number = get_retrieve_block(proxy, contracts_shard, int(args.block))
+    else:
+        block_number = 0
 
-    if args.contracts:
+    if hasattr(args, 'contracts') and args.contracts:
         if args.contract_index:
             if not args.contracts:
                 log_step_fail("Contract index provided but no contracts to retrieve from. Please provide a specific type of contracts.")
@@ -563,10 +567,10 @@ def retrieve_handler(args: Any):
             
         fetch_contract_states(context, args, proxy, block_number)
     
-    if args.account:
+    if hasattr(args, 'account') and args.account:
         fetch_user_state_with_tokens(args.account, context, proxy, block_number)
 
-    if args.token:
+    if hasattr(args, 'token') and args.token:
         fetch_system_account_state_from_token(args.token, proxy, block_number)
 
 
@@ -575,12 +579,12 @@ def start_handler(args: Any) -> tuple[ChainSimulator, list[str]]:
     Starts the chain simulator and loads all the contract and account states found in the default folder.
     """
 
-    if not args.docker_path or not Path(args.docker_path).exists():
+    if not hasattr(args, 'docker_path') or not args.docker_path or not Path(args.docker_path).exists():
         log_step_fail("Docker path is not provided or does not exist. Please provide a valid docker path.")
         return
-    if not args.state_path or not Path(args.state_path).exists():
+    if not hasattr(args, 'state_path') or not args.state_path or not Path(args.state_path).exists():
         log_warning(f"State path is not provided or does not exist. Using default folder: {STATES_FOLDER}")
-        args.state_path = STATES_FOLDER
+        args.state_path = config.DEFAULT_WORKSPACE.absolute() / STATES_FOLDER
     
     chronology = get_shard_chronology_in_folder(Path(args.state_path))
     if not chronology:
