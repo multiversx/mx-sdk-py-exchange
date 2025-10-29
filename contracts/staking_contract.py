@@ -7,7 +7,7 @@ from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, ESDTToken, multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string, base64_to_hex
 from utils.contract_data_fetchers import StakingContractDataFetcher
-from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider, Token
 from multiversx_sdk.abi import AddressValue
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
@@ -481,17 +481,17 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
                                                               holder_address: str, token_nonce: int) -> Dict[str, Any]:
         """ Get decoded attributes of the farm token from the proxy without underlying farm and stake tokens.
         Proxy usage requires to know the holder address."""
-        farm_token_on_network = proxy.get_nonfungible_token_of_account(Address(holder_address), self.farm_token, token_nonce)
+        farm_token_on_network = proxy.get_token_of_account(Address(holder_address), Token(self.farm_token, token_nonce))
 
         try:
-            farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), STAKE_V2_TOKEN_ATTRIBUTES)
+            farm_token_decoded_attributes = decode_merged_attributes(farm_token_on_network.attributes.hex(), STAKE_V2_TOKEN_ATTRIBUTES)
         except ValueError as e:
             try:
                 # handle for old stake token attributes
-                farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), STAKE_V1_TOKEN_ATTRIBUTES)
+                farm_token_decoded_attributes = decode_merged_attributes(farm_token_on_network.attributes.hex(), STAKE_V1_TOKEN_ATTRIBUTES)
             except ValueError as e:
                 # unstake token
-                farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), STAKE_UNBOND_TOKEN_ATTRIBUTES)
+                farm_token_decoded_attributes = decode_merged_attributes(farm_token_on_network.attributes.hex(), STAKE_UNBOND_TOKEN_ATTRIBUTES)
 
         logger.debug(f'Farm Tokens: {farm_token_decoded_attributes}')
 

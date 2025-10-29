@@ -6,7 +6,7 @@ from utils.logger import get_logger
 from utils.utils_tx import deploy, upgrade_call, \
     endpoint_call, multi_esdt_endpoint_call
 from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes, hex_to_string
-from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
+from multiversx_sdk import CodeMetadata, ProxyNetworkProvider, Token
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 import config
@@ -281,9 +281,9 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
                                                               holder_address: str, token_nonce: int) -> Dict[str, Any]:
         """ Get decoded attributes of the metastake token from the proxy without underlying farm and stake tokens.
         Proxy usage requires to know the holder address."""
-        metastake_token_on_network = proxy.get_nonfungible_token_of_account(Address(holder_address), self.metastake_token, token_nonce)
+        metastake_token_on_network = proxy.get_token_of_account(Address(holder_address), Token(self.metastake_token, token_nonce))
          
-        decoded_attributes = decode_merged_attributes(base64_to_hex(metastake_token_on_network.attributes), METASTAKE_TOKEN_ATTRIBUTES)
+        decoded_attributes = decode_merged_attributes(metastake_token_on_network.attributes.hex(), METASTAKE_TOKEN_ATTRIBUTES)
         logger.debug(f'Metastake Tokens: {decoded_attributes}')
 
         return decoded_attributes
@@ -294,16 +294,16 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
         Proxy usage requires to know the holder address."""
         decoded_attributes = self.get_decoded_metastake_token_attributes_from_proxy(proxy, holder_address, token_nonce)
 
-        farm_token_on_network = proxy.get_nonfungible_token_of_account(Address(self.address), self.farm_token, decoded_attributes.get('lp_farm_token_nonce'))
-        farm_token_decoded_attributes = decode_merged_attributes(base64_to_hex(farm_token_on_network.attributes), FARM_TOKEN_ATTRIBUTES)
+        farm_token_on_network = proxy.get_token_of_account(Address(self.address), Token(self.farm_token, decoded_attributes.get('lp_farm_token_nonce')))
+        farm_token_decoded_attributes = decode_merged_attributes(farm_token_on_network.attributes.hex(), FARM_TOKEN_ATTRIBUTES)
         logger.debug(f'Underlying Farm Tokens: {farm_token_decoded_attributes}')
 
-        stake_token_on_network = proxy.get_nonfungible_token_of_account(Address(self.address), self.stake_token, decoded_attributes.get('staking_farm_token_nonce'))
+        stake_token_on_network = proxy.get_token_of_account(Address(self.address), Token(self.stake_token, decoded_attributes.get('staking_farm_token_nonce')))
         try:
-            stake_token_decoded_attributes = decode_merged_attributes(base64_to_hex(stake_token_on_network.attributes), STAKE_V2_TOKEN_ATTRIBUTES)
+            stake_token_decoded_attributes = decode_merged_attributes(stake_token_on_network.attributes.hex(), STAKE_V2_TOKEN_ATTRIBUTES)
         except ValueError as e:
             # handle for old stake token attributes
-            stake_token_decoded_attributes = decode_merged_attributes(base64_to_hex(stake_token_on_network.attributes), STAKE_V1_TOKEN_ATTRIBUTES)
+            stake_token_decoded_attributes = decode_merged_attributes(stake_token_on_network.attributes.hex(), STAKE_V1_TOKEN_ATTRIBUTES)
         logger.debug(f'Underlying Stake Tokens: {stake_token_decoded_attributes}')
 
         return decoded_attributes, farm_token_decoded_attributes, stake_token_decoded_attributes
