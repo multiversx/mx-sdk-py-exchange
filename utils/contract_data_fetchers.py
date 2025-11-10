@@ -325,7 +325,9 @@ class BaseFarmContractDataFetcher(DataFetcher):
         self.view_handler_map = {
             "getFarmTokenSupply": self._get_int_view,
             "getLastRewardBlockNonce": self._get_int_view,
+            "getLastRewardTimestamp": self._get_int_view,
             "getPerBlockRewardAmount": self._get_int_view,
+            "getPerSecondRewardAmount": self._get_int_view,
             "getRewardReserve": self._get_int_view,
             "getRewardPerShare": self._get_int_view,
             "getDivisionSafetyConstant": self._get_int_view,
@@ -350,6 +352,7 @@ class BaseBoostedContractDataFetcher(DataFetcher):
             "getTotalLockedTokensForWeek": self._get_int_view,
             "getTotalEnergyForWeek": self._get_int_view,
             "getTotalRewardsForWeek": self._get_int_view,
+            "getAccumulatedRewardsForWeek": self._get_int_view,
             "getRemainingBoostedRewardsToDistribute": self._get_int_view,
             "getUndistributedBoostedRewards": self._get_int_view,
         }

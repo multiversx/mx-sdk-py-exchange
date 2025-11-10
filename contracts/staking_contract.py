@@ -469,6 +469,13 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         if not raw_results:
             return 0
         return int(raw_results)
+
+    def get_max_apr(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getAnnualPercentageRewards')
+        if not raw_results:
+            return 0
+        return int(raw_results)
     
     def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)

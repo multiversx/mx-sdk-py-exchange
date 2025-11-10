@@ -46,33 +46,13 @@ class BaseBoostedContract(DEXContractInterface, ABC):
         result = int(raw_results)
 
         return result
-    
-    def get_last_global_update_week(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastGlobalUpdateWeek')
-        if not raw_results:
-            return 0
-        result = int(raw_results)
 
-        return result
-    
-    def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentWeek')
-        if not raw_results:
-            return 0
-        current_week = int(raw_results)
+    def get_next_week_start_epoch(self, proxy: ProxyNetworkProvider) -> int:
+        first_week = self.get_first_week_start_epoch(proxy)
+        current_week = self.get_current_week(proxy)
+        next_week_at_epoch = first_week + current_week * 7
 
-        return current_week
-    
-    def get_first_week_start_epoch(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFirstWeekStartEpoch')
-        if not raw_results:
-            return 0
-        result = int(raw_results)
-
-        return result
+        return next_week_at_epoch
     
     def get_last_global_update_week(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
@@ -123,6 +103,13 @@ class BaseBoostedContract(DEXContractInterface, ABC):
         if not raw_results:
             return 0
         return int(raw_results)
+
+    def get_accumulated_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
+        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getAccumulatedRewardsForWeek', [U64Value(week)])
+        if not raw_results:
+            return 0
+        return int(raw_results)
     
     def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
@@ -163,7 +150,10 @@ class BaseBoostedContract(DEXContractInterface, ABC):
             "first_week": self.get_first_week_start_epoch(proxy),
             "current_week": self.get_current_week(proxy),
             "farm_supply_for_week": self.get_farm_supply_for_week(proxy, week),
+            "total_rewards_for_week": self.get_total_rewards_for_week(proxy, week),
             "total_locked_tokens_for_week": self.get_total_locked_tokens_for_week(proxy, week),
+            "accumulated_rewards_for_week": self.get_accumulated_rewards_for_week(proxy, week),
+            ""
             "total_energy_for_week": self.get_total_energy_for_week(proxy, week)
         }
         return staking_stats
@@ -203,6 +193,13 @@ class BaseFarmContract(DEXContractInterface, ABC):
     def get_last_reward_block_nonce(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getLastRewardBlockNonce')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+
+    def get_last_reward_timestamp(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getLastRewardTimestamp')
         if not raw_results:
             return 0
         return int(raw_results)
@@ -259,6 +256,7 @@ class BaseFarmContract(DEXContractInterface, ABC):
             "reward_reserve": self.get_reward_reserve(proxy),
             "reward_per_share": self.get_reward_per_share(proxy),
             "last_reward_block_nonce": self.get_last_reward_block_nonce(proxy),
+            "last_reward_timestamp": self.get_last_reward_timestamp(proxy),
             "state": self.get_state(proxy)
         }
         return farm_stats

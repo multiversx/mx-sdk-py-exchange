@@ -221,7 +221,7 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
-        gas_limit = 70000000
+        gas_limit = 90000000
         exit_metastake_fn = 'unstakeFarmTokens'
 
         return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,

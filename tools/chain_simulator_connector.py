@@ -30,7 +30,7 @@ GENERATE_BLOCKS_URL = f"{SIMULATOR_URL}/simulator/generate-blocks/"
 SET_STATE_URL = f"{SIMULATOR_URL}/simulator/set-state"
 SEND_USER_FUNDS_URL = f"{SIMULATOR_URL}/transaction/send-user-funds"
 STATES_FOLDER = "states"
-BLOCKS_PER_EPOCH = 20
+BLOCKS_PER_EPOCH = 100
 
 
 def is_valid_address(address: str) -> bool:
@@ -341,13 +341,13 @@ def fetch_account_state(address: str, proxy: ProxyNetworkProvider, block_number:
     keys_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_state.json"
     data_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_data.json"
     chain_config_file = f"{config.DEFAULT_WORKSPACE.absolute()}/{STATES_FOLDER}/{block_number}_{file_label}_{file_index}_chain_config_state.json"
-    keys = get_account_keys_online(address, proxy.url, block_number, keys_file)
+    keys = get_account_keys_online(address, proxy.url, block_number, keys_file, paginated=False)
     data = get_account_data_online(address, proxy.url, block_number, data_file)
     data.pop("rootHash", None) # remove rootHash from data
     
     account_state = {}
     account_state.update(data)
-    account_state['pairs'] = keys 
+    account_state['pairs'] = keys
 
     # save account chain config state to file
     with open(chain_config_file, 'w', encoding="UTF-8") as state_writer:
