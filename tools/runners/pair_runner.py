@@ -1,16 +1,19 @@
 from argparse import ArgumentParser
+import time
 from typing import Any
 from multiversx_sdk import Address
+from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
 from context import Context
 from contracts.contract_identities import PairContractVersion, RouterContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
-from contracts.pair_contract import PairContract
+from contracts.pair_contract import PairContract, SwapFixedInputEvent
 from contracts.router_contract import RouterContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue, run_graphql_query, fetch_and_save_contracts, get_saved_contract_addresses
 from tools.runners.common_runner import add_upgrade_all_command
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
+from utils.utils_chain import Account
 from utils.utils_tx import NetworkProviders
 
 import config
@@ -49,6 +52,12 @@ def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
 
     command_parser = contract_group.add_parser('update-fees', help='update fees percentage in all contracts command')
     command_parser.set_defaults(func=update_fees_percentage)
+
+    command_parser = contract_group.add_parser('generate-swaps', help='generate swaps on pair')
+    command_parser.add_argument('--address', type=str, help='contract address')
+    command_parser.add_argument('--inputAmountUSD', type=float, help='input token amount in USD per swap')
+    command_parser.add_argument('--swapsCount', type=int, help='number of swaps to execute')
+    command_parser.set_defaults(func=generate_swaps)
 
     return group_parser
 
@@ -331,6 +340,101 @@ def update_fees_percentage(_):
             return
 
         count += 1
+
+
+def generate_swaps(args: Any):
+    """Generate swaps on a single pair"""
+
+    print('Start swaps generator')
+
+    pair_address = args.address
+    input_amount_usd = args.inputAmountUSD
+    swaps_count = args.swapsCount
+    network_provider = NetworkProviders(API, PROXY)
+
+    user_account = Account.from_file(config.DEFAULT_ACCOUNTS.as_posix())
+    if user_account is None:
+        print('Invalid account file')
+        return
+
+    pair_contract = PairContract.load_contract_by_address(pair_address, PairContractVersion.V2)
+
+    if pair_contract is None:
+        return
+
+    data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address), network_provider.proxy.url)
+
+    query = """
+        {
+            filteredPairs(filters: { addresses: [\"""" + pair_address + """"] }) {
+                edges {
+                    node {
+                        address
+                        firstToken {
+                            decimals
+                        }
+                        secondToken {
+                            decimals
+                        }
+                        firstTokenPriceUSD
+                        secondTokenPriceUSD
+                    }
+                }
+            }
+        }
+    """
+
+    for i in range(0, swaps_count):
+        result = run_graphql_query(config.GRAPHQL, query)
+        pair_data = result['data']['filteredPairs']['edges'][0]['node']
+
+        user_account.sync_nonce(network_provider.proxy)
+
+        if i % 2 == 1:
+            decimals = pair_data['firstToken']['decimals']
+            token_price_usd = float(pair_data['firstTokenPriceUSD'])
+            token_input_amount = input_amount_usd / token_price_usd * (10**decimals)
+
+            equivalent_amount_token_b = data_fetcher.get_data(
+                "getAmountOut",
+                [
+                    TokenIdentifierValue(pair_contract.firstToken),
+                    BigUIntValue(int(token_input_amount))
+                ]
+            )
+
+            amount_token_b_min = int(equivalent_amount_token_b * 0.99)
+
+            swap_token_event = SwapFixedInputEvent(
+                pair_contract.firstToken,
+                int(token_input_amount),
+                pair_contract.secondToken,
+                amount_token_b_min
+            )
+        else:
+            decimals = pair_data['secondToken']['decimals']
+            token_price_usd = float(pair_data['secondTokenPriceUSD'])
+            token_input_amount = input_amount_usd / token_price_usd * (10**decimals)
+
+            equivalent_amount_token_b = data_fetcher.get_data(
+                "getAmountOut",
+                [
+                    TokenIdentifierValue(pair_contract.secondToken),
+                    BigUIntValue(int(token_input_amount))
+                ]
+            )
+
+            amount_token_b_min = int(equivalent_amount_token_b * 0.99)
+
+            swap_token_event = SwapFixedInputEvent(
+                pair_contract.secondToken,
+                int(token_input_amount),
+                pair_contract.firstToken,
+                amount_token_b_min
+            )
+
+        _ = pair_contract.swap_fixed_input(network_provider, user_account, swap_token_event)
+        time.sleep(6)
 
 
 def deploy_pair_view():
