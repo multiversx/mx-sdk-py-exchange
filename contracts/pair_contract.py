@@ -354,7 +354,7 @@ class PairContract(DEXContractInterface):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 50000000
+        gas_limit = 5000000
         sc_args = [
             Address(args[0]),
             args[1]
@@ -373,7 +373,7 @@ class PairContract(DEXContractInterface):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 50000000
+        gas_limit = 5000000
         sc_args = args
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setFeePercents", sc_args)
 
