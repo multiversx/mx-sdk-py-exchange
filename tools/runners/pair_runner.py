@@ -384,6 +384,20 @@ def generate_swaps(args: Any):
         }
     """
 
+    block_time = 6  # Seconds (e.g., MultiversX is 6s, Ethereum 12s)
+    seconds_in_day = 86400
+
+    # Calculate how many full batches of 2 trades we will run
+    batches_per_day = swaps_count / 2
+
+    # Calculate the specific wait time between batches to fill 24 hours
+    # Formula: (Total Seconds - (Time spent inside batches)) / Number of Batches
+    # Time spent inside a batch is just 1 block time (between trade A and B)
+    batch_wait_time = (seconds_in_day - (batches_per_day * block_time)) / batches_per_day
+
+    print(f"Strategy: {batches_per_day} batches.")
+    print(f"Sequence: Trade -> Wait {block_time}s -> Trade -> Wait {batch_wait_time:.2f}s")
+
     for i in range(0, swaps_count):
         result = run_graphql_query(config.GRAPHQL, query)
         pair_data = result['data']['filteredPairs']['edges'][0]['node']
@@ -433,8 +447,18 @@ def generate_swaps(args: Any):
                 amount_token_b_min
             )
 
-        _ = pair_contract.swap_fixed_input(network_provider, user_account, swap_token_event)
-        time.sleep(6)
+        tx_hash = pair_contract.swap_fixed_input(network_provider, user_account, swap_token_event)
+        print(f"Trade {i + 1}/{swaps_count} executed. Hash: {tx_hash}")
+
+        is_end_of_batch = (i + 1) % 2 == 0
+
+        if i < swaps_count - 1:
+            if is_end_of_batch:
+                print(f"Batch complete. Waiting {batch_wait_time:.2f} seconds...")
+                time.sleep(batch_wait_time)
+            else:
+                print(f"Leg 1 complete. Waiting {block_time}s for next block...")
+                time.sleep(block_time)
 
 
 def deploy_pair_view():
