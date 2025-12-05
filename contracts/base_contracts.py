@@ -153,7 +153,6 @@ class BaseBoostedContract(DEXContractInterface, ABC):
             "total_rewards_for_week": self.get_total_rewards_for_week(proxy, week),
             "total_locked_tokens_for_week": self.get_total_locked_tokens_for_week(proxy, week),
             "accumulated_rewards_for_week": self.get_accumulated_rewards_for_week(proxy, week),
-            ""
             "total_energy_for_week": self.get_total_energy_for_week(proxy, week)
         }
         return staking_stats
