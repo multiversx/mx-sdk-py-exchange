@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.backend_bases import PickEvent
+from pathlib import Path
 
 
 LOG_FILENAME = "dump/safe_price_observations.csv"
@@ -99,6 +100,9 @@ def main(cli_args: List[str]):
 
     global LOG_FILENAME
     LOG_FILENAME = f"dump/safe_price_observations_{args.file_suffix}.csv"
+
+    if not Path(LOG_FILENAME).exists():
+        raise FileNotFoundError(f"File {LOG_FILENAME} does not exist")
 
 
 if __name__ == "__main__":

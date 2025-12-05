@@ -74,11 +74,6 @@ def get_lp_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, 
 def get_safe_price_legacy(context: Context, abi: Abi, pair_contract: PairContract, token: str, reference_amount: int) -> tuple[int, str]:
     contract_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_contract.address), context.network_provider.proxy.url)
 
-    # view_payload = f"000000{dec_to_padded_hex(len(string_to_hex(pair_contract.firstToken))//2)}" \
-    #                f"{string_to_hex(pair_contract.firstToken)}" \
-    #                f"0000000000000000" \
-    #                f"000000{dec_to_padded_hex(len(dec_to_padded_hex(reference_amount))//2)}" \
-    #                f"{dec_to_padded_hex(reference_amount)}"
     view_payload_new = abi.encode_custom_type("EsdtTokenPayment", [token, 0, reference_amount])
     hex_val = contract_data_fetcher.get_data("updateAndGetSafePrice", [bytes.fromhex(view_payload_new)])
 
@@ -91,9 +86,6 @@ def get_safe_price_legacy(context: Context, abi: Abi, pair_contract: PairContrac
 
 def get_spot_price(context: Context, pair_contract: PairContract, token: str, reference_amount: int) -> tuple[int, str]:
     contract_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_contract.address), context.network_provider.proxy.url)
-    # args_payload = f"{string_to_hex(pair_contract.firstToken)}" \
-    #                f"000000{dec_to_padded_hex(len(dec_to_padded_hex(reference_amount)) // 2)}" \
-    #                f"{dec_to_padded_hex(reference_amount)}"
     spot_price = contract_data_fetcher.get_data("getEquivalent",
                                                     [TokenIdentifierValue(token),
                                                      BigUIntValue(reference_amount)])
