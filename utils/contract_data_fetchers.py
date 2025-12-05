@@ -211,7 +211,7 @@ class PairContractDataFetcher(DataFetcher):
             "getFirstTokenId": self._get_hex_view,
             "getSecondTokenId": self._get_hex_view,
             "getInitialLiquidtyAdder": self._get_hex_view,
-            "getTokensForGivenPosition": self._get_int_list_view,
+            "getTokensForGivenPosition": self._get_hex_list_view,
             "getState": self._get_int_view,
             "getReservesAndTotalSupply": self._get_int_list_view,
             "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
