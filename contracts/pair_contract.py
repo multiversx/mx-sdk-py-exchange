@@ -354,7 +354,7 @@ class PairContract(DEXContractInterface):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 5000000
+        gas_limit = 5500000
         sc_args = [
             Address(args[0]),
             args[1]
