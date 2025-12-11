@@ -36,11 +36,11 @@ class FetchedUsers:
         return address in [user.address for user in self.users]
 
     # getter for users having farming tokens
-    def get_users_with_farming_tokens(self) -> list:
+    def get_users_with_farming_tokens(self) -> list[FetchedUser]:
         return [user for user in self.users if len(user.farming_tokens) > 0]
     
     # getter for users having farm tokens
-    def get_users_with_farm_tokens(self) -> list:
+    def get_users_with_farm_tokens(self) -> list[FetchedUser]:
         return [user for user in self.users if len(user.farm_tokens) > 0]
     
     # getter for users having more than one farm tokens
