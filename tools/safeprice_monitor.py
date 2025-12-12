@@ -6,7 +6,7 @@ import config
 from argparse import ArgumentParser
 from multiversx_sdk import Address, SmartContractController
 from multiversx_sdk.abi import AddressValue, U64Value, TokenIdentifierValue, BigUIntValue, Abi
-from typing import List
+from typing import List, Any
 from context import Context
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_padded_hex
@@ -39,6 +39,7 @@ zero_esdt_token_result = {
 
 
 def get_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pair_contract: PairContract, offset: int, token: str, reference_amount: int) -> tuple[int, str]:
+    """ Returns the amount and token identifier of the safe price of the given token at the given offset """
     safe_price_view_contract = context.get_contracts(config.PAIRS_VIEW)[0]
     view_controller = SmartContractController(context.network_provider.proxy.get_network_config().chain_id, context.network_provider.proxy, abi)
     
@@ -51,14 +52,28 @@ def get_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pai
     return 0, ""
 
 
+def get_lp_safe_price_by_offset(timebase: Timebase, context: Context, abi: Abi, pair_contract: PairContract, 
+                                offset: int, reference_amount: int) -> list[Any]:
+    """ Returns a list of namespaces containing the two tokens underlying the given lp reference amount.
+        Each namespace contains:
+        - token_identifier
+        - nonce
+        - amount"""
+    safe_price_view_contract = context.get_contracts(config.PAIRS_VIEW)[0]
+    view_controller = SmartContractController(context.network_provider.proxy.get_network_config().chain_id, context.network_provider.proxy, abi)
+    
+    endpoint = f"getLpTokensSafePriceBy{timebase.value}Offset"
+    query = view_controller.create_query(Address.new_from_bech32(safe_price_view_contract.address), endpoint, 
+                                                 [pair_contract.address, offset, reference_amount])
+    response = view_controller.run_query(query)
+    if response:
+        return view_controller.parse_query_response(response)
+    return []
+
+
 def get_safe_price_legacy(context: Context, abi: Abi, pair_contract: PairContract, token: str, reference_amount: int) -> tuple[int, str]:
     contract_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_contract.address), context.network_provider.proxy.url)
 
-    # view_payload = f"000000{dec_to_padded_hex(len(string_to_hex(pair_contract.firstToken))//2)}" \
-    #                f"{string_to_hex(pair_contract.firstToken)}" \
-    #                f"0000000000000000" \
-    #                f"000000{dec_to_padded_hex(len(dec_to_padded_hex(reference_amount))//2)}" \
-    #                f"{dec_to_padded_hex(reference_amount)}"
     view_payload_new = abi.encode_custom_type("EsdtTokenPayment", [token, 0, reference_amount])
     hex_val = contract_data_fetcher.get_data("updateAndGetSafePrice", [bytes.fromhex(view_payload_new)])
 
@@ -71,9 +86,6 @@ def get_safe_price_legacy(context: Context, abi: Abi, pair_contract: PairContrac
 
 def get_spot_price(context: Context, pair_contract: PairContract, token: str, reference_amount: int) -> tuple[int, str]:
     contract_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_contract.address), context.network_provider.proxy.url)
-    # args_payload = f"{string_to_hex(pair_contract.firstToken)}" \
-    #                f"000000{dec_to_padded_hex(len(dec_to_padded_hex(reference_amount)) // 2)}" \
-    #                f"{dec_to_padded_hex(reference_amount)}"
     spot_price = contract_data_fetcher.get_data("getEquivalent",
                                                     [TokenIdentifierValue(token),
                                                      BigUIntValue(reference_amount)])
@@ -84,8 +96,9 @@ def main(cli_args: List[str]):
     parser = ArgumentParser()
     parser.add_argument("--file-suffix", required=False, default="")
     parser.add_argument("--view-contract", action="store_true", required=False, default=False)
-    parser.add_argument("--model-samples", required=False, type=int, nargs='+',
-                        help='Number of round samples to use for offline models')
+    parser.add_argument("--model-samples", required=True, type=int, nargs='+',
+                        help='Number of round samples to use for both online and offline models')
+    parser.add_argument("--offline-models", action="store_true", required=False, default=False)
     args = parser.parse_args(cli_args)
 
     global LOG_FILENAME
@@ -97,19 +110,23 @@ def main(cli_args: List[str]):
     context = Context()
     pair_contract = context.get_pair_v2_contract(0)
     proxy = context.network_provider.proxy
+    ms_per_round = proxy.get_network_config().round_duration
 
     # add offline models
     offline_models: List[OfflineModel] = []
     uniswap_models: List[UniswapV2Model] = []
-    if args.model_samples:
+    if args.offline_models:
         for samples in args.model_samples:
             offline_models.append(OfflineModel(samples))
 
-    uniswap_models.append(UniswapV2Model(6, 60000))
+    # uniswap_models.append(UniswapV2Model(6, 60000))
 
-    csv_header = ["block", "safe_price", "spot_price"]
+    csv_header = ["block", "updateAndGetSafePrice", "spot_price"]
     if args.view_contract:
-        csv_header.extend(["10min_avg_rounds", "20min_avg_timestamp"])
+        for samples in args.model_samples:
+            samples_to_timestamp = samples * ms_per_round // 1000
+            csv_header.append(f"getSafePriceByRoundOffset({samples})")
+            csv_header.append(f"getSafePriceByTimestampOffset({samples_to_timestamp})")
     for offline_model in offline_models:
         csv_header.append(f"{offline_model.avg_samples}_rounds_avg_offline")
         if len(uniswap_models):
@@ -130,21 +147,25 @@ def main(cli_args: List[str]):
         spot_price, _ = get_spot_price(context, pair_contract, pair_contract.firstToken, reference_amount)
         last_block = proxy.get_network_status(1).current_round
 
-        if args.view_contract:
-            ten_min_avg, _ = get_safe_price_by_offset(Timebase.ROUND, context, abi, pair_contract, 100, pair_contract.firstToken, reference_amount)
-            ten_min_avg_2, _ = get_safe_price_by_offset(Timebase.TIMESTAMP, context, abi, pair_contract, 600, pair_contract.firstToken, reference_amount)
-            twenty_min_avg, _ = get_safe_price_by_offset(Timebase.TIMESTAMP, context, abi, pair_contract, 1200, pair_contract.firstToken, reference_amount)
-
-        print(f"SAFE PRICE: {safe_price} {other_token}")
         print(f"SPOT PRICE: {spot_price} {other_token}")
+        print(f"Online legacy safe price: {safe_price} {other_token}")
+
+        online_averages = []
         if args.view_contract:
-            print(f"10MIN AVG ROUNDS: {ten_min_avg} {other_token}")
-            print(f"10MIN AVG TIMESTAMP: {ten_min_avg_2} {other_token}")
-            print(f"20MIN AVG TIMESTAMP: {twenty_min_avg} {other_token}")
+            for samples in args.model_samples:
+                samples_to_timestamp = samples * ms_per_round // 1000
+                
+                round_safe_price, _ = get_safe_price_by_offset(Timebase.ROUND, context, abi, pair_contract, samples, pair_contract.firstToken, reference_amount)
+                timestamp_safe_price, _ = get_safe_price_by_offset(Timebase.TIMESTAMP, context, abi, pair_contract, samples_to_timestamp, pair_contract.firstToken, reference_amount)
+                
+                online_averages.extend([round_safe_price, timestamp_safe_price])
+                
+                print(f"{samples} online round safe price: {round_safe_price} {other_token}")
+                print(f"{samples_to_timestamp}s online timestamp safe price: {timestamp_safe_price} {other_token}")
 
         for model in offline_models:
             model.add_observation(spot_price, last_block)
-            print(f"Token: {other_token} {model.avg_samples} AVG: {model.last_computed_price.price} ")
+            print(f"{model.avg_samples} offline round average: {model.last_computed_price.price} {other_token}")
 
         for model in uniswap_models:
             model.add_observation(spot_price, last_block)
@@ -153,8 +174,7 @@ def main(cli_args: List[str]):
             file_writer = csv.writer(f)
             row_data = [last_block, safe_price / 10 ** 18, spot_price / 10 ** 18]
             if args.view_contract:
-                row_data.extend([ten_min_avg / 10 ** 18,
-                                 twenty_min_avg / 10 ** 18])
+                row_data.extend([average / 10 ** 18 for average in online_averages])
             for model in offline_models:
                 row_data.append(model.last_computed_price.price / 10 ** 18)
                 # also log the same averaging in case we use uniswap models

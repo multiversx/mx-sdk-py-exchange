@@ -36,11 +36,11 @@ class FetchedUsers:
         return address in [user.address for user in self.users]
 
     # getter for users having farming tokens
-    def get_users_with_farming_tokens(self) -> list:
+    def get_users_with_farming_tokens(self) -> list[FetchedUser]:
         return [user for user in self.users if len(user.farming_tokens) > 0]
     
     # getter for users having farm tokens
-    def get_users_with_farm_tokens(self) -> list:
+    def get_users_with_farm_tokens(self) -> list[FetchedUser]:
         return [user for user in self.users if len(user.farm_tokens) > 0]
     
     # getter for users having more than one farm tokens
@@ -259,32 +259,32 @@ class PhaseDictsCollector():
         """
         Print a formatted view of all collections across all phases.
         """
-        print("\nCollections Summary:")
-        print("=" * 80)
+        logger.info("\nCollections Summary:")
+        logger.info("=" * 80)
 
         for phase in sorted(self.collections.keys()):
-            print(f"\nPhase: {phase}")
-            print("-" * 40)
+            logger.info(f"\nPhase: {phase}")
+            logger.info("-" * 40)
 
             for dict_type in self.dict_types:  # This will iterate over all enum values of the concrete type
                 collections_list = self.collections[phase][dict_type]
 
                 if not collections_list:
-                    print(f"  No collections")
+                    logger.info(f"  No collections")
                     continue
 
-                print(f"\n{dict_type}:")
-                print("-" * 20)
+                logger.info(f"\n{dict_type}:")
+                logger.info("-" * 20)
 
                 for i, (data, desc) in enumerate(collections_list, 1):
-                    print(f"  Collection {i}" + (f" ({desc})" if desc else ""))
+                    logger.info(f"  Collection {i}" + (f" ({desc})" if desc else ""))
                     if isinstance(data, dict):
                         for key, value in data.items():
-                            print(f"    {key}: {value}")
+                            logger.info(f"    {key}: {value}")
                     else:
-                        print(f"    {data}")
+                        logger.info(f"    {data}")
 
-            print("\n" + "=" * 80)
+            logger.info("\n" + "=" * 80)
 
 # Example usage:
 """
