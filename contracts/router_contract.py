@@ -320,34 +320,48 @@ class RouterContract(DEXContractInterface):
         gas_limit = 10000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "withdrawEgld", [])
     
-    def set_safe_price_round_save_interval(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
+    def set_safe_price_round_save_interval(self, deployer: Account, proxy: ProxyNetworkProvider, interval: int):
         """ Expected as args:
             type[int]: interval
-            type[list[str]]: pair addresses
         """
         function_purpose = f"Set safe price round save interval"
         logger.info(function_purpose)
 
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
+        gas_limit = 10000000
+        sc_args = [
+            interval
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setSafePriceRoundSaveInterval", sc_args)
+
+    def set_default_safe_price_rounds_offset(self, deployer: Account, proxy: ProxyNetworkProvider, offset: int):
+        """ 
+        Sets the default safe price rounds offset for the legacy safe price views.
+        Expected as args:
+            type[int]: offset
+        """
+        function_purpose = f"Set default safe price rounds offset"
+        logger.info(function_purpose)
 
         gas_limit = 10000000
         sc_args = [
-            args[0]
+            offset
         ]
-
-        if type(args[1]) != list:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        sc_args.extend([Address(address) for address in args[1]])
-
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setSafePriceRoundSaveInterval", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setDefaultSafePriceRoundsOffset", sc_args)
     
     def get_pair_template_address(self, proxy: ProxyNetworkProvider):
         router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
         template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
         return template_pair_address
+
+    def get_safe_price_round_save_interval(self, proxy: ProxyNetworkProvider):
+        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
+        interval = router_data_fetcher.get_data("getSafePriceRoundSaveInterval")
+        return int(interval)
+
+    def get_default_safe_price_rounds_offset(self, proxy: ProxyNetworkProvider):
+        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
+        offset = router_data_fetcher.get_data("getDefaultSafePriceRoundsOffset")
+        return int(offset)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

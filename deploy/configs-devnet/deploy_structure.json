@@ -248,6 +248,17 @@
             "special_fee": 100,
             "fees_collector": 0,
             "fees_collector_cut": 500
+        },
+        {
+            "launched_token": 0,
+            "accepted_token": 2,
+            "lp_token": "MEXUSDC",
+            "lp_token_name": "MEXUSDCLP",
+            "fee_token": 1,
+            "total_fee": 300,
+            "special_fee": 100,
+            "fees_collector": 0,
+            "fees_collector_cut": 500
         }
     ],
 

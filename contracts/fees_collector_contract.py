@@ -105,7 +105,7 @@ class FeesCollectorContract(BaseBoostedContract):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 10000000
+        gas_limit = 10000000 + len(args) * 1000000
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addKnownTokens", args)
 
     def remove_known_contracts(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
