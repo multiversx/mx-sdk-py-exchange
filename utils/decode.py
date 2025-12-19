@@ -49,6 +49,14 @@ class BigUintDecoder:
         return int.from_bytes(b.read(length), "big")
 
 
+class AddressDecoder:
+    def top_decode(self, b: ByteReader) -> bytes:
+        return b.read(32)
+
+    def nest_decode(self, b: ByteReader) -> bytes:
+        return self.top_decode(b)
+
+
 class StringDecoder:
     def top_decode(self, b: ByteReader) -> str:
         return b.read_all().decode()
@@ -66,17 +74,50 @@ class BooleanDecoder:
         return self.top_decode(b)
 
 
-class TupleDecoder:
-    decoders: Dict[str, Decoder]
+class OptionDecoder:
+    decoder: Decoder
 
-    def __init__(self, decoders: Dict[str, Decoder]):
+    def __init__(self, decoder: Decoder):
+        self.decoder = decoder
+
+    def top_decode(self, b: ByteReader) -> Any:
+        if b.is_consumed():
+            return None
+        flag = b.read(1)
+        if flag == b'\x01':
+            return self.decoder.nest_decode(b)
+        else:
+            raise ValueError("Invalid Option flag")
+
+    def nest_decode(self, b: ByteReader) -> Any:
+        flag = b.read(1)
+        if flag == b'\x01':
+            return self.decoder.nest_decode(b)
+        elif flag == b'\x00':
+            return None
+        else:
+            raise ValueError("Invalid Option flag")
+
+
+class TupleDecoder:
+    decoders: List[Decoder] | Dict[str, Decoder]
+
+    def __init__(self, decoders: List[Decoder] | Dict[str, Decoder]):
         self.decoders = decoders
 
-    def top_decode(self, b: ByteReader) -> Dict[str, Any]:
-        result = {}
-        for key, decoder in self.decoders.items():
-            result[key] = decoder.nest_decode(b)
-        return result
+    def top_decode(self, b: ByteReader) -> List[Any] | Dict[str, Any]:
+        if isinstance(self.decoders, list):
+            result = []
+            for decoder in self.decoders:
+                result.append(decoder.nest_decode(b))
+            return result
+        elif isinstance(self.decoders, dict):
+            result = {}
+            for key, decoder in self.decoders.items():
+                result[key] = decoder.nest_decode(b)
+            return result
+        else:
+            raise ValueError("Invalid decoders.")
 
     def nest_decode(self, b: ByteReader) -> Dict[str, Any]:
         return self.top_decode(b)
@@ -124,12 +165,20 @@ class d:
         return BigUintDecoder()
 
     @classmethod
+    def Addr(cls):
+        return AddressDecoder()
+
+    @classmethod
     def Str(cls):
         return StringDecoder()
 
     @classmethod
     def Bool(cls):
         return BooleanDecoder()
+
+    @classmethod
+    def Option(cls, decoder: Decoder):
+        return OptionDecoder(decoder)
 
     @classmethod
     def Tuple(cls, decoders: Dict[str, Decoder]):
@@ -140,19 +189,8 @@ class d:
         return ListDecoder(decoder)
 
 
-def top_dec_hex(hex_str: bytes, decoder: Decoder):
-    return decoder.top_decode(ByteReader(bytes.fromhex(hex_str)))
+def top_dec_bytes(b: bytes, decoder: Decoder):
+    return decoder.top_decode(ByteReader(b))
 
-
-# decoded = top_dec_hex(
-#     "000000030c0d0e00000007626f6e6a6f7572000000010c",
-#     d.Tuple({
-#         "a": d.List(d.U8()),
-#         "b": d.Tuple({
-#             "a": d.Str(),
-#             "b": d.U(),
-#         })
-#     }),
-# )
-# print(decoded)
-# # Output: {'a': [12, 13, 14], 'b': {'a': 'bonjour', 'b': 12}}
+def top_dec_hex_str(hex_str: str, decoder: Decoder):
+    return top_dec_bytes(bytes.fromhex(hex_str), decoder)
