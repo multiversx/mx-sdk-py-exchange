@@ -1,5 +1,6 @@
 ipykernel
 ipytest
+pytest>=7.0.0
 toml
 debugpy
 wget
