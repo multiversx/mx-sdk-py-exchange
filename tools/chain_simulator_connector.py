@@ -48,16 +48,16 @@ def is_smart_contract(address: str) -> bool:
         return False
     
 
-def get_sc_states_files_in_folder(state_folder: Path) -> str | None:
+def get_sc_states_files_in_folder(state_folder: Path) -> list[Path]:
     state_files = list(state_folder.iterdir())
-    all_keys_file = None
 
+    sc_state_files = []
     for file in state_files:
-        if "all_all_keys.json" in file.name:
-            all_keys_file = file
-            break
+        if file and "all_keys.json" in file.name:
+            logger.info(f"Return file path: {file.as_posix()}")
+            sc_state_files.append(file)
 
-    return all_keys_file
+    return sc_state_files
 
 
 def get_address_states_in_folder(state_folder: Path, addresses: list[str]) -> list[dict[str, Any]] | None:
@@ -123,13 +123,18 @@ def get_shard_chronology_in_folder(state_folder: Path) -> dict[str, int] | None:
     return None
 
 
-def get_all_sc_states_in_folder(state_folder: Path) -> list[str]:
-    state_file = get_sc_states_files_in_folder(state_folder)
-    if not state_file:
+def get_all_sc_states_in_folder(state_folder: Path) -> list[Any]:
+    state_file_paths = get_sc_states_files_in_folder(state_folder)
+    if len(state_file_paths) == 0:
         return []
-    with open(state_file, 'r', encoding="UTF-8") as f:
-        return [json.load(f)]
     
+    all_sc_states = []
+    for file_path in state_file_paths:
+        with open(file_path, 'r', encoding="UTF-8") as f:
+            all_sc_states.append(json.load(f))
+
+    return all_sc_states
+
 
 class ChainSimulator:
     def __init__(self, docker_path: Path = None):
@@ -153,7 +158,7 @@ class ChainSimulator:
         # alter docker-compose.yml to start with the correct block, round and epoch & add other necessary mods
         self._update_docker_compose(block, round, epoch)
         self.process = subprocess.Popen(["docker", "compose", "up", "-d"], cwd = self.docker_path)
-        time.sleep(50)
+        time.sleep(30)
         return self.process
 
     def stop(self):
@@ -251,7 +256,7 @@ class ChainSimulator:
                     "balance": str(amount),
                 }]])
         logger.debug(f'Funded {len(users)} users with {amount} EGLD')
-        
+
     def fund_users_w_esdt_from_mainnet(self, users: list[str], esdt: str, amount: int):
         from utils.utils_chain import dec_to_padded_hex
         from multiversx_sdk import ApiNetworkProvider, ProxyNetworkProvider

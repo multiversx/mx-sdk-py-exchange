@@ -255,7 +255,7 @@ class NetworkProviders:
     def wait_for_epoch(self, target_epoch: int, idle_time: int = 30):
         status = self.proxy.get_network_status()
         while status.current_epoch < target_epoch:
-            status = self.proxy.get_network_status
+            status = self.proxy.get_network_status()
             time.sleep(idle_time)
 
     def wait_for_nonce_in_shard(self, shard_id: int, target_nonce: int, idle_time: int = 6):
@@ -600,7 +600,7 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
     if "localhost" in proxy.url:
-        proxy.do_post_generic(f"simulator/generate-blocks/1", {})
+        proxy.do_post_generic(f"simulator/generate-blocks/4", {})
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""

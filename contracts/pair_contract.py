@@ -107,7 +107,7 @@ class PairContract(DEXContractInterface):
         logger.debug(f"Account: {user.address}")
         logger.debug(f"{event.amountA} {event.tokenA} for minimum {event.amountBmin} {event.tokenB}")
 
-        gas_limit = 50000000
+        gas_limit = 13500000
 
         tokens = [ESDTToken(event.tokenA, 0, event.amountA)]
         sc_args = [tokens,
