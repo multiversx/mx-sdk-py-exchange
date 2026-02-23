@@ -606,7 +606,7 @@ class TestSwapFixedInput:
         # 3. ASSERT: Check outcome
         tx_result = network_providers.proxy.get_transaction(tx_hash)
 
-        if tx_result.status.is_successful():
+        if tx_result.status.is_successful:
             logger.info("Dust swap succeeded")
 
             reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)

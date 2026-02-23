@@ -3,12 +3,11 @@ services:
     container_name: chain-simulator
     ports:
     - 8085:8085
-    image: multiversx/chainsimulator:v1.9.6-fix1
+    image: multiversx/chainsimulator:v1.11.3
     entrypoint: /bin/bash -c " sed -i 's|http://localhost:9200|http://elasticsearch:9200|g'
       ./config/node/config/external.toml && sed -i '11i\    { File = \"enableEpochs.toml\",
       Path = \"EnableEpochs.StakingV2EnableEpoch\", Value = 0},' ./config/nodeOverrideDefault.toml
-      && ./start-with-services.sh -log-level *:INFO --initial-round=28639764 --initial-nonce=28611743
-      --initial-epoch=1984 --rounds-per-epoch=100"
+      && ./start-with-services.sh -log-level *:INFO --rounds-per-epoch=5"
     healthcheck:
       test:
       - CMD

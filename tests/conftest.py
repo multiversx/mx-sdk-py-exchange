@@ -224,13 +224,24 @@ def blockchain_controller(test_environment):
             """
             Wait for transaction to be processed.
 
+            For chain simulator: uses generate-blocks-until-transaction-processed
+            endpoint which handles cross-shard finalization automatically.
+            Falls back to generating fixed block count if endpoint unavailable.
+
             Args:
                 tx_hash: Transaction hash
-                blocks: Number of blocks to wait (default 1)
+                blocks: Number of blocks to wait (used as max for chainsim,
+                        multiplied by 6s for live networks)
             """
             if self.env.supports_time_control():
-                logger.debug(f"Advancing {blocks} block(s) for tx {tx_hash}")
-                self.env.advance_blocks(blocks)
+                from tests.environments import ChainsimEnvironment
+                if isinstance(self.env, ChainsimEnvironment):
+                    max_blocks = max(blocks, 30)
+                    logger.debug(f"Generating blocks until tx {tx_hash} processed (max {max_blocks})")
+                    self.env.generate_blocks_until_tx_processed(tx_hash, max_blocks)
+                else:
+                    logger.debug(f"Advancing {blocks} block(s) for tx {tx_hash}")
+                    self.env.advance_blocks(blocks)
             else:
                 wait_time = blocks * 6  # ~6 seconds per block
                 logger.debug(f"Waiting {wait_time}s for tx {tx_hash}")
@@ -830,7 +841,9 @@ def isolated_pair_factory(
         blockchain_controller.wait_for_tx(tx_hash_1, blocks=8)
 
         tx_data_1 = network_providers.proxy.get_transaction(tx_hash_1)
-        issue_event_1 = find_events_by_identifier(tx_data_1, "issue")[0]
+        issue_events_1 = find_events_by_identifier(tx_data_1, "issue")
+        assert issue_events_1, f"No 'issue' events found for token issuance tx {tx_hash_1}. Status: {tx_data_1.status}"
+        issue_event_1 = issue_events_1[0]
         first_token = issue_event_1.topics[0].decode('utf-8') if isinstance(issue_event_1.topics[0], bytes) else str(issue_event_1.topics[0])
         logger.info(f"First token issued: {first_token}")
 
@@ -845,7 +858,9 @@ def isolated_pair_factory(
         blockchain_controller.wait_for_tx(tx_hash_2, blocks=8)
 
         tx_data_2 = network_providers.proxy.get_transaction(tx_hash_2)
-        issue_event_2 = find_events_by_identifier(tx_data_2, "issue")[0]
+        issue_events_2 = find_events_by_identifier(tx_data_2, "issue")
+        assert issue_events_2, f"No 'issue' events found for token issuance tx {tx_hash_2}. Status: {tx_data_2.status}"
+        issue_event_2 = issue_events_2[0]
         second_token = issue_event_2.topics[0].decode('utf-8') if isinstance(issue_event_2.topics[0], bytes) else str(issue_event_2.topics[0])
         logger.info(f"Second token issued: {second_token}")
 

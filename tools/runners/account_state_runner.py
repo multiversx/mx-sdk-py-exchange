@@ -30,6 +30,7 @@ def get_all_keys_online_with_retry(address: str, proxy_provider: ProxyNetworkPro
     else:
         resource_url = f"address/{address}/keys?blockNonce={block_number}"
 
+    response = None
     while True:
         try:
             response = proxy_provider.do_get_generic(resource_url)
@@ -39,7 +40,7 @@ def get_all_keys_online_with_retry(address: str, proxy_provider: ProxyNetworkPro
             if input("Do you want to retry? (y/n): ").lower() != "y":
                 break
 
-    keys = response.get("pairs", {})
+    keys = response.get("pairs", {}) if response else {}
 
     return keys
 

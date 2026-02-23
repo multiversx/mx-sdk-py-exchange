@@ -72,6 +72,8 @@ class ChainsimEnvironment(TestEnvironment):
         self.loaded_accounts: List[str] = []
         self._proxy: Optional[ProxyNetworkProvider] = None
         self._network_providers: Optional[NetworkProviders] = None
+        self._externally_started: bool = False
+        self._state_loaded: bool = False
 
         logger.info(f"Initialized ChainsimEnvironment with docker_path={docker_path}")
         if state_path:
@@ -83,30 +85,40 @@ class ChainsimEnvironment(TestEnvironment):
 
         Process:
         1. Initialize ChainSimulator with docker path
-        2. Start docker containers (blocks until ready, ~50s)
-        3. If state_path provided, load state via simulator API
-        4. Initialize network proxy
+        2. Check if chain simulator is already running
+        3. If not running, start docker containers (blocks until ready, ~50s)
+        4. Advance to epoch 1+ to ensure all protocol features (ESDT, etc.) are enabled
+        5. If state_path provided, load state via simulator API
+        6. Initialize network proxy
 
         Raises:
             RuntimeError: If docker fails to start or state loading fails
         """
-        logger.info("Starting chain simulator...")
-
         self.chain_sim = ChainSimulator(self.docker_path)
 
-        # Start simulator with initial block/epoch
-        # self.chain_sim.start(
-        #     block=self.initial_block,
-        #     round=self.initial_round,
-        #     epoch=self.initial_epoch
-        # )
+        # Check if chain simulator is already running (e.g. started externally via docker-compose)
+        if self.chain_sim.is_running():
+            logger.info("Chain simulator already running, connecting to existing instance")
+            self._externally_started = True
+        else:
+            logger.info("Starting chain simulator...")
+            self.chain_sim.start(
+                block=self.initial_block,
+                round=self.initial_round,
+                epoch=self.initial_epoch
+            )
 
-        # if not self.chain_sim.is_running():
-        #     raise RuntimeError("Chain simulator failed to start")
+            if not self.chain_sim.is_running():
+                raise RuntimeError("Chain simulator failed to start")
 
-        self.chain_sim.advance_epochs(1)
+        # Advance past epoch 0 (ESDT disabled) to epoch 10.
+        # firstWeekStartEpoch is overridden to 0 during state loading, so
+        # epoch 7+ gives week >= 1 for fees collector. Epoch 10 adds margin.
+        target_epoch = 10
+        logger.info(f"Advancing to epoch {target_epoch}...")
+        self.chain_sim.advance_epochs_to_epoch(target_epoch)
 
-        logger.info("Chain simulator started successfully")
+        logger.info("Chain simulator ready")
 
         # Initialize proxy (for internal use)
         self._proxy = ProxyNetworkProvider(self.chain_sim.proxy_url, None, NetworkProviderConfig("py-sdk-exchange"))
@@ -118,7 +130,10 @@ class ChainsimEnvironment(TestEnvironment):
         # Load pre-saved state if provided
         if self.state_path and self.state_path.exists():
             logger.info(f"Loading state from {self.state_path}")
-            self.loaded_accounts = self.chain_sim.init_state_from_folder(self.state_path)
+            self.loaded_accounts = self.chain_sim.init_state_from_folder(
+                self.state_path, filter_safe_price=True
+            )
+            self._state_loaded = True
             logger.info(f"Loaded state for {len(self.loaded_accounts)} accounts")
 
             # Generate a block to finalize state loading
@@ -132,21 +147,23 @@ class ChainsimEnvironment(TestEnvironment):
         """
         Stop chain simulator and cleanup docker containers.
 
-        This will:
-        - Terminate docker-compose process
-        - Run 'docker compose down' to cleanup containers
-        - Clear internal state
+        If the simulator was started externally (detected as already running
+        during setup), this only clears internal references without stopping
+        the docker containers.
 
         Note: Does NOT save current blockchain state. Use chain_sim.save_state()
         explicitly if you need to preserve state for future tests.
         """
         if self.chain_sim:
-            logger.info("Stopping chain simulator...")
-            # self.chain_sim.stop()
+            if self._externally_started:
+                logger.info("Chain simulator was externally started, leaving it running")
+            else:
+                logger.info("Stopping chain simulator...")
+                self.chain_sim.stop()
+                logger.info("Chain simulator stopped")
             self.chain_sim = None
             self._proxy = None
             self._network_providers = None
-            logger.info("Chain simulator stopped")
 
     def get_network_providers(self) -> NetworkProviders:
         """
@@ -176,9 +193,9 @@ class ChainsimEnvironment(TestEnvironment):
         Check if environment has pre-deployed contracts.
 
         Returns:
-            bool: True if state_path was provided and loaded, False for clean slate
+            bool: True if state_path was provided and state was loaded, False for clean slate
         """
-        return self.state_path is not None and len(self.loaded_accounts) > 0
+        return self.state_path is not None and self._state_loaded
 
     def advance_blocks(self, count: int) -> None:
         """
@@ -282,6 +299,26 @@ class ChainsimEnvironment(TestEnvironment):
             List[str]: Bech32 addresses of loaded accounts (empty if no state loaded)
         """
         return self.loaded_accounts
+
+    def generate_blocks_until_tx_processed(self, tx_hash: str, max_num_blocks: int = 30):
+        """
+        Generate blocks until a specific transaction is fully processed.
+
+        Uses the chain simulator's dedicated endpoint that handles cross-shard
+        transaction finalization automatically.
+
+        Args:
+            tx_hash: Transaction hash to wait for
+            max_num_blocks: Maximum blocks to generate (default 30)
+
+        Raises:
+            RuntimeError: If simulator not running
+        """
+        if not self.chain_sim:
+            raise RuntimeError("Chain simulator not running")
+
+        logger.debug(f"Generating blocks until tx processed: {tx_hash}")
+        self.chain_sim.generate_blocks_until_tx_processed(tx_hash, max_num_blocks)
 
     def is_running(self) -> bool:
         """

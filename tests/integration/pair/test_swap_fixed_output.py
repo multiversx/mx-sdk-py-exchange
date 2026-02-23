@@ -165,15 +165,16 @@ class TestSwapFixedOutput:
         reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         k_before = reserves_before[0] * reserves_before[1]
 
-        # Desired output: a reasonable amount of second token
-        desired_output = nominated_amount(5)
+        # Desired output: 1% of the second token reserve (safe for any token decimals)
+        desired_output = reserves_before[1] // 100
+        assert desired_output > 0, "Pool must have non-zero second reserve"
 
         # Estimate input needed and set max to 2x for safety
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.firstToken, desired_output, network_providers
         )
         max_input = estimated_input * 2
-        logger.info(f"Requesting {desired_output / 10**18:.4f} secondToken, estimated input: {estimated_input / 10**18:.4f}, max: {max_input / 10**18:.4f}")
+        logger.info(f"Requesting {desired_output} secondToken (1% of reserve), estimated input: {estimated_input}, max: {max_input}")
 
         # 2. ARRANGE: Fund Alice
         ensure_esdt_amounts(alice, {pair_contract.firstToken: max_input})
@@ -266,7 +267,10 @@ class TestSwapFixedOutput:
         reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         k_before = reserves_before[0] * reserves_before[1]
 
-        desired_output = nominated_amount(5)
+        # Desired output: 1% of the first token reserve (safe for any token decimals)
+        desired_output = reserves_before[0] // 100
+        assert desired_output > 0, "Pool must have non-zero first reserve"
+
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.secondToken, desired_output, network_providers
         )
@@ -350,14 +354,17 @@ class TestSwapFixedOutput:
             blockchain_controller, ensure_esdt_amounts
         )
 
-        # 1. ARRANGE: Calculate amounts
-        desired_output = nominated_amount(5)
+        # 1. ARRANGE: Calculate amounts (1% of second reserve, safe for any token decimals)
+        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        desired_output = reserves[1] // 100
+        assert desired_output > 0, "Pool must have non-zero second reserve"
+
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.firstToken, desired_output, network_providers
         )
         # Tight max: only 5% above estimated
         tight_max_input = int(estimated_input * 1.05)
-        logger.info(f"Estimated input: {estimated_input / 10**18:.4f}, tight max: {tight_max_input / 10**18:.4f}")
+        logger.info(f"Estimated input: {estimated_input}, tight max: {tight_max_input}")
 
         # 2. ARRANGE: Fund Alice
         ensure_esdt_amounts(alice, {pair_contract.firstToken: tight_max_input})
@@ -429,13 +436,16 @@ class TestSwapFixedOutput:
         # 1. ARRANGE: Calculate amounts
         reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
 
-        desired_output = nominated_amount(5)
+        # Desired output: 1% of second reserve (safe for any token decimals)
+        desired_output = reserves_before[1] // 100
+        assert desired_output > 0, "Pool must have non-zero second reserve"
+
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.firstToken, desired_output, network_providers
         )
         # Set max to only 50% of estimated (too low)
         insufficient_max = estimated_input // 2
-        logger.info(f"Estimated input: {estimated_input / 10**18:.4f}, insufficient max: {insufficient_max / 10**18:.4f}")
+        logger.info(f"Estimated input: {estimated_input}, insufficient max: {insufficient_max}")
 
         # Fund Alice with the insufficient max
         ensure_esdt_amounts(alice, {pair_contract.firstToken: insufficient_max})

@@ -24,6 +24,21 @@ from utils.utils_tx import ESDTToken
 logger = get_logger(__name__)
 
 
+# Hex-encoded storage key prefixes for safe price observations in pair contracts.
+# These keys store round-dependent TWAP data that causes "cast to i64 error" when
+# loaded mainnet state has round numbers higher than the chain simulator's current round.
+# Filtering these keys lets pair contracts reinitialize safe price from scratch.
+SAFE_PRICE_KEY_PREFIXES = [
+    "70726963655f6f62736572766174696f6e73",              # "price_observations" (covers .item* and .len)
+    "736166655f70726963655f63757272656e745f696e646578",  # "safe_price_current_index"
+]
+
+# Hex-encoded storage key for firstWeekStartEpoch in fees collector and boosted contracts.
+# Week calculation: week = (current_epoch - first_week_start_epoch) / 7
+# When mainnet state has first_week_start_epoch=862, the chain simulator needs epoch 869+.
+# Overriding to 0 means epoch 7+ suffices for week >= 1.
+FIRST_WEEK_START_EPOCH_KEY = "66697273745765656b537461727445706f6368"  # "firstWeekStartEpoch"
+
 SIMULATOR_URL = "http://localhost:8085"
 API_URL = "http://localhost:3001"
 GENERATE_BLOCKS_URL = f"{SIMULATOR_URL}/simulator/generate-blocks/"
@@ -123,11 +138,77 @@ def get_shard_chronology_in_folder(state_folder: Path) -> dict[str, int] | None:
     return None
 
 
+def filter_safe_price_keys(states: list[Any], key_prefixes: list[str] = None) -> tuple[list[Any], int]:
+    """Filter round-dependent safe price storage keys from account states.
+
+    Pair contracts store TWAP price observations tagged with mainnet round numbers.
+    When loaded into a chain simulator with much lower round numbers, arithmetic
+    underflow occurs (current_round - stored_round < 0 → "cast to i64 error").
+
+    Removing these keys lets the contract reinitialize safe price observations
+    using the chain simulator's current round numbers.
+
+    Args:
+        states: List of account state dicts (each with optional 'pairs' storage dict)
+        key_prefixes: Hex key prefixes to filter (defaults to SAFE_PRICE_KEY_PREFIXES)
+
+    Returns:
+        Tuple of (filtered_states, count_of_removed_keys)
+    """
+    if key_prefixes is None:
+        key_prefixes = SAFE_PRICE_KEY_PREFIXES
+
+    total_removed = 0
+    for account_state in states:
+        if not isinstance(account_state, dict) or 'pairs' not in account_state:
+            continue
+        pairs = account_state['pairs']
+        keys_to_remove = [
+            k for k in pairs
+            if any(k.startswith(prefix) for prefix in key_prefixes)
+        ]
+        for k in keys_to_remove:
+            del pairs[k]
+        total_removed += len(keys_to_remove)
+
+    return states, total_removed
+
+
+def override_first_week_start_epoch(states: list[Any], new_value: str = "") -> tuple[list[Any], int]:
+    """Override firstWeekStartEpoch storage key to 0 in all account states.
+
+    Fees collector (and boosted contracts) compute the current week as:
+        week = (current_epoch - first_week_start_epoch) / 7
+    When mainnet state has first_week_start_epoch=862, the chain simulator needs
+    to be at epoch 869+ for valid weeks. By overriding to 0, epoch 7+ suffices.
+
+    Args:
+        states: List of account state dicts (each with optional 'pairs' storage dict)
+        new_value: Hex-encoded new value (default "" = 0 for u64)
+
+    Returns:
+        Tuple of (modified_states, count_of_overridden_keys)
+    """
+    total_overridden = 0
+    for account_state in states:
+        if not isinstance(account_state, dict) or 'pairs' not in account_state:
+            continue
+        pairs = account_state['pairs']
+        if FIRST_WEEK_START_EPOCH_KEY in pairs:
+            old_value = pairs[FIRST_WEEK_START_EPOCH_KEY]
+            pairs[FIRST_WEEK_START_EPOCH_KEY] = new_value
+            total_overridden += 1
+            address = account_state.get('address', 'unknown')
+            logger.info(f"Overrode firstWeekStartEpoch for {address}: {old_value} -> 0")
+
+    return states, total_overridden
+
+
 def get_all_sc_states_in_folder(state_folder: Path) -> list[Any]:
     state_file_paths = get_sc_states_files_in_folder(state_folder)
     if len(state_file_paths) == 0:
         return []
-    
+
     all_sc_states = []
     for file_path in state_file_paths:
         with open(file_path, 'r', encoding="UTF-8") as f:
@@ -189,11 +270,44 @@ class ChainSimulator:
                 return False
         return True
 
-    def init_state_from_folder(self, state_folder: Path) -> list[str]:
+    def init_state_from_folder(self, state_folder: Path, filter_safe_price: bool = False) -> list[str]:
+        """Load all contract and account states from a folder into the chain simulator.
+
+        Args:
+            state_folder: Path to folder containing state JSON files
+            filter_safe_price: If True, remove safe price observation keys from contract
+                state before loading. This prevents "cast to i64 error" when mainnet state
+                has round numbers higher than the chain simulator's current round.
+
+        Returns:
+            List of loaded user addresses (bech32)
+        """
         all_sc_states = get_all_sc_states_in_folder(state_folder)
         user_addresses, contract_addresses = get_standalone_addresses_in_folder(state_folder)
         all_user_states = get_address_states_in_folder(state_folder, user_addresses)
         all_standalone_contract_states = get_address_states_in_folder(state_folder, contract_addresses)
+
+        if filter_safe_price:
+            total_removed = 0
+            for sc_states in all_sc_states:
+                _, removed = filter_safe_price_keys(sc_states)
+                total_removed += removed
+            for contract_states in all_standalone_contract_states:
+                _, removed = filter_safe_price_keys(contract_states)
+                total_removed += removed
+            if total_removed:
+                logger.info(f"Filtered {total_removed} safe price storage keys from loaded state")
+
+            # Override firstWeekStartEpoch to 0 so chain simulator only needs epoch 7+
+            total_overridden = 0
+            for sc_states in all_sc_states:
+                _, overridden = override_first_week_start_epoch(sc_states)
+                total_overridden += overridden
+            for contract_states in all_standalone_contract_states:
+                _, overridden = override_first_week_start_epoch(contract_states)
+                total_overridden += overridden
+            if total_overridden:
+                logger.info(f"Overrode firstWeekStartEpoch in {total_overridden} contract(s)")
 
         if all_sc_states:
             self.apply_states(all_sc_states)
@@ -205,7 +319,7 @@ class ChainSimulator:
 
         if all_user_states:
             self.apply_states(all_user_states)
-            logger.info("User states applied.") 
+            logger.info("User states applied.")
 
         # return found user addresses
         return user_addresses
@@ -214,18 +328,54 @@ class ChainSimulator:
         url = f"{self.proxy_url}/simulator/generate-blocks/{number_of_blocks}"
         response = requests.post(url)
         return response.json()
+
+    def generate_blocks_until_tx_processed(self, tx_hash: str, max_num_blocks: int = 30):
+        """Generate blocks until a transaction is fully processed (cross-shard included).
+
+        Uses the chain simulator's dedicated endpoint that generates blocks on ALL shards
+        until the transaction reaches a final state (success or failure).
+
+        Args:
+            tx_hash: Transaction hash to wait for
+            max_num_blocks: Maximum blocks to generate before stopping (default 30)
+        """
+        url = f"{self.proxy_url}/simulator/generate-blocks-until-transaction-processed/{tx_hash}"
+        if max_num_blocks != 20:  # 20 is the server default
+            url += f"?maxNumBlocks={max_num_blocks}"
+        response = requests.post(url)
+        return response.json()
     
     def advance_epochs(self, number_of_epochs: int):
         blocks_to_advance = self.blocks_per_epoch * number_of_epochs
         return self.advance_blocks(blocks_to_advance)
     
-    def advance_epochs_to_epoch(self, target_epoch: int):
+    def advance_epochs_to_epoch(self, target_epoch: int, chunk_size: int = 500):
+        """Advance the chain simulator to a specific epoch.
+
+        Uses the dedicated /simulator/generate-blocks-until-epoch-reached endpoint
+        which handles epoch transitions internally. For large jumps, advances in
+        chunks to avoid HTTP 500 errors from generating too many blocks at once.
+
+        Args:
+            target_epoch: Target epoch number to reach
+            chunk_size: Maximum epochs to advance per API call (default 500)
+        """
         proxy = ProxyNetworkProvider(self.proxy_url)
         current_epoch = proxy.get_network_status().current_epoch
         if current_epoch >= target_epoch:
             return
-        blocks_to_advance = (target_epoch - current_epoch) * self.blocks_per_epoch
-        return self.advance_blocks(blocks_to_advance)
+
+        logger.info(f"Advancing from epoch {current_epoch} to {target_epoch}...")
+        while current_epoch < target_epoch:
+            chunk_target = min(current_epoch + chunk_size, target_epoch)
+            url = f"{self.proxy_url}/simulator/generate-blocks-until-epoch-reached/{chunk_target}"
+            response = requests.post(url)
+            if response.status_code != 200:
+                logger.warning(f"Epoch advancement returned {response.status_code}, retrying...")
+            current_epoch = proxy.get_network_status().current_epoch
+            logger.info(f"  ... reached epoch {current_epoch}")
+
+        return current_epoch
 
     def _update_docker_compose(self, block: int, round: int, epoch: int):
         # Load the docker-compose.yaml file

@@ -1,22 +1,22 @@
 # Pair Contract Integration Test Coverage Plan
 
-**Last Updated:** 2026-02-10
-**Current Coverage:** ~47.4% (45/95 tests complete)
+**Last Updated:** 2026-02-19
+**Current Coverage:** ~58.9% (56/95 tests complete)
 **Target Coverage:** 95%
 
 ---
 
 ## 📊 Progress Overview
 
-- ✅ **Completed:** 45 tests (47.4%)
+- ✅ **Completed:** 56 tests (58.9%)
 - 🚧 **In Progress:** 0 tests
-- ⏳ **Planned:** 50 tests
+- ⏳ **Planned:** 39 tests
 
 ---
 
 ## Test Categories
 
-### 🌊 Category 1: Liquidity Operations (21 tests) - 18/21 COMPLETE ✅
+### 🌊 Category 1: Liquidity Operations (21 tests) - 21/21 COMPLETE ✅
 
 #### Add Liquidity (11 tests)
 - [x] `test_add_initial_liquidity_empty_pool` - **COMPLETED** ✅
@@ -42,9 +42,10 @@
   - User provides imbalanced token amounts
   - Contract should adjust and return excess
   - File: `test_add_liquidity.py:777-962`
-- [ ] `test_add_liquidity_slippage_exceeded`
-  - Pool ratio changes beyond slippage tolerance
-  - Transaction should fail with proper error
+- [x] `test_add_liquidity_slippage_exceeded` - **COMPLETED** ✅
+  - Bob swaps to change pool ratio, then Alice's add_liquidity fails
+  - Verifies slippage protection: tight min amounts rejected when ratio shifts
+  - File: `test_add_liquidity.py`
 - [x] `test_add_liquidity_zero_amounts` - **COMPLETED** ✅
   - Attempt to add zero of both tokens
   - Should fail with validation error
@@ -57,12 +58,14 @@
   - Send only one token (not both)
   - Should fail - both tokens required
   - File: `test_add_liquidity.py:596-680`
-- [ ] `test_add_liquidity_multiple_users_sequential`
+- [x] `test_add_liquidity_multiple_users_sequential` - **COMPLETED** ✅
   - Alice, Bob, Charlie add liquidity sequentially
-  - Verify proportional LP distribution
-- [ ] `test_add_liquidity_with_fees_accumulated`
-  - Add liquidity after swaps have accumulated fees
-  - LP value should include accrued fees
+  - Verifies proportional LP distribution and pool ratio maintenance
+  - File: `test_add_liquidity.py`
+- [x] `test_add_liquidity_with_fees_accumulated` - **COMPLETED** ✅
+  - Bob swaps to accumulate fees, then Alice adds liquidity
+  - Verifies LP minted proportional to fee-enriched reserves
+  - File: `test_add_liquidity.py`
 
 #### Remove Liquidity (10 tests) - **ALL COMPLETED** ✅
 - [x] `test_remove_liquidity_partial` - **COMPLETED** ✅
@@ -193,26 +196,30 @@
 
 ---
 
-### 💰 Category 3: Economic Invariants (7 tests) - 3/7 COMPLETE ✅
+### 💰 Category 3: Economic Invariants (7 tests) - 7/7 COMPLETE ✅
 
 - [x] `test_constant_product_maintained_after_swaps` - **COVERED** ✅
   - Covered by: `test_swap_fixed_input_multiple_sequential` (10 swaps, `assert_constant_product_holds` after each, `k_final > k_initial`)
   - Also verified in: every swap test calls `assert_constant_product_holds(k_before)`
-- [ ] `test_fees_accumulate_correctly`
-  - Execute swaps with 0.3% fee
-  - Verify fees remain in reserves
-- [ ] `test_lp_token_value_increases_with_fees`
-  - LP redemption value should increase as fees accumulate
-  - Compare LP value before/after swaps
-- [ ] `test_no_arbitrage_opportunity`
-  - After normal operations
-  - Verify no profitable arbitrage exists
+- [x] `test_fees_accumulate_correctly` - **COMPLETED** ✅
+  - 8 swaps alternating direction, k monitored after each
+  - Verifies monotonic k increase, LP supply unchanged, fee config queried
+  - File: `test_economic_invariants.py`
+- [x] `test_lp_token_value_increases_with_fees` - **COMPLETED** ✅
+  - Computes LP geometric value before/after 10 swaps
+  - Verifies geometric mean of position value strictly increases
+  - File: `test_economic_invariants.py`
+- [x] `test_no_arbitrage_opportunity` - **COMPLETED** ✅
+  - Round-trip swap A->B->A with exact amounts
+  - Verifies net loss (fees prevent profitable arbitrage)
+  - File: `test_economic_invariants.py`
 - [x] `test_reserves_never_negative` - **COVERED** ✅
   - Covered by: `test_swap_fixed_input_large_amount`, `test_swap_fixed_input_multiple_sequential`, `test_swap_fixed_output_large_output`
   - All assert `reserves[0] > 0` and `reserves[1] > 0` after operations including extreme cases
-- [ ] `test_lp_supply_consistency`
-  - Sum of all user LP holdings = total supply
-  - Track multiple users
+- [x] `test_lp_supply_consistency` - **COMPLETED** ✅
+  - Alice, Bob, Charlie add liquidity; sum of LP balances <= total supply
+  - Verifies locked LP is small, no phantom minting
+  - File: `test_economic_invariants.py`
 - [x] `test_price_impact_calculation` - **COVERED** ✅
   - Covered by: `test_swap_fixed_input_large_amount`
   - Queries `getAmountOut` for 1 token and 40% of reserve, compares rates, asserts `large_rate < small_rate`
@@ -233,7 +240,7 @@
 
 ---
 
-### 👁️ Category 5: View Functions (7 tests) - 3/7 COMPLETE ✅
+### 👁️ Category 5: View Functions (7 tests) - 7/7 COMPLETE ✅
 
 - [x] `test_get_amount_out` - **COVERED** ✅
   - Covered by: `test_swap_fixed_input_minimum_output`
@@ -245,18 +252,25 @@
 - [x] `test_get_reserves_and_total_supply` - **COVERED** ✅
   - Covered by: every test via `PairAssertions.get_reserves()` which calls `getReservesAndTotalSupply`
   - Values verified against expected state changes (reserve increases/decreases, LP supply changes)
-- [ ] `test_get_tokens_for_given_position`
-  - Calculate underlying tokens for LP position
-  - Verify proportional calculation
-- [ ] `test_get_fee_percentages`
-  - Query total fee and special fee
-  - Verify configuration
-- [ ] `test_get_safe_price`
-  - Query safe price oracle
-  - Verify TWAP calculation
-- [ ] `test_get_price_observation`
-  - Query historical price observations
-  - Verify data points stored correctly
+- [x] `test_get_tokens_for_given_position` - **COMPLETED** ✅
+  - Queries getTokensForGivenPosition with known LP amount
+  - Verifies amounts proportional to reserves: amount = lp * reserve / supply
+  - File: `test_view_functions.py`
+- [x] `test_get_fee_percentages` - **COMPLETED** ✅
+  - Queries getTotalFeePercent and getSpecialFee
+  - Verifies constraints: 0 <= special <= total <= 5000
+  - Verifies fees affect swap output (actual < zero-fee output)
+  - File: `test_view_functions.py`
+- [x] `test_get_safe_price` - **COMPLETED** ✅
+  - Executes swaps with block advancement to create observations
+  - Queries updateAndGetSafePrice with ABI-encoded EsdtTokenPayment
+  - Compares TWAP with spot price for consistency
+  - File: `test_view_functions.py`
+- [x] `test_get_price_observation` - **COMPLETED** ✅
+  - Executes swaps across multiple blocks
+  - Queries getPriceObservation for recent round
+  - Verifies observation data exists and pool state consistent
+  - File: `test_view_functions.py`
 
 ---
 
@@ -475,8 +489,8 @@ def test_operation_scenario(
 | Remove Liquidity | 10 | 12 | ✅ DONE |
 | Swap Fixed Input | 10 | 14 | ✅ DONE |
 | Swap Fixed Output | 8 | 10 | ✅ DONE |
-| Economic Invariants | 7 (3 covered) | 8 | HIGH |
-| View Functions | 7 (3 covered) | 6 | HIGH |
+| Economic Invariants | 7 | 8 | ✅ DONE |
+| View Functions | 7 | 6 | ✅ DONE |
 | Security | 9 | 16 | MEDIUM |
 | Multi-User | 5 (1 covered) | 10 | MEDIUM |
 | Edge Cases | 6 (2 covered) | 12 | MEDIUM |
@@ -495,9 +509,9 @@ def test_operation_scenario(
 3. ✅ Implement Remove Liquidity tests (10 tests) - **DONE**
 4. ✅ Implement Swap Fixed Input tests (10 tests) - **DONE**
 5. ✅ Implement Swap Fixed Output tests (8 tests) - **DONE**
-6. Start Phase 1 continued: Add remaining Economic Invariant tests (4 remaining: fees, LP value, arbitrage, LP supply)
-7. Add remaining View Function tests (4 remaining: position, fees, safe price, observations)
-8. Continue with Phase 2: Security (9), Multi-User (4 remaining), Edge Cases (4 remaining)
+6. ✅ Implement remaining Economic Invariant tests (4 tests) - **DONE**
+7. ✅ Implement remaining View Function tests (4 tests) - **DONE**
+8. Start Phase 2: Security (9), Multi-User (4 remaining), Edge Cases (4 remaining)
 9. Phase 3: State Transitions (3), Fee Mechanics (5), Integration (4), Stress (4)
 
 ---
