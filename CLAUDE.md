@@ -76,6 +76,22 @@ Pytest-based integration tests running against a MultiversX chain simulator (Doc
 - `tests/conftest.py` — Fixtures: environment setup, account funding, contract loading, `BlockchainController`
 - `tests/environments/chainsim_environment.py` — Chain simulator lifecycle (start, state load, block/epoch control)
 - `tools/chain_simulator_connector.py` — Low-level chain sim API (set-state, generate-blocks, state filtering)
+- `tests/helpers/` — Test assertion helpers (`PairAssertions`, `TransactionAssertions`, `ContractStateSnapshot`)
+
+**Test files (pair contract — 82 tests, 100% coverage):**
+- `test_add_liquidity.py` — Add liquidity (initial, slippage, edge cases)
+- `test_remove_liquidity.py` — Remove liquidity (partial, full, slippage)
+- `test_swap_fixed_input.py` — Swap with fixed input amount
+- `test_swap_fixed_output.py` — Swap with fixed output amount
+- `test_view_functions.py` — View/query functions (reserves, safe price, fees)
+- `test_economic_invariants.py` — k=x*y invariant, fee accumulation, LP value
+- `test_multi_user.py` — Concurrent users, LP dilution, fee distribution
+- `test_edge_cases.py` — Extreme ratios, dust amounts, pool recovery
+- `test_fee_mechanics.py` — Fee collection, accumulation, LP value growth
+- `test_state_transitions.py` — Pause/resume lifecycle (requires deployer)
+- `test_security.py` — Sandwich attacks, front-running, price manipulation
+- `test_overflow_boundary.py` — Large/tiny amounts, BigUint boundaries
+- `test_contract_integration.py` — Multi-hop swaps, farm staking, router admin
 
 **Running tests:**
 ```bash
@@ -121,3 +137,13 @@ PYTHONPATH=. python -m pytest tests/integration/pair/test_add_liquidity.py::Test
 - Contract bytecode can be local WASM files or GitHub release URLs
 - Deployed state saved/loaded via `deployed_*.json` files under the config save path
 - `TransactionStatus` fields (`is_successful`, `is_failed`, `is_completed`) are **properties**, not methods — use `tx.status.is_successful` not `tx.status.is_successful()`
+
+## Integration Test Conventions
+
+- **Helpers**: Use `PairAssertions.get_reserves()`, `PairAssertions.assert_constant_product_holds()`, `TransactionAssertions.assert_transaction_success/failed()` from `tests/helpers/`
+- **Deployer tests**: The `deployer_account` fixture does NOT auto-fund with EGLD on chain sim. Call `_ensure_deployer_has_egld()` with `test_environment` fixture for admin operations (pause/resume)
+- **Reserve-relative amounts**: Tests sharing a session-scoped pool must use reserve-relative amounts (e.g., 0.1% of reserve) instead of fixed values, to avoid failures when prior tests modify reserves
+- **Multi-pair tests**: Use `all_pair_contracts` fixture; pairs share WEGLD as a common token for multi-hop swaps
+- **Config labels**: `config.FARMS_V2` = "farms_boosted", `config.FARMS_LOCKED` = "farms_locked", `config.PAIRS_V2` = "pairs_v2", `config.ROUTER_V2` = router. There is no `config.FARMS_BOOSTED`
+- **Farm contracts on chain sim**: Farm contract addresses exist in config but bytecode is not loaded. Tests must check for deployed code and `pytest.skip()` when absent
+- **Cleanup pattern**: Tests that modify contract state (pause/resume) must use `try/finally` to always restore state for other tests

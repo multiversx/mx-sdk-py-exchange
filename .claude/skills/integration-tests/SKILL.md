@@ -1,8 +1,6 @@
 ---
 name: integration-tests
 description: Run and manage integration tests against the MultiversX chain simulator. Use when writing, running, debugging, or fixing integration tests for DEX smart contracts.
-allowed-tools: Bash(docker *), Bash(PYTHONPATH=. python -m pytest *), Bash(curl *)
-argument-hint: [test-path-or-action]
 ---
 
 # Integration Test Framework
@@ -59,18 +57,30 @@ Total setup: ~8 seconds.
 
 ```
 tests/
-  conftest.py                     # Session fixtures, environment setup
+  conftest.py                       # Session fixtures, environment setup
+  helpers/
+    __init__.py                     # Exports PairAssertions, TransactionAssertions, etc.
+    assertions.py                   # Black-box assertion helpers
+    contract_state.py               # ContractStateSnapshot, MultiContractSnapshot
   environments/
-    base_environment.py           # TestEnvironment ABC
-    chainsim_environment.py       # Chain simulator environment
+    base_environment.py             # TestEnvironment ABC
+    chainsim_environment.py         # Chain simulator environment
   integration/
     pair/
-      test_add_liquidity.py       # Liquidity addition tests
-      test_remove_liquidity.py    # Liquidity removal tests
-      test_swap_fixed_input.py    # Fixed input swap tests
-      test_swap_fixed_output.py   # Fixed output swap tests
-      test_view_functions.py      # View/query tests
-      test_economic_invariants.py # k=x*y invariant tests
+      test_add_liquidity.py         # Liquidity addition (11 tests)
+      test_remove_liquidity.py      # Liquidity removal (10 tests)
+      test_swap_fixed_input.py      # Fixed input swaps (10 tests)
+      test_swap_fixed_output.py     # Fixed output swaps (8 tests)
+      test_view_functions.py        # View/query functions (4 tests)
+      test_economic_invariants.py   # k=x*y invariant, fees (4 tests)
+      test_multi_user.py            # Concurrent users, dilution (4 tests)
+      test_edge_cases.py            # Extreme ratios, dust, recovery (3 tests)
+      test_fee_mechanics.py         # Fee collection & accumulation (5 tests)
+      test_state_transitions.py     # Pause/resume lifecycle (3 tests)
+      test_security.py              # Sandwich, front-running, oracle (4 tests)
+      test_overflow_boundary.py     # Large/tiny amounts, BigUint (3 tests)
+      test_contract_integration.py  # Multi-hop, farm, router admin (4 tests)
+      TEST_COVERAGE_PLAN.md         # Coverage tracking (100%, 82/82 tests)
 ```
 
 ## Key Fixtures
@@ -80,11 +90,29 @@ tests/
 | `test_environment` | session | Chain simulator lifecycle |
 | `network_providers` | session | API + Proxy network access |
 | `dex_context` | session | Loaded DEX contracts from `Context` |
-| `pair_contract` | function | First deployed pair (index 1) |
+| `pair_contract` | function | Pair at index 1 from `config.PAIRS_V2` |
+| `all_pair_contracts` | function | All pairs from `config.PAIRS_V2` (for multi-hop) |
+| `router_contract` | function | Router from `config.ROUTER_V2` |
+| `deployer_account` | session | DEX owner — does NOT auto-fund EGLD on chain sim |
 | `blockchain_controller` | function | Block/epoch advancement helper |
 | `alice`, `bob`, `charlie` | function | Funded test accounts with synced nonces |
 | `ensure_esdt_amounts` | function | Callable to fund accounts with exact token amounts |
 | `isolated_pair_factory` | function | Creates fresh pair contracts (has cross-shard limitations) |
+
+### Deployer account EGLD funding
+
+The `deployer_account` starts with 0 EGLD on chain sim. Tests using deployer (pause/resume, admin ops) must fund it first:
+
+```python
+def _ensure_deployer_has_egld(deployer_account, test_environment, network_providers):
+    from tests.environments import ChainsimEnvironment
+    if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+        account_data = network_providers.proxy.get_account(deployer_account.address)
+        if account_data.balance < nominated_amount(10):
+            test_environment.chain_sim.fund_users_w_egld(
+                [deployer_account.address.to_bech32()], nominated_amount(10)
+            )
+```
 
 ## Writing Tests
 
@@ -122,11 +150,53 @@ class TestMyFeature:
 ### Checking reserves and state
 
 ```python
+# Preferred: use test helpers
+from tests.helpers import PairAssertions, TransactionAssertions
+
+# Get reserves (returns tuple: first_reserve, second_reserve, lp_supply)
+reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+
+# Assert k invariant holds (k_after >= k_before)
+PairAssertions.assert_constant_product_holds(pair_contract.address, k_before, network_providers.proxy)
+
+# Assert transaction success/failure
+TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+
+# Low-level: direct data fetcher
 from utils.contract_data_fetchers import PairContractDataFetcher
 from multiversx_sdk import Address
 
 fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_contract.address), network_providers.proxy.url)
 first_reserve = fetcher.get_data("getReserve", [pair_contract.firstToken.encode()])
+```
+
+### Reserve-relative amounts (pool-state independence)
+
+Tests sharing a session-scoped pool must use reserve-relative amounts instead of fixed values,
+since prior tests modify reserves:
+
+```python
+reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+swap_amount = reserves[0] // 1000  # 0.1% of first reserve
+```
+
+### Admin operations (pause/resume, trusted pairs)
+
+Tests modifying contract state must use `try/finally` to restore state:
+
+```python
+def test_pause_resume(self, pair_contract, deployer_account, ...):
+    _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
+    deployer_account.sync_nonce(network_providers.proxy)
+    tx_pause = pair_contract.set_active_no_swaps(deployer_account, network_providers.proxy)
+    blockchain_controller.wait_for_tx(tx_pause)
+    try:
+        # ... test paused behavior ...
+    finally:
+        deployer_account.sync_nonce(network_providers.proxy)
+        tx_resume = pair_contract.resume(deployer_account, network_providers.proxy)
+        blockchain_controller.wait_for_tx(tx_resume)
 ```
 
 ## State Filtering Details
@@ -138,6 +208,15 @@ Located in `tools/chain_simulator_connector.py`:
 | `filter_safe_price_keys()` | `price_observations.*`, `safe_price_current_index` | Mainnet rounds (~29M) vs chain sim rounds (~100) causes i64 underflow |
 | `override_first_week_start_epoch()` | `firstWeekStartEpoch` | Mainnet value 862 requires epoch 869+; override to 0 needs only epoch 7+ |
 
+## Config Label Reference
+
+| Constant | Value | Notes |
+|----------|-------|-------|
+| `config.PAIRS_V2` | "pairs_v2" | Pair contracts; fixture uses index 1 |
+| `config.ROUTER_V2` | router label | Router contract |
+| `config.FARMS_V2` | "farms_boosted" | Boosted farms (NOT `FARMS_BOOSTED`) |
+| `config.FARMS_LOCKED` | "farms_locked" | Locked reward farms |
+
 ## Known Limitations
 
 1. **Factory SC deploys fail**: Router's `createPair` deploys child contracts via metachain. The chain simulator doesn't fully support cross-shard SC creation for child contracts. Tests using `isolated_pair_factory` will fail with "Failed to deploy pair".
@@ -147,6 +226,10 @@ Located in `tools/chain_simulator_connector.py`:
 3. **Stale state between runs**: The chain simulator retains all state between test runs. For clean results, restart: `docker compose down && docker compose up -d` (wait ~25 seconds).
 
 4. **`TransactionStatus` properties**: `is_successful`, `is_failed`, `is_completed` are properties, not methods. Use `tx.status.is_successful` not `tx.status.is_successful()`.
+
+5. **Farm contracts have no code on chain sim**: Farm contract addresses exist in config but bytecode is not loaded in the pre-saved state. Tests must check for deployed code and `pytest.skip()` when absent.
+
+6. **No `config.FARMS_BOOSTED`**: The attribute is `config.FARMS_V2` (maps to "farms_boosted" internally). Using `config.FARMS_BOOSTED` raises `AttributeError`.
 
 ## Troubleshooting
 
@@ -158,3 +241,6 @@ Located in `tools/chain_simulator_connector.py`:
 | "Failed to deploy pair" | Factory-pattern SC deploy limitation | Known chain sim limitation — skip test or use pre-deployed pairs |
 | "could not find proof for header" | `--initial-epoch` > 0 used | Remove `--initial-epoch` from docker-compose, restart |
 | Tests pass individually but fail together | Stale chain sim state | Restart chain sim between runs |
+| "Slippage exceeded" on multi-hop swap | Intermediate amount too large for second pool | Use reserve-relative amounts (0.1%) and cap intermediate to 0.1% of target pool reserve |
+| `AttributeError: FARMS_BOOSTED` | Wrong config label | Use `config.FARMS_V2` (maps to "farms_boosted") |
+| Farm `enterFarm` "invalid contract code" | Farm bytecode not in chain sim state | Check for deployed code first, `pytest.skip()` if absent |
