@@ -338,23 +338,18 @@ class TestPairEconomicInvariants:
         # Swap amounts to test
         swap_amount = nominated_amount(100)
 
-        # Fund Alice
+        # Fund Alice with firstToken for leg 1 (leg 2 uses received secondToken)
         ensure_esdt_amounts(alice, {
-            pair_contract.firstToken: swap_amount,
-            pair_contract.secondToken: swap_amount  # extra for the return leg
+            pair_contract.firstToken: swap_amount
         })
 
-        # Get Alice's initial tokenA balance
+        # Get Alice's initial balances
         token_first = Token(pair_contract.firstToken, 0)
         token_second = Token(pair_contract.secondToken, 0)
         alice_first_before = network_providers.proxy.get_token_of_account(alice.address, token_first).amount
+        alice_second_before = network_providers.proxy.get_token_of_account(alice.address, token_second).amount
 
         # Leg 1: Swap tokenA -> tokenB
-        expected_output_b = pair_data_fetcher.get_data(
-            "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(swap_amount)]
-        )
-
         event1 = SwapFixedInputEvent(
             tokenA=pair_contract.firstToken,
             amountA=swap_amount,
@@ -366,20 +361,17 @@ class TestPairEconomicInvariants:
         blockchain_controller.wait_for_tx(tx1)
         TransactionAssertions.assert_transaction_success(tx1, network_providers.proxy)
 
-        # Check how much tokenB Alice received
+        # Check how much tokenB Alice ACTUALLY received (not pre-queried estimate)
         alice_second_after_leg1 = network_providers.proxy.get_token_of_account(alice.address, token_second).amount
-        logger.info(f"Leg 1: Swapped {swap_amount} tokenA -> {alice_second_after_leg1} tokenB received")
+        actual_received_b = alice_second_after_leg1 - alice_second_before
+        logger.info(f"Leg 1: Swapped {swap_amount} tokenA -> received {actual_received_b} tokenB")
 
-        # Leg 2: Swap ALL received tokenB back to tokenA
-        # Query expected output for return leg
-        expected_output_a = pair_data_fetcher.get_data(
-            "getAmountOut",
-            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(expected_output_b)]
-        )
-
+        # Leg 2: Swap ALL ACTUALLY RECEIVED tokenB back to tokenA
+        # Critical: use actual_received_b, not pre-queried expected amount,
+        # since pool state changed after leg 1
         event2 = SwapFixedInputEvent(
             tokenA=pair_contract.secondToken,
-            amountA=expected_output_b,
+            amountA=actual_received_b,
             tokenB=pair_contract.firstToken,
             amountBmin=1
         )

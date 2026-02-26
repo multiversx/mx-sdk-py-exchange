@@ -370,55 +370,51 @@ class TestPairViewFunctions:
             'amount': 'biguint',
         }
 
-        try:
-            from multiversx_sdk.abi import Abi
-            import config
-            abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
+        from multiversx_sdk.abi import Abi
+        import config
+        abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
 
-            if abi_path.exists():
-                abi = Abi.load(abi_path)
-                view_payload = abi.encode_custom_type(
-                    "EsdtTokenPayment",
-                    [pair_contract.firstToken, 0, test_input_amount]
+        if abi_path.exists():
+            abi = Abi.load(abi_path)
+            view_payload = abi.encode_custom_type(
+                "EsdtTokenPayment",
+                [pair_contract.firstToken, 0, test_input_amount]
+            )
+
+            safe_price_hex = pair_data_fetcher.get_data(
+                "updateAndGetSafePrice",
+                [bytes.fromhex(view_payload)]
+            )
+
+            if safe_price_hex:
+                decoded = decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
+                safe_price_amount = decoded['amount']
+                safe_price_token = decoded['token_identifier']
+                logger.info(f"Safe price: {safe_price_amount} {safe_price_token}")
+
+                # Safe price should be non-zero
+                assert safe_price_amount > 0, "Safe price should return non-zero amount"
+
+                # Compare with spot price for sanity
+                spot_price = pair_data_fetcher.get_data(
+                    "getEquivalent",
+                    [TokenIdentifierValue(pair_contract.firstToken),
+                     BigUIntValue(test_input_amount)]
                 )
+                logger.info(f"Spot price (getEquivalent): {spot_price}")
 
-                safe_price_hex = pair_data_fetcher.get_data(
-                    "updateAndGetSafePrice",
-                    [bytes.fromhex(view_payload)]
-                )
-
-                if safe_price_hex:
-                    decoded = decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
-                    safe_price_amount = decoded['amount']
-                    safe_price_token = decoded['token_identifier']
-                    logger.info(f"Safe price: {safe_price_amount} {safe_price_token}")
-
-                    # Safe price should be non-zero
-                    assert safe_price_amount > 0, "Safe price should return non-zero amount"
-
-                    # Compare with spot price for sanity
-                    spot_price = pair_data_fetcher.get_data(
-                        "getEquivalent",
-                        [TokenIdentifierValue(pair_contract.firstToken),
-                         BigUIntValue(test_input_amount)]
+                # TWAP should be in the same order of magnitude as spot
+                if spot_price > 0:
+                    ratio = safe_price_amount / spot_price
+                    logger.info(f"Safe/Spot ratio: {ratio:.4f}")
+                    # With small swaps on a large pool, they should be close
+                    assert 0.5 < ratio < 2.0, (
+                        f"Safe price diverges too much from spot: ratio={ratio:.4f}"
                     )
-                    logger.info(f"Spot price (getEquivalent): {spot_price}")
-
-                    # TWAP should be in the same order of magnitude as spot
-                    if spot_price > 0:
-                        ratio = safe_price_amount / spot_price
-                        logger.info(f"Safe/Spot ratio: {ratio:.4f}")
-                        # With small swaps on a large pool, they should be close
-                        assert 0.5 < ratio < 2.0, (
-                            f"Safe price diverges too much from spot: ratio={ratio:.4f}"
-                        )
-                else:
-                    logger.info("updateAndGetSafePrice returned empty - may need more observations")
             else:
-                logger.info(f"ABI file not found at {abi_path}, skipping ABI-based safe price query")
-        except Exception as e:
-            logger.info(f"Safe price ABI query encountered issue: {e}")
-            logger.info("Falling back to basic price verification")
+                logger.info("updateAndGetSafePrice returned empty - may need more observations")
+        else:
+            logger.info(f"ABI file not found at {abi_path}, skipping ABI-based safe price query")
 
         # Always verify basic price functionality works (spot price via getAmountOut)
         reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
@@ -510,30 +506,25 @@ class TestPairViewFunctions:
         current_block = blockchain_controller.get_current_block()
         logger.info(f"Current block: {current_block}")
 
-        # Try to query price observation for a recent round
+        # Query price observation for a recent round
         pair_address = Address.new_from_bech32(pair_contract.address)
-        try:
-            search_round = current_block - 5  # Look back a few rounds
-            observation = pair_data_fetcher.get_data(
-                "getPriceObservation",
-                [AddressValue(pair_address), BigUIntValue(search_round)]
-            )
+        search_round = current_block - 5  # Look back a few rounds
+        observation = pair_data_fetcher.get_data(
+            "getPriceObservation",
+            [AddressValue(pair_address), BigUIntValue(search_round)]
+        )
 
-            logger.info(f"Price observation for round {search_round}: {observation}")
+        logger.info(f"Price observation for round {search_round}: {observation}")
 
-            if observation and len(observation) > 0:
-                logger.info(f"Observation has {len(observation)} data parts")
-                has_data = any(len(part) > 0 for part in observation)
-                if has_data:
-                    logger.info("Price observation contains non-empty data")
-                else:
-                    logger.info("Price observation parts are empty - may need more blocks")
+        if observation and len(observation) > 0:
+            logger.info(f"Observation has {len(observation)} data parts")
+            has_data = any(len(part) > 0 for part in observation)
+            if has_data:
+                logger.info("Price observation contains non-empty data")
             else:
-                logger.info("No price observation returned for this round")
-        except Exception as e:
-            logger.info(f"Price observation query encountered issue: {e}")
-            logger.info("This is expected if observation format requires specific encoding "
-                        "or if the view contract is needed")
+                logger.info("Price observation parts are empty - may need more blocks")
+        else:
+            logger.info("No price observation returned for this round")
 
         # Verify the pool state is consistent after all operations
         reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
@@ -552,3 +543,297 @@ class TestPairViewFunctions:
         assert state > 0, "Pair contract should be in active state"
 
         logger.info("Test passed: Price observation mechanism operational")
+
+    @pytest.mark.happy_path
+    def test_get_amount_in_basic(
+        self,
+        pair_contract: PairContract,
+        alice: Account,
+        network_providers,
+        blockchain_controller,
+        ensure_esdt_amounts
+    ):
+        """
+        SCENARIO: Query required input amount for a desired output via getAmountIn
+
+        GIVEN: Pool with liquidity
+        WHEN: Query getAmountIn for both token directions
+        THEN:
+            - Returns positive values for both directions
+            - Required input > desired output (due to fees and price impact)
+            - Results are consistent with the AMM formula
+
+        SECURITY: getAmountIn is used by UIs and aggregators to calculate swap
+                  parameters. Incorrect values could lead to failed transactions
+                  or users overpaying.
+        """
+        logger.info("TEST: getAmountIn basic view function")
+
+        _ensure_pool_has_liquidity(
+            pair_contract, alice, network_providers,
+            blockchain_controller, ensure_esdt_amounts
+        )
+
+        pair_data_fetcher = PairContractDataFetcher(
+            Address.new_from_bech32(pair_contract.address),
+            network_providers.proxy.url
+        )
+
+        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        logger.info(f"Reserves: first={reserves[0]}, second={reserves[1]}")
+
+        # Use 0.1% of second reserve as desired output (small to avoid price impact)
+        desired_output = reserves[1] // 1000
+
+        # Query getAmountIn: how much firstToken to get desired_output of secondToken
+        amount_in_first = pair_data_fetcher.get_data(
+            "getAmountIn",
+            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(desired_output)]
+        )
+
+        logger.info(f"getAmountIn(second={desired_output}) -> first={amount_in_first}")
+        assert amount_in_first > 0, "getAmountIn should return positive value"
+        assert amount_in_first > desired_output * reserves[0] // reserves[1], (
+            "Required input should be greater than equivalent (fees + price impact)"
+        )
+
+        # Query reverse direction: how much secondToken to get firstToken output
+        desired_output_first = reserves[0] // 1000
+        amount_in_second = pair_data_fetcher.get_data(
+            "getAmountIn",
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(desired_output_first)]
+        )
+
+        logger.info(f"getAmountIn(first={desired_output_first}) -> second={amount_in_second}")
+        assert amount_in_second > 0, "getAmountIn reverse direction should return positive value"
+
+        logger.info("Test passed: getAmountIn returns valid values for both directions")
+
+    @pytest.mark.happy_path
+    def test_get_amount_in_consistency_with_amount_out(
+        self,
+        pair_contract: PairContract,
+        alice: Account,
+        network_providers,
+        blockchain_controller,
+        ensure_esdt_amounts
+    ):
+        """
+        SCENARIO: Verify getAmountIn and getAmountOut are inverse functions
+
+        GIVEN: Pool with liquidity
+        WHEN: Query getAmountIn for desired output X, then getAmountOut with the result
+        THEN: getAmountOut(getAmountIn(X)) >= X (within 1 wei rounding)
+
+        SECURITY: If getAmountIn and getAmountOut are inconsistent, fixed output
+                  swaps could fail or return incorrect amounts.
+        """
+        logger.info("TEST: getAmountIn/getAmountOut round-trip consistency")
+
+        _ensure_pool_has_liquidity(
+            pair_contract, alice, network_providers,
+            blockchain_controller, ensure_esdt_amounts
+        )
+
+        pair_data_fetcher = PairContractDataFetcher(
+            Address.new_from_bech32(pair_contract.address),
+            network_providers.proxy.url
+        )
+
+        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        desired_output = reserves[1] // 1000  # 0.1% of second reserve
+
+        # Step 1: getAmountIn -> how much firstToken needed for desired_output of secondToken
+        required_input = pair_data_fetcher.get_data(
+            "getAmountIn",
+            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(desired_output)]
+        )
+        logger.info(f"getAmountIn({desired_output}) = {required_input}")
+
+        # Step 2: getAmountOut -> feed required_input back, should get >= desired_output
+        resulting_output = pair_data_fetcher.get_data(
+            "getAmountOut",
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(required_input)]
+        )
+        logger.info(f"getAmountOut({required_input}) = {resulting_output}")
+
+        # The round-trip should give back at least the desired output
+        # (getAmountIn adds +1 for rounding, so getAmountOut may give slightly more)
+        assert resulting_output >= desired_output, (
+            f"Round-trip inconsistency: wanted {desired_output}, "
+            f"getAmountIn said need {required_input}, "
+            f"getAmountOut with that gives only {resulting_output}"
+        )
+
+        # But it shouldn't be wildly more (within 0.1% tolerance)
+        overshoot = resulting_output - desired_output
+        if desired_output > 0:
+            overshoot_pct = overshoot / desired_output * 100
+            logger.info(f"Round-trip overshoot: {overshoot} ({overshoot_pct:.4f}%)")
+            assert overshoot_pct < 0.1, (
+                f"Round-trip overshoot too large: {overshoot_pct:.4f}% > 0.1%"
+            )
+
+        logger.info("Test passed: getAmountIn and getAmountOut are consistent inverses")
+
+    @pytest.mark.happy_path
+    def test_get_amount_in_matches_fixed_output_swap(
+        self,
+        pair_contract: PairContract,
+        alice: Account,
+        network_providers,
+        blockchain_controller,
+        ensure_esdt_amounts
+    ):
+        """
+        SCENARIO: Verify getAmountIn matches actual input spent in a fixed output swap
+
+        GIVEN: Pool with liquidity
+        WHEN: Query getAmountIn, then execute swapTokensFixedOutput with that info
+        THEN: Actual input spent matches getAmountIn prediction
+
+        SECURITY: If the view function disagrees with the endpoint, users cannot
+                  reliably set max_input parameters, leading to failed or overpaid swaps.
+        """
+        logger.info("TEST: getAmountIn matches actual fixed output swap")
+
+        from contracts.pair_contract import SwapFixedOutputEvent
+
+        _ensure_pool_has_liquidity(
+            pair_contract, alice, network_providers,
+            blockchain_controller, ensure_esdt_amounts
+        )
+
+        pair_data_fetcher = PairContractDataFetcher(
+            Address.new_from_bech32(pair_contract.address),
+            network_providers.proxy.url
+        )
+
+        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        desired_output = reserves[1] // 1000  # 0.1% of second reserve
+
+        # Query getAmountIn for this desired output
+        predicted_input = pair_data_fetcher.get_data(
+            "getAmountIn",
+            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(desired_output)]
+        )
+        logger.info(f"getAmountIn predicts: {predicted_input} firstToken for {desired_output} secondToken")
+
+        # Fund Alice with generous max input (2x predicted to be safe)
+        max_input = predicted_input * 2
+        ensure_esdt_amounts(alice, {pair_contract.firstToken: max_input})
+
+        # Record balance before
+        first_token = Token(pair_contract.firstToken, 0)
+        second_token = Token(pair_contract.secondToken, 0)
+        alice_first_before = network_providers.proxy.get_token_of_account(alice.address, first_token).amount
+        alice_second_before = network_providers.proxy.get_token_of_account(alice.address, second_token).amount
+
+        # Execute fixed output swap
+        event = SwapFixedOutputEvent(
+            tokenA=pair_contract.firstToken,
+            amountAmax=max_input,
+            tokenB=pair_contract.secondToken,
+            amountB=desired_output
+        )
+        alice.sync_nonce(network_providers.proxy)
+        tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
+        blockchain_controller.wait_for_tx(tx_hash)
+        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+
+        # Record balance after
+        alice_first_after = network_providers.proxy.get_token_of_account(alice.address, first_token).amount
+        alice_second_after = network_providers.proxy.get_token_of_account(alice.address, second_token).amount
+
+        actual_input_spent = alice_first_before - alice_first_after
+        actual_output_received = alice_second_after - alice_second_before
+
+        logger.info(f"Predicted input: {predicted_input}")
+        logger.info(f"Actual input spent: {actual_input_spent}")
+        logger.info(f"Actual output received: {actual_output_received}")
+
+        # Output should be exactly what was requested
+        assert actual_output_received == desired_output, (
+            f"Expected exact output {desired_output}, got {actual_output_received}"
+        )
+
+        # Actual input spent should match getAmountIn prediction closely
+        # Allow 1 wei tolerance for rounding
+        assert abs(actual_input_spent - predicted_input) <= 1, (
+            f"getAmountIn prediction ({predicted_input}) doesn't match actual input ({actual_input_spent}).\n"
+            f"Difference: {abs(actual_input_spent - predicted_input)} wei"
+        )
+
+        logger.info("Test passed: getAmountIn accurately predicts fixed output swap input")
+
+    @pytest.mark.edge_case
+    def test_get_amount_in_edge_cases(
+        self,
+        pair_contract: PairContract,
+        alice: Account,
+        network_providers,
+        blockchain_controller,
+        ensure_esdt_amounts
+    ):
+        """
+        SCENARIO: Verify getAmountIn handles edge cases correctly
+
+        GIVEN: Pool with liquidity
+        WHEN: Query getAmountIn with extreme values (very large output, tiny output)
+        THEN:
+            - Very large output (exceeding reserve): returns error or very large value
+            - Tiny output (1 wei): returns valid small input
+
+        SECURITY: Edge cases in view functions can cause UI/aggregator crashes
+                  or incorrect parameter calculations.
+        """
+        logger.info("TEST: getAmountIn edge cases")
+
+        _ensure_pool_has_liquidity(
+            pair_contract, alice, network_providers,
+            blockchain_controller, ensure_esdt_amounts
+        )
+
+        pair_data_fetcher = PairContractDataFetcher(
+            Address.new_from_bech32(pair_contract.address),
+            network_providers.proxy.url
+        )
+
+        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+
+        # Edge case 1: Tiny output (1 wei)
+        tiny_output = 1
+        amount_in_tiny = pair_data_fetcher.get_data(
+            "getAmountIn",
+            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(tiny_output)]
+        )
+        logger.info(f"getAmountIn for 1 wei output: {amount_in_tiny}")
+        assert amount_in_tiny > 0, "Should return positive input even for 1 wei output"
+
+        # Edge case 2: Large but valid output (50% of reserve)
+        large_output = reserves[1] // 2
+        amount_in_large = pair_data_fetcher.get_data(
+            "getAmountIn",
+            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(large_output)]
+        )
+        logger.info(f"getAmountIn for 50% reserve output ({large_output}): {amount_in_large}")
+        assert amount_in_large > 0, "Should return valid input for 50% reserve output"
+        assert amount_in_large > large_output, (
+            "Input for 50% of reserve should be > output due to price impact + fees"
+        )
+
+        # Edge case 3: Output exceeding reserve - should fail or return error
+        excessive_output = reserves[1] * 2
+        try:
+            amount_in_excessive = pair_data_fetcher.get_data(
+                "getAmountIn",
+                [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(excessive_output)]
+            )
+            # If it returns a value, it should be -1 (error) or an astronomically large number
+            logger.info(f"getAmountIn for 2x reserve output: {amount_in_excessive}")
+            if amount_in_excessive > 0:
+                logger.info("Contract returned a value for excessive output (may be an error indicator)")
+        except Exception as e:
+            logger.info(f"getAmountIn correctly errored for excessive output: {e}")
+
+        logger.info("Test passed: getAmountIn handles edge cases appropriately")

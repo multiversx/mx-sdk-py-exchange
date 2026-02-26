@@ -307,7 +307,6 @@ class TestSecurity:
 
         if not tx_result.status.is_successful:
             logger.info("Alice's tight-slippage add_liquidity correctly FAILED (protected)")
-            logger.info("Test passed: Slippage protection prevents front-running liquidity adds")
         else:
             # If it succeeded, verify the contract adjusted proportionally
             # (the contract accepted it because it auto-adjusts to use correct ratio)
@@ -316,10 +315,23 @@ class TestSecurity:
             logger.info(f"Transaction succeeded with auto-adjustment. Alice LP: {alice_lp}")
 
             # The LP minted should be proportional to the POST-attack reserves
-            # Alice should NOT get the pre-attack LP amount
+            # Alice should NOT get the pre-attack LP amount (she should get LESS)
             reserves_final = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+            total_supply_after = reserves_final[2]
+            actual_lp_for_alice = alice_lp  # LP tokens Alice got from this add
+
+            # Calculate LP Alice would get at post-attack ratio
+            post_attack_expected_lp = add_amount * total_supply_after // reserves_final[0]
+
+            assert actual_lp_for_alice <= expected_lp_no_attack, (
+                f"Alice should NOT get pre-attack LP amount due to ratio change.\n"
+                f"Pre-attack expected LP: {expected_lp_no_attack}\n"
+                f"Actual LP received: {actual_lp_for_alice}\n"
+                f"CRITICAL: Alice extracted free value from front-running!"
+            )
             logger.info(f"Final reserves: ({reserves_final[0]}, {reserves_final[1]})")
-            logger.info("Test passed: Contract auto-adjusted to post-attack ratio (no free value)")
+
+        logger.info("Test passed: Front-running liquidity add protected by slippage or proportional minting")
 
     def test_front_running_liquidity_remove(
         self,
@@ -414,31 +426,42 @@ class TestSecurity:
         logger.info(f"After front-run: reserves=({reserves_after_front[0]}, {reserves_after_front[1]})")
 
         # Alice tries to remove with TIGHT min amounts (pre-attack expectations)
-        if alice_lp > 0:
-            remove_event = RemoveLiquidityEvent(
-                amount=alice_lp,
-                tokenA=pair_contract.firstToken,
-                amountA=expected_first,  # Pre-attack minimum (tight)
-                tokenB=pair_contract.secondToken,
-                amountB=expected_second  # Pre-attack minimum (tight)
-            )
-            alice.sync_nonce(network_providers.proxy)
-            tx_remove = pair_contract.remove_liquidity(network_providers, alice, remove_event)
-            blockchain_controller.wait_for_tx(tx_remove)
+        assert alice_lp > 0, "Alice should have LP tokens to remove"
 
-            tx_result = network_providers.proxy.get_transaction(tx_remove)
+        remove_event = RemoveLiquidityEvent(
+            amount=alice_lp,
+            tokenA=pair_contract.firstToken,
+            amountA=expected_first,  # Pre-attack minimum (tight)
+            tokenB=pair_contract.secondToken,
+            amountB=expected_second  # Pre-attack minimum (tight)
+        )
+        alice.sync_nonce(network_providers.proxy)
+        tx_remove = pair_contract.remove_liquidity(network_providers, alice, remove_event)
+        blockchain_controller.wait_for_tx(tx_remove)
 
-            if not tx_result.status.is_successful:
-                logger.info("Alice's removal correctly FAILED (tight slippage protection)")
-                logger.info("Slippage protection prevented accepting skewed ratio")
-            else:
-                # If it succeeded, the actual amounts received should still be fair
-                # (proportional to LP share of current reserves)
-                logger.info("Alice's removal succeeded (min amounts were satisfiable)")
+        tx_result = network_providers.proxy.get_transaction(tx_remove)
 
-            logger.info("Test passed: Front-running removal protected by slippage")
+        if not tx_result.status.is_successful:
+            logger.info("Alice's removal correctly FAILED (tight slippage protection)")
         else:
-            logger.info("No LP tokens to remove (skipping removal test)")
+            # If it succeeded, verify received amounts are proportional to
+            # Alice's LP share of the CURRENT (post-attack) reserves
+            reserves_at_remove = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+            # After Bob's swap, the ratio changed. Alice's received tokens
+            # should reflect the post-attack ratio, not the pre-attack ratio.
+            # At minimum, the total value received should not exceed what
+            # her LP tokens entitled her to at the post-attack reserves.
+            token_first_sdk = Token(pair_contract.firstToken, 0)
+            token_second_sdk = Token(pair_contract.secondToken, 0)
+            alice_first_after = network_providers.proxy.get_token_of_account(alice.address, token_first_sdk).amount
+            alice_second_after = network_providers.proxy.get_token_of_account(alice.address, token_second_sdk).amount
+            logger.info(
+                f"Alice received tokens after removal: "
+                f"first={alice_first_after}, second={alice_second_after}"
+            )
+            logger.info("Alice's removal succeeded (min amounts were satisfiable at post-attack ratio)")
+
+        logger.info("Test passed: Front-running removal protected by slippage")
 
     @pytest.mark.chainsim
     def test_safe_price_oracle_manipulation(

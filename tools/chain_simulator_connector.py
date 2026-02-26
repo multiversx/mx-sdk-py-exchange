@@ -324,6 +324,60 @@ class ChainSimulator:
         # return found user addresses
         return user_addresses
 
+    def ensure_pair_template_has_code(self, router_address: str, source_pair_address: str):
+        """Ensure the Router's pair template contract has bytecode loaded.
+
+        The Router's createPair uses deployFromSourceContract to clone the pair template.
+        When loading mainnet state, the template contract's bytecode may not be included
+        in the state dump. This method copies bytecode from an existing pair contract
+        to the template address via the set-state API.
+
+        Args:
+            router_address: Bech32 address of the Router contract
+            source_pair_address: Bech32 address of an existing pair contract to copy code from
+        """
+        from utils.contract_data_fetchers import RouterContractDataFetcher
+
+        # 1. Query Router for pair template address
+        fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), self.proxy_url)
+        template_hex = fetcher.get_data("getPairTemplateAddress")
+        if not template_hex:
+            logger.warning("Router returned empty pair template address")
+            return
+        template_address = Address(bytes.fromhex(template_hex), "erd").to_bech32()
+
+        # 2. Check if template already has code
+        resp = requests.get(f"{self.proxy_url}/address/{template_address}")
+        template_acct = resp.json()["data"]["account"]
+        if template_acct.get("code"):
+            logger.info(f"Pair template already has code at {template_address}")
+            return
+
+        # 3. Copy code from source pair contract
+        resp = requests.get(f"{self.proxy_url}/address/{source_pair_address}")
+        source_acct = resp.json()["data"]["account"]
+        if not source_acct.get("code"):
+            logger.warning(f"Source pair {source_pair_address} has no code to copy")
+            return
+
+        state = [{
+            "address": template_address,
+            "nonce": 0,
+            "balance": "0",
+            "code": source_acct["code"],
+            "codeHash": source_acct["codeHash"],
+            "codeMetadata": source_acct["codeMetadata"],
+            "ownerAddress": source_acct["ownerAddress"],
+            "developerReward": "0"
+        }]
+
+        resp = requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
+        if resp.status_code == 200:
+            logger.info(f"Loaded pair template bytecode at {template_address}")
+            self.advance_blocks(1)  # Finalize state change
+        else:
+            logger.error(f"Failed to load pair template bytecode: {resp.text}")
+
     def advance_blocks(self, number_of_blocks: int):
         url = f"{self.proxy_url}/simulator/generate-blocks/{number_of_blocks}"
         response = requests.post(url)

@@ -20,6 +20,7 @@ from contracts.builtin_contracts import ESDTContract
 from contracts.pair_contract import PairContract, AddLiquidityEvent, RemoveLiquidityEvent, SwapFixedInputEvent, PairContractVersion
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import nominated_amount, Account, hex_to_string
+from utils.utils_tx import multi_esdt_transfer, ESDTToken
 from tests.helpers import PairAssertions, TransactionAssertions
 from utils.logger import get_logger
 from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
@@ -268,7 +269,6 @@ class TestRemoveLiquidity:
     @pytest.mark.happy_path
     @pytest.mark.pair
     @pytest.mark.chainsim
-    @pytest.mark.xfail(reason="Chain simulator limitation: factory-pattern SC deploys via Router fail on cross-shard metachain finalization")
     def test_remove_liquidity_full(
         self,
         isolated_pair_factory,
@@ -946,8 +946,10 @@ class TestRemoveLiquidity:
         tx_hash = pair_contract.remove_liquidity(network_providers, alice, remove_event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # VERIFICATION 1: Transaction should fail
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # VERIFICATION 1: Transaction should fail (protocol rejects 0-amount ESDT transfer)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="negative value"
+        )
         logger.info("✓ Transaction failed as expected")
 
         # VERIFICATION 2: LP balance unchanged
@@ -1064,8 +1066,10 @@ class TestRemoveLiquidity:
         tx_hash = pair_contract.remove_liquidity(network_providers, alice, remove_event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # VERIFICATION 1: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # VERIFICATION 1: Transaction FAILED (user doesn't have enough LP tokens)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="insufficient funds"
+        )
         logger.info("✓ Transaction failed as expected (insufficient LP tokens)")
 
         # VERIFICATION 2: LP balance unchanged
@@ -1276,7 +1280,6 @@ class TestRemoveLiquidity:
     @pytest.mark.happy_path
     @pytest.mark.pair
     @pytest.mark.chainsim
-    @pytest.mark.xfail(reason="Chain simulator limitation: factory-pattern SC deploys via Router fail on cross-shard metachain finalization")
     def test_remove_liquidity_multiple_users(
         self,
         isolated_pair_factory,
@@ -1311,29 +1314,26 @@ class TestRemoveLiquidity:
         logger.info(f"Isolated pair created: {pair_contract.address}")
         logger.info(f"Tokens: {first_token} / {second_token}")
 
-        # Fund Bob and Charlie with the same tokens
-        if test_environment.supports_time_control():
-            from tests.environments import ChainsimEnvironment
-            if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
-                # Fund Bob
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [bob.address.to_bech32()], first_token, nominated_amount(200)
-                )
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [bob.address.to_bech32()], second_token, nominated_amount(200)
-                )
-                # Fund Charlie
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [charlie.address.to_bech32()], first_token, nominated_amount(150)
-                )
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [charlie.address.to_bech32()], second_token, nominated_amount(150)
-                )
-
         # Define contribution amounts
         alice_amount = nominated_amount(10)
         bob_amount = nominated_amount(20)
         charlie_amount = nominated_amount(15)
+
+        # Fund Bob and Charlie via ESDT transfers from Alice
+        # (tokens are locally issued, can't use fund_users_w_esdt_from_mainnet)
+        alice.sync_nonce(network_providers.proxy)
+        tx_hash = multi_esdt_transfer(
+            network_providers.proxy, 10000000, alice, bob.address,
+            [ESDTToken(first_token, 0, bob_amount), ESDTToken(second_token, 0, bob_amount)]
+        )
+        blockchain_controller.wait_for_tx(tx_hash)
+
+        alice.sync_nonce(network_providers.proxy)
+        tx_hash = multi_esdt_transfer(
+            network_providers.proxy, 10000000, alice, charlie.address,
+            [ESDTToken(first_token, 0, charlie_amount), ESDTToken(second_token, 0, charlie_amount)]
+        )
+        blockchain_controller.wait_for_tx(tx_hash)
 
         lp_token = Token(pair_contract.lpToken, 0)
 
@@ -1540,7 +1540,6 @@ class TestRemoveLiquidity:
     @pytest.mark.edge_case
     @pytest.mark.pair
     @pytest.mark.chainsim
-    @pytest.mark.xfail(reason="Chain simulator limitation: factory-pattern SC deploys via Router fail on cross-shard metachain finalization")
     def test_remove_liquidity_to_empty_pool(
         self,
         isolated_pair_factory,

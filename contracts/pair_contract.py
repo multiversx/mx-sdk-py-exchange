@@ -321,6 +321,16 @@ class PairContract(DEXContractInterface):
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "whitelist", sc_args)
 
+    def remove_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_remove: str):
+        function_purpose = f"Remove whitelist contract in pair"
+        logger.info(function_purpose)
+
+        gas_limit = 100000000
+        sc_args = [
+            Address(contract_to_remove)
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeWhitelist", sc_args)
+
     def add_trusted_swap_pair(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: trusted swap pair address

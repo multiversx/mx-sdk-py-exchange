@@ -382,7 +382,24 @@ def dex_context(test_environment, network_proxy, request) -> Context:
     # Verify we have contracts
     context.deploy_structure.print_deployed_contracts()
 
+    # Ensure pair template has bytecode (needed for Router.createPair on chain simulator)
+    if test_environment.supports_time_control() and test_environment.has_pre_existing_state():
+        _ensure_pair_template_loaded(context, test_environment)
+
     return context
+
+
+def _ensure_pair_template_loaded(context: Context, env):
+    """Ensure the Router's pair template contract has bytecode loaded on chain simulator.
+
+    When mainnet state is loaded, the Router references a pair template address for
+    deployFromSourceContract, but the template's own bytecode may not be in the state dump.
+    This copies bytecode from an existing pair contract to the template address.
+    """
+    routers = context.get_contracts(config.ROUTER_V2)
+    pairs = context.get_contracts(config.PAIRS_V2)
+    if routers and pairs and hasattr(env, 'chain_sim') and env.chain_sim:
+        env.chain_sim.ensure_pair_template_has_code(routers[0].address, pairs[0].address)
 
 
 # ============================================================================

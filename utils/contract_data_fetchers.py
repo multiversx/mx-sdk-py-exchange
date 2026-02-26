@@ -199,6 +199,7 @@ class PairContractDataFetcher(DataFetcher):
         super().__init__(contract_address, proxy_url)
         self.view_handler_map = {
             "getAmountOut": self._get_int_view,
+            "getAmountIn": self._get_int_view,
             "getEquivalent": self._get_int_view,
             "getTotalFeePercent": self._get_int_view,
             "getSpecialFee": self._get_int_view,
@@ -217,6 +218,11 @@ class PairContractDataFetcher(DataFetcher):
             "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
             "getPriceObservation": self._get_hex_list_view,
             "getSafePriceRoundSaveInterval": self._get_int_view,
+            "getSafePriceCurrentIndex": self._get_int_view,
+            "getSafePriceByDefaultOffset": self._get_hex_view,
+            "getLpTokensSafePriceByDefaultOffset": self._get_hex_list_view,
+            "getLpTokensSafePriceByRoundOffset": self._get_hex_list_view,
+            "getCurrentPriceObservation": self._get_hex_view,
             "getFeesCollectorAddress": self._get_hex_view
         }
 

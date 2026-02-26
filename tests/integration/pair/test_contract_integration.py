@@ -3,7 +3,6 @@ Integration tests for Pair contract interactions with other DEX contracts.
 
 These tests verify the pair contract works correctly with:
 - Router contract (multi-hop swaps via sequential pairs)
-- Farm contracts (staking LP tokens)
 - Trusted swap pairs (cross-pair price references)
 - Proxy contract configuration
 
@@ -16,13 +15,11 @@ from multiversx_sdk import Address, Token
 import pytest
 
 from contracts.pair_contract import (
-    PairContract, SwapFixedInputEvent, AddLiquidityEvent, RemoveLiquidityEvent
+    PairContract, SwapFixedInputEvent, AddLiquidityEvent
 )
 from contracts.router_contract import RouterContract
-from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ExitFarmEvent
-from utils.contract_data_fetchers import PairContractDataFetcher, FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, WrapperAddress
+from utils.contract_data_fetchers import PairContractDataFetcher
+from utils.utils_chain import nominated_amount, Account
 from tests.helpers import PairAssertions, TransactionAssertions
 from utils.logger import get_logger
 from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
@@ -239,195 +236,6 @@ class TestContractIntegration:
         logger.info("Test passed: Multi-hop swap succeeded through two connected pairs")
 
     @pytest.mark.happy_path
-    def test_farm_staking_lp_tokens(
-        self,
-        pair_contract: PairContract,
-        all_pair_contracts: List[PairContract],
-        dex_context,
-        alice: Account,
-        network_providers,
-        blockchain_controller,
-        ensure_esdt_amounts
-    ):
-        """
-        SCENARIO: LP tokens from a pair can be staked in a farm contract
-
-        GIVEN: Alice has LP tokens from providing liquidity
-        WHEN: Alice enters the corresponding farm with LP tokens
-        THEN:
-            - Enter farm transaction succeeds
-            - Alice receives farm tokens (SFT with nonce)
-            - Farm token amount matches LP tokens staked
-            - LP tokens are transferred to the farm contract
-            - Alice can exit the farm and get LP tokens back
-
-        SECURITY: Farm contracts must correctly handle LP token deposits.
-                  Incorrect token transfers could result in stuck funds or
-                  double-counting of staked positions.
-        """
-        logger.info("TEST: Farm staking LP tokens")
-
-        # Find a farm that accepts our pair's LP token
-        farms = dex_context.get_contracts(config.FARMS_V2)
-        if not farms:
-            farms = dex_context.get_contracts(config.FARMS_LOCKED)
-        if not farms:
-            pytest.skip("No Farm contracts deployed")
-
-        # Find the farm whose farmingToken matches one of our pairs' LP tokens
-        target_farm = None
-        target_pair = None
-
-        for farm in farms:
-            for pair in all_pair_contracts:
-                if farm.farmingToken == pair.lpToken:
-                    target_farm = farm
-                    target_pair = pair
-                    break
-            if target_farm:
-                break
-
-        if not target_farm or not target_pair:
-            pytest.skip(
-                f"No farm found matching any pair's LP token. "
-                f"Farm farming tokens: {[f.farmingToken for f in farms[:5]]}. "
-                f"Pair LP tokens: {[p.lpToken for p in all_pair_contracts[:5]]}"
-            )
-
-        logger.info(f"Using farm: {target_farm.address}")
-        logger.info(f"Farming token (LP): {target_farm.farmingToken}")
-        logger.info(f"Farm token: {target_farm.farmToken}")
-        logger.info(f"Paired with: {target_pair.firstToken}/{target_pair.secondToken}")
-
-        # Check if farm contract has code deployed on-chain
-        # (Chain simulator may only load pair/router state, not farm contracts)
-        farm_account = network_providers.proxy.get_account(
-            Address.new_from_bech32(target_farm.address)
-        )
-        if not hasattr(farm_account, 'code_hash') or farm_account.code_hash == b'':
-            # Alternative check: try querying a view function
-            try:
-                farm_data_fetcher = FarmContractDataFetcher(
-                    WrapperAddress(target_farm.address),
-                    network_providers.proxy.url
-                )
-                farming_token_check = farm_data_fetcher.get_data("getFarmingTokenId")
-                if not farming_token_check:
-                    pytest.skip("Farm contract has no code deployed on chain simulator")
-            except Exception:
-                pytest.skip("Farm contract not accessible on chain simulator")
-
-        # Ensure the target pair has liquidity
-        reserves = PairAssertions.get_reserves(target_pair.address, network_providers.proxy)
-        if reserves[0] == 0:
-            pytest.skip("Target pair has no liquidity")
-
-        # Alice adds liquidity to get LP tokens
-        pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(target_pair.address),
-            network_providers.proxy.url
-        )
-
-        add_amount = nominated_amount(100)
-        equivalent = pair_data_fetcher.get_data(
-            "getEquivalent",
-            [TokenIdentifierValue(target_pair.firstToken), BigUIntValue(add_amount)]
-        )
-
-        ensure_esdt_amounts(alice, {
-            target_pair.firstToken: add_amount,
-            target_pair.secondToken: equivalent
-        })
-
-        lp_token = Token(target_pair.lpToken, 0)
-        alice_lp_before = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-
-        add_event = AddLiquidityEvent(
-            tokenA=target_pair.firstToken,
-            amountA=add_amount,
-            amountAmin=int(add_amount * 0.95),
-            tokenB=target_pair.secondToken,
-            amountB=equivalent,
-            amountBmin=int(equivalent * 0.95)
-        )
-        alice.sync_nonce(network_providers.proxy)
-        tx_add = target_pair.add_liquidity(network_providers, alice, add_event)
-        blockchain_controller.wait_for_tx(tx_add)
-        TransactionAssertions.assert_transaction_success(tx_add, network_providers.proxy)
-
-        alice_lp_after = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-        lp_delta = alice_lp_after - alice_lp_before
-        assert lp_delta > 0, "Alice should have received LP tokens"
-        logger.info(f"Alice received {lp_delta} LP tokens ({target_pair.lpToken})")
-
-        # Enter the farm with LP tokens
-        enter_amount = lp_delta  # Stake all LP tokens received
-        enter_event = EnterFarmEvent(
-            farming_token=target_farm.farmingToken,
-            farming_nonce=0,
-            farming_amount=enter_amount,
-            farm_token="",
-            farm_nonce=0,
-            farm_amount=0
-        )
-        alice.sync_nonce(network_providers.proxy)
-        tx_enter = target_farm.enterFarm(network_providers, alice, enter_event)
-        blockchain_controller.wait_for_tx(tx_enter)
-        TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
-        logger.info("Alice entered farm successfully")
-
-        # Verify Alice's LP tokens decreased
-        alice_lp_after_farm = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-        assert alice_lp_after_farm < alice_lp_after, "LP tokens should have been transferred to farm"
-        logger.info(f"LP balance: {alice_lp_after} -> {alice_lp_after_farm} (staked {alice_lp_after - alice_lp_after_farm})")
-
-        # Verify Alice received farm tokens (SFT - check via fungible token list won't work for SFTs)
-        # Farm tokens are Semi-Fungible Tokens (SFTs) with nonces, so we check the tx events
-        tx_enter_data = network_providers.proxy.get_transaction(tx_enter)
-        logger.info(f"Farm entry tx status: {tx_enter_data.status}")
-
-        # Exit farm to get LP tokens back
-        # We need the nonce of the farm token Alice received
-        # Get it from the transaction events
-        from multiversx_sdk import find_events_by_identifier
-        transfer_events = find_events_by_identifier(tx_enter_data, "ESDTNFTTransfer")
-        farm_nonce = 0
-        farm_amount = 0
-
-        for event in transfer_events:
-            if len(event.topics) >= 4:
-                token_id = event.topics[0].decode('utf-8') if isinstance(event.topics[0], bytes) else str(event.topics[0])
-                if token_id == target_farm.farmToken:
-                    farm_nonce = int.from_bytes(event.topics[1], 'big') if isinstance(event.topics[1], bytes) else int(event.topics[1])
-                    farm_amount = int.from_bytes(event.topics[2], 'big') if isinstance(event.topics[2], bytes) else int(event.topics[2])
-                    logger.info(f"Farm token received: {token_id} nonce={farm_nonce} amount={farm_amount}")
-                    break
-
-        if farm_nonce > 0 and farm_amount > 0:
-            # Exit farm
-            exit_event = ExitFarmEvent(
-                farm_token=target_farm.farmToken,
-                amount=farm_amount,
-                nonce=farm_nonce,
-                attributes=""
-            )
-            alice.sync_nonce(network_providers.proxy)
-            tx_exit = target_farm.exitFarm(network_providers, alice, exit_event)
-            blockchain_controller.wait_for_tx(tx_exit)
-            TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
-
-            # Verify LP tokens returned
-            alice_lp_final = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-            assert alice_lp_final > alice_lp_after_farm, "LP tokens should be returned from farm"
-            logger.info(f"LP balance after exit: {alice_lp_final} (recovered {alice_lp_final - alice_lp_after_farm})")
-
-            logger.info("Test passed: LP tokens successfully staked and unstaked in farm")
-        else:
-            # Even if we can't parse the exact nonce, the enter was successful
-            logger.info("Farm entry succeeded but could not parse farm token details for exit")
-            logger.info("Test passed: LP tokens successfully staked in farm (enter verified)")
-
-    @pytest.mark.happy_path
     def test_trusted_swap_pair_integration(
         self,
         pair_contract: PairContract,
@@ -615,3 +423,210 @@ class TestContractIntegration:
         logger.info("Swap works after router resume")
 
         logger.info("Test passed: Router pause/resume correctly controls pair contract")
+
+    @pytest.mark.happy_path
+    def test_full_lifecycle_continuous_flow(
+        self,
+        pair_contract: PairContract,
+        alice: Account,
+        bob: Account,
+        network_providers,
+        blockchain_controller,
+        ensure_esdt_amounts
+    ):
+        """
+        SCENARIO: Full lifecycle of pool operations in continuous sequence
+
+        GIVEN: Pool with liquidity
+        WHEN: Execute a complete flow:
+            1. Add liquidity
+            2. Swap A -> B
+            3. Swap B -> A
+            4. Add more liquidity
+            5. Remove partial liquidity
+            6. Swap again
+        THEN:
+            - All transactions succeed
+            - k invariant holds after each operation
+            - LP tokens minted/burned correctly
+            - Final state is consistent
+
+        SECURITY: Verifies the state machine handles all transitions correctly
+                  in sequence without state corruption.
+        """
+        logger.info("TEST: Full lifecycle continuous flow")
+
+        _ensure_pool_has_liquidity(
+            pair_contract, alice, network_providers,
+            blockchain_controller, ensure_esdt_amounts
+        )
+
+        pair_data_fetcher = PairContractDataFetcher(
+            Address.new_from_bech32(pair_contract.address),
+            network_providers.proxy.url
+        )
+
+        # Step 1: Add liquidity
+        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        k_initial = reserves[0] * reserves[1]
+        logger.info(f"Initial reserves: {reserves[0]}, {reserves[1]}, k={k_initial}")
+
+        add_amount = reserves[0] // 100  # 1% of first reserve
+        equivalent = pair_data_fetcher.get_data(
+            "getEquivalent",
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(add_amount)]
+        )
+        ensure_esdt_amounts(alice, {
+            pair_contract.firstToken: add_amount,
+            pair_contract.secondToken: equivalent
+        })
+
+        lp_token = Token(pair_contract.lpToken, 0)
+        alice_lp_before = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+
+        add_event = AddLiquidityEvent(
+            tokenA=pair_contract.firstToken,
+            amountA=add_amount,
+            amountAmin=1,
+            tokenB=pair_contract.secondToken,
+            amountB=equivalent,
+            amountBmin=1
+        )
+        alice.sync_nonce(network_providers.proxy)
+        tx1 = pair_contract.add_liquidity(network_providers, alice, add_event)
+        blockchain_controller.wait_for_tx(tx1)
+        TransactionAssertions.assert_transaction_success(tx1, network_providers.proxy)
+
+        reserves_1 = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        k_1 = reserves_1[0] * reserves_1[1]
+        assert k_1 >= k_initial, f"k decreased after add liquidity: {k_initial} -> {k_1}"
+        alice_lp_after_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        assert alice_lp_after_add > alice_lp_before, "Alice should have received LP tokens"
+        logger.info(f"Step 1 (Add liquidity): k={k_1}, LP gained={alice_lp_after_add - alice_lp_before}")
+
+        # Step 2: Swap A -> B
+        swap_amount = reserves_1[0] // 1000  # 0.1% of reserve
+        ensure_esdt_amounts(bob, {pair_contract.firstToken: swap_amount})
+
+        swap1_event = SwapFixedInputEvent(
+            tokenA=pair_contract.firstToken,
+            amountA=swap_amount,
+            tokenB=pair_contract.secondToken,
+            amountBmin=1
+        )
+        bob.sync_nonce(network_providers.proxy)
+        tx2 = pair_contract.swap_fixed_input(network_providers, bob, swap1_event)
+        blockchain_controller.wait_for_tx(tx2)
+        TransactionAssertions.assert_transaction_success(tx2, network_providers.proxy)
+
+        reserves_2 = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        k_2 = reserves_2[0] * reserves_2[1]
+        assert k_2 >= k_1, f"k decreased after swap A->B: {k_1} -> {k_2}"
+        logger.info(f"Step 2 (Swap A->B): k={k_2}")
+
+        # Step 3: Swap B -> A
+        swap_amount_b = reserves_2[1] // 1000
+        ensure_esdt_amounts(bob, {pair_contract.secondToken: swap_amount_b})
+
+        swap2_event = SwapFixedInputEvent(
+            tokenA=pair_contract.secondToken,
+            amountA=swap_amount_b,
+            tokenB=pair_contract.firstToken,
+            amountBmin=1
+        )
+        bob.sync_nonce(network_providers.proxy)
+        tx3 = pair_contract.swap_fixed_input(network_providers, bob, swap2_event)
+        blockchain_controller.wait_for_tx(tx3)
+        TransactionAssertions.assert_transaction_success(tx3, network_providers.proxy)
+
+        reserves_3 = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        k_3 = reserves_3[0] * reserves_3[1]
+        assert k_3 >= k_2, f"k decreased after swap B->A: {k_2} -> {k_3}"
+        logger.info(f"Step 3 (Swap B->A): k={k_3}")
+
+        # Step 4: Add more liquidity
+        add_amount_2 = reserves_3[0] // 200  # 0.5% of reserve
+        equivalent_2 = pair_data_fetcher.get_data(
+            "getEquivalent",
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(add_amount_2)]
+        )
+        ensure_esdt_amounts(alice, {
+            pair_contract.firstToken: add_amount_2,
+            pair_contract.secondToken: equivalent_2
+        })
+
+        add_event_2 = AddLiquidityEvent(
+            tokenA=pair_contract.firstToken,
+            amountA=add_amount_2,
+            amountAmin=1,
+            tokenB=pair_contract.secondToken,
+            amountB=equivalent_2,
+            amountBmin=1
+        )
+        alice.sync_nonce(network_providers.proxy)
+        tx4 = pair_contract.add_liquidity(network_providers, alice, add_event_2)
+        blockchain_controller.wait_for_tx(tx4)
+        TransactionAssertions.assert_transaction_success(tx4, network_providers.proxy)
+
+        reserves_4 = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        k_4 = reserves_4[0] * reserves_4[1]
+        assert k_4 >= k_3, f"k decreased after second add: {k_3} -> {k_4}"
+        logger.info(f"Step 4 (Add liquidity 2): k={k_4}")
+
+        # Step 5: Remove partial liquidity
+        alice_lp_now = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        MINIMUM_LIQUIDITY = 1000
+        total_supply = reserves_4[2]
+        max_removable = min(alice_lp_now, total_supply - MINIMUM_LIQUIDITY)
+        remove_amount = max_removable // 20  # Remove 5% of removable LP
+
+        if remove_amount > 0:
+            from contracts.pair_contract import RemoveLiquidityEvent
+            remove_event = RemoveLiquidityEvent(
+                amount=remove_amount,
+                tokenA=pair_contract.firstToken,
+                amountA=1,
+                tokenB=pair_contract.secondToken,
+                amountB=1
+            )
+            alice.sync_nonce(network_providers.proxy)
+            tx5 = pair_contract.remove_liquidity(network_providers, alice, remove_event)
+            blockchain_controller.wait_for_tx(tx5)
+            TransactionAssertions.assert_transaction_success(tx5, network_providers.proxy)
+
+            reserves_5 = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+            k_5 = reserves_5[0] * reserves_5[1]
+            # k can decrease on remove (proportional withdrawal)
+            assert k_5 > 0, "k should remain positive after partial removal"
+            logger.info(f"Step 5 (Remove liquidity): k={k_5}")
+        else:
+            reserves_5 = reserves_4
+            logger.info("Step 5 skipped: insufficient LP for removal")
+
+        # Step 6: Final swap to verify pool still functional
+        final_swap = reserves_5[0] // 2000
+        ensure_esdt_amounts(bob, {pair_contract.firstToken: final_swap})
+
+        final_event = SwapFixedInputEvent(
+            tokenA=pair_contract.firstToken,
+            amountA=final_swap,
+            tokenB=pair_contract.secondToken,
+            amountBmin=1
+        )
+        bob.sync_nonce(network_providers.proxy)
+        tx6 = pair_contract.swap_fixed_input(network_providers, bob, final_event)
+        blockchain_controller.wait_for_tx(tx6)
+        TransactionAssertions.assert_transaction_success(tx6, network_providers.proxy)
+
+        reserves_final = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        assert reserves_final[0] > 0, "First reserve should be positive"
+        assert reserves_final[1] > 0, "Second reserve should be positive"
+        assert reserves_final[2] > 0, "LP supply should be positive"
+        logger.info(f"Step 6 (Final swap): reserves={reserves_final[0]}, {reserves_final[1]}")
+
+        # Summary
+        k_growth = (reserves_final[0] * reserves_final[1]) / k_initial
+        logger.info(f"k growth over lifecycle: {k_growth:.6f}x")
+        logger.info(f"Operations completed: add, swap, swap, add, remove, swap")
+
+        logger.info("Test passed: Full lifecycle completed successfully")

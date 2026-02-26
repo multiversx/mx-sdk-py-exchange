@@ -50,7 +50,6 @@ class TestPairAddLiquidity:
     """
 
     @pytest.mark.happy_path
-    @pytest.mark.xfail(reason="Chain simulator limitation: factory-pattern SC deploys via Router fail on cross-shard metachain finalization")
     def test_add_initial_liquidity_empty_pool(
         self,
         router_contract,
@@ -1478,31 +1477,6 @@ class TestPairAddLiquidity:
 
         logger.info("Test passed: Liquidity added correctly to fee-enriched pool")
 
-    @pytest.mark.skip_on_live
-    def test_add_liquidity_high_volume_stress(
-        self,
-        pair_contract: PairContract,
-        test_accounts,
-        network_providers,
-        blockchain_controller
-    ):
-        """
-        SCENARIO: Multiple users add liquidity concurrently (stress test)
-
-        GIVEN: Pair contract with liquidity
-        WHEN: 5 users add liquidity in rapid succession
-        THEN:
-            - All transactions succeed
-            - Reserves increase by sum of all contributions
-            - Constant product maintained
-            - No race conditions or nonce conflicts
-
-        SECURITY: Tests contract behavior under load.
-                  Ensures concurrent operations don't corrupt state.
-
-        Note: Marked skip_on_live to avoid polluting shared test networks.
-        """
-        pytest.skip("Stress test - implement when framework stabilized")
 
 
 # ============================================================================

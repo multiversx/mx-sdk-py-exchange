@@ -83,7 +83,7 @@ def _estimate_input_for_output(
     Uses the constant product formula:
     amount_in = (reserve_in * amount_out) / (reserve_out - amount_out) + 1
 
-    Then adds fee adjustment (0.3% fee -> multiply by 1000/997).
+    Then adds fee adjustment using the actual configured fee from the contract.
     """
     reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
 
@@ -97,11 +97,20 @@ def _estimate_input_for_output(
     if desired_output >= reserve_out:
         return reserve_in * 10  # Return a very large amount
 
-    # Constant product formula with fee (3% total fee = 300 basis points)
+    # Query actual fee from contract
+    pair_data_fetcher = PairContractDataFetcher(
+        Address.new_from_bech32(pair_contract.address),
+        network_providers.proxy.url
+    )
+    total_fee = pair_data_fetcher.get_data("getTotalFeePercent")
+    # total_fee is in /100000 units. Convert to /10000 for the formula.
+    fee_in_10k = total_fee // 10  # e.g., 300/100000 -> 30/10000
+
+    # Constant product formula with fee
     # amount_in_no_fee = (reserve_in * desired_output) / (reserve_out - desired_output)
-    # With fee: amount_in = amount_in_no_fee * 10000 / (10000 - total_fee)
+    # With fee: amount_in = amount_in_no_fee * 10000 / (10000 - fee_in_10k)
     numerator = reserve_in * desired_output * 10000
-    denominator = (reserve_out - desired_output) * (10000 - 300)
+    denominator = (reserve_out - desired_output) * (10000 - fee_in_10k)
     estimated_input = numerator // denominator + 1
 
     return estimated_input
@@ -219,14 +228,33 @@ class TestSwapFixedOutput:
             f"Max: {max_input}, Spent: {actual_input_spent}"
         )
         assert actual_input_spent > 0, "Some input should have been spent"
-        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} (max was {max_input / 10**18:.4f})")
+
+        # 6b. ASSERT: Refund is correct (max_input - actual_spent returned)
+        refund = max_input - actual_input_spent
+        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f}, refund: {refund / 10**18:.4f} (max was {max_input / 10**18:.4f})")
+        assert refund >= 0, "Refund must be non-negative"
+        if max_input > actual_input_spent:
+            assert refund > 0, (
+                f"Contract should refund excess input.\n"
+                f"Max: {max_input}, Spent: {actual_input_spent}, Refund: {refund}"
+            )
 
         # 7. ASSERT: Reserves consistent
         reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         assert reserves_after[0] > reserves_before[0], "First reserve should increase"
         assert reserves_after[1] < reserves_before[1], "Second reserve should decrease"
 
-        # 8. ASSERT: Constant product holds
+        # 8. ASSERT: Reserve increase <= actual input spent
+        # Note: reserve increase may be less than input spent because the special
+        # fee is deducted from input and sent to the fee collector externally
+        reserve_increase = reserves_after[0] - reserves_before[0]
+        assert reserve_increase <= actual_input_spent, (
+            f"Reserve increase should not exceed actual input spent.\n"
+            f"Reserve increase: {reserve_increase}, Input spent: {actual_input_spent}"
+        )
+        assert reserve_increase > 0, "Reserve should increase from input"
+
+        # 9. ASSERT: Constant product holds
         PairAssertions.assert_constant_product_holds(
             pair_contract.address, k_before, network_providers.proxy
         )
@@ -466,8 +494,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (max input too low for required amount)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Slippage exceeded"
+        )
         logger.info("Transaction failed as expected (insufficient max input)")
 
         # 4. ASSERT: Reserves unchanged
@@ -627,8 +657,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (output > reserve causes BigUint underflow)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Not enough reserve"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -687,8 +719,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (contract rejects 0 output)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Invalid args"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -749,8 +783,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (contract rejects unknown output token)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Invalid tokens"
+        )
         logger.info("Transaction failed as expected (wrong output token)")
 
         # 4. ASSERT: Reserves unchanged

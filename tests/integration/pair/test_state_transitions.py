@@ -159,7 +159,9 @@ class TestStateTransitions:
         tx_post = pair_contract.swap_fixed_input(network_providers, alice, post_event)
         blockchain_controller.wait_for_tx(tx_post)
 
-        TransactionAssertions.assert_transaction_failed(tx_post, network_providers.proxy)
+        TransactionAssertions.assert_transaction_failed(
+            tx_post, network_providers.proxy, expected_error="Swap is not enabled"
+        )
         logger.info("Swap correctly rejected after pause")
 
         # CLEANUP: Resume the contract for other tests
@@ -230,7 +232,9 @@ class TestStateTransitions:
             tx_swap = pair_contract.swap_fixed_input(network_providers, alice, swap_event)
             blockchain_controller.wait_for_tx(tx_swap)
 
-            TransactionAssertions.assert_transaction_failed(tx_swap, network_providers.proxy)
+            TransactionAssertions.assert_transaction_failed(
+                tx_swap, network_providers.proxy, expected_error="Swap is not enabled"
+            )
             logger.info("1. Swap correctly rejected when paused")
 
             # Verify reserves unchanged after failed swap
@@ -251,8 +255,66 @@ class TestStateTransitions:
             tx_swap_rev = pair_contract.swap_fixed_input(network_providers, alice, swap_rev_event)
             blockchain_controller.wait_for_tx(tx_swap_rev)
 
-            TransactionAssertions.assert_transaction_failed(tx_swap_rev, network_providers.proxy)
+            TransactionAssertions.assert_transaction_failed(
+                tx_swap_rev, network_providers.proxy, expected_error="Swap is not enabled"
+            )
             logger.info("2. Reverse swap correctly rejected when paused")
+
+            # Test 3: Add liquidity should WORK in ActiveNoSwaps state
+            pair_data_fetcher = PairContractDataFetcher(
+                Address.new_from_bech32(pair_contract.address),
+                network_providers.proxy.url
+            )
+            add_amount = nominated_amount(10)
+            equivalent = pair_data_fetcher.get_data(
+                "getEquivalent",
+                [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(add_amount)]
+            )
+            ensure_esdt_amounts(alice, {
+                pair_contract.firstToken: add_amount,
+                pair_contract.secondToken: equivalent
+            })
+
+            add_event = AddLiquidityEvent(
+                tokenA=pair_contract.firstToken,
+                amountA=add_amount,
+                amountAmin=1,
+                tokenB=pair_contract.secondToken,
+                amountB=equivalent,
+                amountBmin=1
+            )
+            alice.sync_nonce(network_providers.proxy)
+            tx_add = pair_contract.add_liquidity(network_providers, alice, add_event)
+            blockchain_controller.wait_for_tx(tx_add)
+            TransactionAssertions.assert_transaction_success(tx_add, network_providers.proxy)
+            logger.info("3. Add liquidity correctly ALLOWED in ActiveNoSwaps state")
+
+            # Test 4: Remove liquidity should WORK in ActiveNoSwaps state
+            lp_token = Token(pair_contract.lpToken, 0)
+            alice_lp = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+            reserves_now = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+            total_supply = reserves_now[2]
+            MINIMUM_LIQUIDITY = 1000
+
+            # Must leave at least MINIMUM_LIQUIDITY in the pool after removal
+            max_removable = min(alice_lp, total_supply - MINIMUM_LIQUIDITY)
+            remove_amount = max_removable // 10 if max_removable > 0 else 0
+
+            if remove_amount > 0:
+                remove_event = RemoveLiquidityEvent(
+                    amount=remove_amount,
+                    tokenA=pair_contract.firstToken,
+                    amountA=1,
+                    tokenB=pair_contract.secondToken,
+                    amountB=1
+                )
+                alice.sync_nonce(network_providers.proxy)
+                tx_remove = pair_contract.remove_liquidity(network_providers, alice, remove_event)
+                blockchain_controller.wait_for_tx(tx_remove)
+                TransactionAssertions.assert_transaction_success(tx_remove, network_providers.proxy)
+                logger.info("4. Remove liquidity correctly ALLOWED in ActiveNoSwaps state")
+            else:
+                logger.info("4. Skipped remove liquidity test (insufficient LP or pool near minimum)")
 
         finally:
             # CLEANUP: Always resume the contract

@@ -256,14 +256,23 @@ class TestFeeMechanics:
             logger.info(f"Effective fee: ~{fee_impact:.0f}/100000")
             logger.info(f"Configured total fee: {total_fee}/100000")
 
-            # Effective fee should be close to configured (within 10% relative)
+            # Effective fee should be close to the configured total_fee.
+            # The exact relationship is:
+            #   fee_impact = total_fee * reserve_in / (reserve_in + swap_amount * (1 - total_fee/100000))
+            # This accounts for the AMM curve reducing effective fee for large swaps.
             if total_fee > 0:
-                fee_error = abs(fee_impact - total_fee) / total_fee
-                assert fee_error < 0.15, (
-                    f"Effective fee ({fee_impact:.0f}) doesn't match configured ({total_fee}).\n"
-                    f"Error: {fee_error:.2%}"
+                # Compute expected fee impact from AMM math
+                fee_frac = total_fee / 100000
+                expected_fee_impact = total_fee * reserves[0] / (
+                    reserves[0] + swap_amount * (1 - fee_frac)
                 )
-                logger.info(f"Fee match: effective ~= configured (error: {fee_error:.2%})")
+                fee_error = abs(fee_impact - expected_fee_impact) / expected_fee_impact
+                assert fee_error < 0.05, (
+                    f"Effective fee ({fee_impact:.0f}) doesn't match expected ({expected_fee_impact:.0f}).\n"
+                    f"Configured total fee: {total_fee}/100000\n"
+                    f"Error: {fee_error:.2%} (must be < 5%)"
+                )
+                logger.info(f"Fee match: effective ≈ expected ({expected_fee_impact:.0f}) (error: {fee_error:.2%})")
 
         logger.info("Test passed: Special fee configuration is valid and affects swaps correctly")
 

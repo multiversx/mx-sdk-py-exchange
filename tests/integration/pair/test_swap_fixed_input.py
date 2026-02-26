@@ -679,8 +679,10 @@ class TestSwapFixedInput:
         tx_hash = pair_contract.swap_fixed_input(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (protocol rejects 0-amount ESDT transfer)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="negative value"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -747,8 +749,10 @@ class TestSwapFixedInput:
         tx_hash = pair_contract.swap_fixed_input(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED with slippage error
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Slippage exceeded"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -808,8 +812,10 @@ class TestSwapFixedInput:
         tx_hash = pair_contract.swap_fixed_input(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (user doesn't have FAKE token)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="insufficient funds"
+        )
         logger.info("Transaction failed as expected (wrong token)")
 
         # 4. ASSERT: Reserves unchanged
