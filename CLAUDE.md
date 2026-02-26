@@ -78,7 +78,7 @@ Pytest-based integration tests running against a MultiversX chain simulator (Doc
 - `tools/chain_simulator_connector.py` — Low-level chain sim API (set-state, generate-blocks, state filtering)
 - `tests/helpers/` — Test assertion helpers (`PairAssertions`, `TransactionAssertions`, `ContractStateSnapshot`)
 
-**Test files (pair contract — 82 tests, 100% coverage):**
+**Test files (pair contract — 123 tests, 100% passing):**
 - `test_add_liquidity.py` — Add liquidity (initial, slippage, edge cases)
 - `test_remove_liquidity.py` — Remove liquidity (partial, full, slippage)
 - `test_swap_fixed_input.py` — Swap with fixed input amount
@@ -91,7 +91,8 @@ Pytest-based integration tests running against a MultiversX chain simulator (Doc
 - `test_state_transitions.py` — Pause/resume lifecycle (requires deployer)
 - `test_security.py` — Sandwich attacks, front-running, price manipulation
 - `test_overflow_boundary.py` — Large/tiny amounts, BigUint boundaries
-- `test_contract_integration.py` — Multi-hop swaps, farm staking, router admin
+- `test_contract_integration.py` — Multi-hop swaps, trusted swap pairs, router admin
+- `test_safe_price.py` — TWAP oracle: observations, views, math, manipulation resistance, LP valuation, edge cases (34 tests)
 
 **Running tests:**
 ```bash
@@ -125,7 +126,7 @@ PYTHONPATH=. python -m pytest tests/integration/pair/test_add_liquidity.py::Test
 - SC deploys go through metachain (cross-shard). The `get_deployed_address_from_tx()` in `utils/utils_tx.py` handles this.
 
 **Known Limitations:**
-- Factory-pattern SC deploys (e.g., Router creating new Pair contracts) may fail on chain simulator — cross-shard deploy finalization is unreliable for child contracts
+- **Pair template bytecode**: The Router's `createPair` uses `deployFromSourceContract` to clone a pair template. When loading mainnet state, the template's bytecode may not be in the state dump. The `ensure_pair_template_has_code()` method in `chain_simulator_connector.py` copies bytecode from an existing pair to the template address (called automatically during test setup via `conftest.py`)
 - NEVER use `--initial-epoch` with non-zero values in docker-compose — breaks cross-shard transactions permanently ("could not find proof for header")
 - Chain simulator retains state between test runs unless restarted (`docker compose down && docker compose up -d`)
 
@@ -145,5 +146,4 @@ PYTHONPATH=. python -m pytest tests/integration/pair/test_add_liquidity.py::Test
 - **Reserve-relative amounts**: Tests sharing a session-scoped pool must use reserve-relative amounts (e.g., 0.1% of reserve) instead of fixed values, to avoid failures when prior tests modify reserves
 - **Multi-pair tests**: Use `all_pair_contracts` fixture; pairs share WEGLD as a common token for multi-hop swaps
 - **Config labels**: `config.FARMS_V2` = "farms_boosted", `config.FARMS_LOCKED` = "farms_locked", `config.PAIRS_V2` = "pairs_v2", `config.ROUTER_V2` = router. There is no `config.FARMS_BOOSTED`
-- **Farm contracts on chain sim**: Farm contract addresses exist in config but bytecode is not loaded. Tests must check for deployed code and `pytest.skip()` when absent
 - **Cleanup pattern**: Tests that modify contract state (pause/resume) must use `try/finally` to always restore state for other tests

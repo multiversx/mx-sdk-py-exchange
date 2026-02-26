@@ -50,6 +50,7 @@ When `pytest` starts, `tests/conftest.py` creates a `ChainsimEnvironment` that:
    - **firstWeekStartEpoch overridden to 0**: Prevents "Week 0 is not a valid week" at low epochs
 4. Generates 1 block to finalize state
 5. Initializes `Context` with deployed contracts
+6. Ensures pair template has bytecode (copies from existing pair if missing, needed for Router's `createPair`)
 
 Total setup: ~8 seconds.
 
@@ -71,7 +72,7 @@ tests/
       test_remove_liquidity.py      # Liquidity removal (10 tests)
       test_swap_fixed_input.py      # Fixed input swaps (10 tests)
       test_swap_fixed_output.py     # Fixed output swaps (8 tests)
-      test_view_functions.py        # View/query functions (4 tests)
+      test_view_functions.py        # View/query functions (7 tests)
       test_economic_invariants.py   # k=x*y invariant, fees (4 tests)
       test_multi_user.py            # Concurrent users, dilution (4 tests)
       test_edge_cases.py            # Extreme ratios, dust, recovery (3 tests)
@@ -79,8 +80,9 @@ tests/
       test_state_transitions.py     # Pause/resume lifecycle (3 tests)
       test_security.py              # Sandwich, front-running, oracle (4 tests)
       test_overflow_boundary.py     # Large/tiny amounts, BigUint (3 tests)
-      test_contract_integration.py  # Multi-hop, farm, router admin (4 tests)
-      TEST_COVERAGE_PLAN.md         # Coverage tracking (100%, 82/82 tests)
+      test_contract_integration.py  # Multi-hop, trusted pairs, router admin (3 tests)
+      test_safe_price.py            # TWAP oracle: observations, views, math, manipulation, LP valuation (34 tests)
+      TEST_COVERAGE_PLAN.md         # Coverage tracking (100%, 123/123 tests)
 ```
 
 ## Key Fixtures
@@ -219,7 +221,7 @@ Located in `tools/chain_simulator_connector.py`:
 
 ## Known Limitations
 
-1. **Factory SC deploys fail**: Router's `createPair` deploys child contracts via metachain. The chain simulator doesn't fully support cross-shard SC creation for child contracts. Tests using `isolated_pair_factory` will fail with "Failed to deploy pair".
+1. **Pair template bytecode**: Router's `createPair` uses `deployFromSourceContract` to clone a pair template. When loading mainnet state, the template's bytecode may not be included. Fixed by `ensure_pair_template_has_code()` in `chain_simulator_connector.py` — copies bytecode from an existing pair to the template address via set-state API. Called automatically during test setup via `conftest.py`.
 
 2. **Never use `--initial-epoch` > 0**: In `docker-compose.yaml`, adding `--initial-epoch=N` with N > 0 permanently breaks cross-shard transactions with "could not find proof for header".
 
@@ -227,9 +229,9 @@ Located in `tools/chain_simulator_connector.py`:
 
 4. **`TransactionStatus` properties**: `is_successful`, `is_failed`, `is_completed` are properties, not methods. Use `tx.status.is_successful` not `tx.status.is_successful()`.
 
-5. **Farm contracts have no code on chain sim**: Farm contract addresses exist in config but bytecode is not loaded in the pre-saved state. Tests must check for deployed code and `pytest.skip()` when absent.
+5. **No `config.FARMS_BOOSTED`**: The attribute is `config.FARMS_V2` (maps to "farms_boosted" internally). Using `config.FARMS_BOOSTED` raises `AttributeError`.
 
-6. **No `config.FARMS_BOOSTED`**: The attribute is `config.FARMS_V2` (maps to "farms_boosted" internally). Using `config.FARMS_BOOSTED` raises `AttributeError`.
+6. **Chain sim timeout under load**: Heavy swap sequences (e.g., safe price manipulation resistance tests) can cause SDK `TimeoutError`. The `_perform_swap` helper in `test_safe_price.py` includes retry logic (3 attempts with block advancement between retries).
 
 ## Troubleshooting
 
@@ -237,10 +239,9 @@ Located in `tools/chain_simulator_connector.py`:
 |-------|-------|-----|
 | "cast to i64 error" | Safe price round mismatch | Ensure `filter_safe_price=True` in state loading |
 | "Week 0 is not a valid week" | firstWeekStartEpoch too high for current epoch | Ensure `override_first_week_start_epoch` runs during state load |
-| "account was not found" on SC deploy | Cross-shard deploy not finalized | Use `generate-blocks-until-transaction-processed` |
-| "Failed to deploy pair" | Factory-pattern SC deploy limitation | Known chain sim limitation — skip test or use pre-deployed pairs |
+| "account was not found" on createPair | Pair template has no bytecode | `ensure_pair_template_has_code()` copies bytecode from existing pair via set-state |
 | "could not find proof for header" | `--initial-epoch` > 0 used | Remove `--initial-epoch` from docker-compose, restart |
 | Tests pass individually but fail together | Stale chain sim state | Restart chain sim between runs |
 | "Slippage exceeded" on multi-hop swap | Intermediate amount too large for second pool | Use reserve-relative amounts (0.1%) and cap intermediate to 0.1% of target pool reserve |
 | `AttributeError: FARMS_BOOSTED` | Wrong config label | Use `config.FARMS_V2` (maps to "farms_boosted") |
-| Farm `enterFarm` "invalid contract code" | Farm bytecode not in chain sim state | Check for deployed code first, `pytest.skip()` if absent |
+| `TimeoutError: Fetching transaction` | Chain sim slow under heavy swap load | Retry logic in `_perform_swap` (test_safe_price.py) handles this automatically |
