@@ -39,6 +39,25 @@ SAFE_PRICE_KEY_PREFIXES = [
 # Overriding to 0 means epoch 7+ suffices for week >= 1.
 FIRST_WEEK_START_EPOCH_KEY = "66697273745765656b537461727445706f6368"  # "firstWeekStartEpoch"
 
+# Hex-encoded storage key prefixes for boosted yields week-dependent data.
+# These keys store mainnet week numbers (e.g. week 169) which are incompatible with
+# chain simulator epochs (epoch ~10 → week ~2). The boostedYieldsConfig contains
+# last_update_week which triggers "Invalid config week" when current_week < last_update_week.
+# Clearing all week-dependent keys lets the contract reinitialize from scratch.
+BOOSTED_YIELDS_WEEK_KEY_PREFIXES = [
+    "626f6f737465645969656c6473436f6e666967",                                  # "boostedYieldsConfig"
+    "6c617374476c6f62616c5570646174655765656b",                                # "lastGlobalUpdateWeek"
+    "6661726d537570706c79466f725765656b",                                      # "farmSupplyForWeek"
+    "746f74616c456e65726779466f725765656b",                                    # "totalEnergyForWeek"
+    "746f74616c52657761726473466f725765656b",                                  # "totalRewardsForWeek"
+    "746f74616c4c6f636b6564546f6b656e73466f725765656b",                        # "totalLockedTokensForWeek"
+    "72656d61696e696e67426f6f7374656452657761726473546f44697374726962757465",  # "remainingBoostedRewardsToDistribute"
+    "63757272656e74436c61696d50726f6772657373",                                # "currentClaimProgress"
+    "616363756d756c6174656452657761726473466f725765656b",                      # "accumulatedRewardsForWeek"
+    "6c6f636b6564546f6b656e73496e4275636b6574",                                # "lockedTokensInBucket"
+    "66697273744275636b65744964",                                              # "firstBucketId"
+]
+
 SIMULATOR_URL = "http://localhost:8085"
 API_URL = "http://localhost:3001"
 GENERATE_BLOCKS_URL = f"{SIMULATOR_URL}/simulator/generate-blocks/"
@@ -452,6 +471,90 @@ class ChainSimulator:
             yaml.dump(docker_compose, file, default_flow_style=False, sort_keys=False)
         
         logger.info(f"Updated {self.docker_path / 'docker-compose.yaml'} with block {block}, round {round}, epoch {epoch}.")
+
+    def ensure_contract_state_from_mainnet(self, contract_address: str,
+                                              mainnet_gateway: str = "https://gateway.multiversx.com",
+                                              filter_first_week_epoch: bool = True,
+                                              filter_boosted_yields_weeks: bool = False):
+        """Load a contract's full state (bytecode + storage) from mainnet onto the chain simulator.
+
+        Checks if the contract has code on the chain sim. If not, fetches the account data
+        and all storage keys from the mainnet gateway and loads them via set-state API.
+        Optionally overrides firstWeekStartEpoch to 0 for boosted contracts.
+        Optionally removes boosted yields week-dependent keys that reference mainnet week
+        numbers incompatible with chain simulator epochs.
+
+        Args:
+            contract_address: Bech32 address of the contract
+            mainnet_gateway: Mainnet proxy gateway URL
+            filter_first_week_epoch: If True, override firstWeekStartEpoch to 0
+            filter_boosted_yields_weeks: If True, remove all boosted yields week keys
+        """
+        # 1. Check if contract already has code on chain sim
+        resp = requests.get(f"{self.proxy_url}/address/{contract_address}")
+        if resp.status_code != 200:
+            logger.warning(f"Cannot check contract {contract_address}: {resp.status_code}")
+            return False
+        local_acct = resp.json()["data"]["account"]
+        if local_acct.get("code"):
+            logger.info(f"Contract {contract_address} already has code on chain sim")
+            return True
+
+        # 2. Fetch account data from mainnet
+        logger.info(f"Fetching contract state from mainnet: {contract_address}")
+        mainnet_proxy = ProxyNetworkProvider(mainnet_gateway)
+
+        # Get account data (code, balance, nonce, etc.)
+        account_data = get_account_data_online(contract_address, mainnet_gateway)
+        if not account_data or not account_data.get("code"):
+            logger.error(f"Contract {contract_address} has no code on mainnet")
+            return False
+
+        # Get all storage keys
+        keys = get_account_keys_online(contract_address, mainnet_gateway)
+
+        # 3. Apply filtering
+        if filter_first_week_epoch and keys:
+            if FIRST_WEEK_START_EPOCH_KEY in keys:
+                old_value = keys[FIRST_WEEK_START_EPOCH_KEY]
+                keys[FIRST_WEEK_START_EPOCH_KEY] = ""
+                logger.info(f"Overrode firstWeekStartEpoch for {contract_address}: {old_value} -> 0")
+
+        if filter_boosted_yields_weeks and keys:
+            keys_to_remove = [
+                k for k in keys
+                if any(k.startswith(prefix) for prefix in BOOSTED_YIELDS_WEEK_KEY_PREFIXES)
+            ]
+            for k in keys_to_remove:
+                del keys[k]
+            if keys_to_remove:
+                logger.info(f"Filtered {len(keys_to_remove)} boosted yields week keys for {contract_address}")
+
+        # 4. Build set-state payload
+        account_data.pop("rootHash", None)
+        state_entry = {
+            "address": contract_address,
+            "nonce": account_data.get("nonce", 0),
+            "balance": account_data.get("balance", "0"),
+            "code": account_data.get("code", ""),
+            "codeHash": account_data.get("codeHash", ""),
+            "codeMetadata": account_data.get("codeMetadata", ""),
+            "ownerAddress": account_data.get("ownerAddress", ""),
+            "developerReward": account_data.get("developerReward", "0"),
+        }
+        if keys:
+            state_entry["pairs"] = keys
+
+        # 5. Load onto chain sim
+        resp = requests.post(f"{self.proxy_url}/simulator/set-state", json=[state_entry])
+        if resp.status_code == 200:
+            key_count = len(keys) if keys else 0
+            logger.info(f"Loaded contract state for {contract_address} ({key_count} storage keys)")
+            self.advance_blocks(1)
+            return True
+        else:
+            logger.error(f"Failed to load contract state: {resp.text}")
+            return False
 
     def fund_users_w_egld(self, users: list[str], amount: int):
         for user in users:

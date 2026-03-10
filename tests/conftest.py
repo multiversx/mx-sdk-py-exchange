@@ -62,7 +62,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--docker-path",
         action="store",
-        default=str(Path.home() / "Projects/testing/full-stack-docker-compose/chain-simulator"),
+        default=str(Path(__file__).parent.parent),
         help="Path to chain simulator docker-compose directory (only for chainsim)"
     )
     parser.addoption(
@@ -385,6 +385,8 @@ def dex_context(test_environment, network_proxy, request) -> Context:
     # Ensure pair template has bytecode (needed for Router.createPair on chain simulator)
     if test_environment.supports_time_control() and test_environment.has_pre_existing_state():
         _ensure_pair_template_loaded(context, test_environment)
+        _ensure_farm_state_loaded(context, test_environment)
+        _ensure_staking_state_loaded(context, test_environment)
 
     return context
 
@@ -400,6 +402,71 @@ def _ensure_pair_template_loaded(context: Context, env):
     pairs = context.get_contracts(config.PAIRS_V2)
     if routers and pairs and hasattr(env, 'chain_sim') and env.chain_sim:
         env.chain_sim.ensure_pair_template_has_code(routers[0].address, pairs[0].address)
+
+
+def _ensure_farm_state_loaded(context: Context, env):
+    """Ensure farm contract state is loaded on chain simulator.
+
+    Farm contracts are not included in the default state dump. This fetches
+    their full state (bytecode + storage) from mainnet and loads it onto the
+    chain simulator via set-state API.
+    """
+    from tests.environments import ChainsimEnvironment
+    if not isinstance(env, ChainsimEnvironment) or not env.chain_sim:
+        return
+
+    farms = context.get_contracts(config.FARMS_LOCKED)
+    if not farms:
+        logger.debug("No farms_locked contracts configured, skipping farm state loading")
+        return
+
+    for farm in farms:
+        try:
+            env.chain_sim.ensure_contract_state_from_mainnet(
+                farm.address,
+                filter_boosted_yields_weeks=True,
+            )
+        except Exception as e:
+            logger.warning(f"Could not load farm state for {farm.address}: {e}")
+
+
+def _ensure_staking_state_loaded(context: Context, env):
+    """Ensure staking contract state is loaded on chain simulator.
+
+    Staking contracts are not included in the default state dump. This fetches
+    their full state (bytecode + storage) from mainnet and loads it onto the
+    chain simulator via set-state API.
+
+    Filters:
+    - filter_first_week_epoch=True: Override firstWeekStartEpoch to 0
+    - filter_boosted_yields_weeks=True: Remove week-dependent keys (CRITICAL for both V2 and V3Boosted)
+
+    Note: Even V2 staking contracts need boosted yields week filtering because
+    they store week-related state that's incompatible with chain sim epochs.
+    """
+    from tests.environments import ChainsimEnvironment
+    if not isinstance(env, ChainsimEnvironment) or not env.chain_sim:
+        return
+
+    # Try V2 staking contracts first
+    stakings = context.get_contracts(config.STAKINGS_V2)
+    if not stakings:
+        # Try V3Boosted staking contracts
+        stakings = context.get_contracts(config.STAKINGS_BOOSTED)
+
+    if not stakings:
+        logger.debug("No staking contracts configured, skipping staking state loading")
+        return
+
+    for staking in stakings:
+        try:
+            env.chain_sim.ensure_contract_state_from_mainnet(
+                staking.address,
+                filter_first_week_epoch=True,       # Override week start for chain sim
+                filter_boosted_yields_weeks=True,   # CRITICAL: Remove week keys for both V2 and V3
+            )
+        except Exception as e:
+            logger.warning(f"Could not load staking state for {staking.address}: {e}")
 
 
 # ============================================================================
@@ -455,6 +522,48 @@ def farm_contract(dex_context) -> FarmContract:
     if not farms:
         pytest.skip("No Farm contracts deployed")
     return farms[0]
+
+
+@pytest.fixture
+def staking_contract(dex_context):
+    """
+    Get a Staking contract for testing.
+
+    Returns:
+        StakingContract: First deployed Staking contract (V2 or V3Boosted)
+
+    Raises:
+        pytest.skip: If no staking contracts deployed
+    """
+    # Try V2 staking contracts first
+    stakings = dex_context.get_contracts(config.STAKINGS_V2)
+    if not stakings:
+        # Try V3Boosted staking contracts
+        stakings = dex_context.get_contracts(config.STAKINGS_BOOSTED)
+    if not stakings:
+        pytest.skip("No Staking contracts deployed")
+    return stakings[0]
+
+
+@pytest.fixture
+def all_staking_contracts(dex_context):
+    """
+    Get all deployed Staking contracts.
+
+    Returns:
+        List[StakingContract]: All deployed Staking contracts (V2 or V3Boosted)
+
+    Raises:
+        pytest.skip: If no staking contracts deployed
+    """
+    # Try V2 staking contracts first
+    stakings = dex_context.get_contracts(config.STAKINGS_V2)
+    if not stakings:
+        # Try V3Boosted staking contracts
+        stakings = dex_context.get_contracts(config.STAKINGS_BOOSTED)
+    if not stakings:
+        pytest.skip("No Staking contracts deployed")
+    return stakings
 
 
 @pytest.fixture
