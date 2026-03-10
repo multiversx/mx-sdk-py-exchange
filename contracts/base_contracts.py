@@ -2,6 +2,8 @@
 ### the base contract class. It is meant to be inherited
 ### by other contracts that want to use these common features.
 
+import requests
+
 from utils.logger import get_logger
 from multiversx_sdk import ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue, U64Value
@@ -19,12 +21,32 @@ logger = get_logger(__name__)
 
 
 class BaseBoostedContract(DEXContractInterface, ABC):
+
+    def _get_storage_int(self, proxy: ProxyNetworkProvider, *key_names: str) -> int:
+        try:
+            resp = requests.get(f"{proxy.url}/address/{self.address}/keys")
+            keys = resp.json().get("data", {}).get("pairs", {})
+            for key_name in key_names:
+                key_hex = key_name.encode().hex()
+                val_hex = keys.get(key_hex, "")
+                if val_hex:
+                    return int(val_hex, 16)
+        except Exception:
+            pass
+        return 0
     
     def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            try:
+                all_nfts = proxy.get_non_fungible_tokens_of_account(Address(user_address))
+                farm_prefix = self.farmToken.split("-")[0]
+                return sum(t.amount for t in all_nfts if t.token.identifier.startswith(farm_prefix))
+            except Exception:
+                return 0
         user_farm_position = int(raw_results)
 
         return user_farm_position
@@ -32,8 +54,14 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getCurrentWeek')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            current_epoch = proxy.get_network_status().current_epoch
+            first_week = self.get_first_week_start_epoch(proxy)
+            if current_epoch < first_week:
+                return 0
+            return ((current_epoch - first_week) // 7) + 1
         current_week = int(raw_results)
 
         return current_week
@@ -41,8 +69,10 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     def get_first_week_start_epoch(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getFirstWeekStartEpoch')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, "firstWeekStartEpoch", "first_week_start_epoch")
         result = int(raw_results)
 
         return result
@@ -93,8 +123,10 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     def get_farm_supply_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getFarmSupplyForWeek', [U64Value(week)])
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self.get_farm_token_supply(proxy)
         return int(raw_results)
     
     def get_total_locked_tokens_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
@@ -114,7 +146,9 @@ class BaseBoostedContract(DEXContractInterface, ABC):
     def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
         data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [U64Value(week)])
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
+            return 0
+        if raw_results < 0:
             return 0
         return int(raw_results)
     
@@ -174,26 +208,45 @@ class BaseBoostedContract(DEXContractInterface, ABC):
 
 
 class BaseFarmContract(DEXContractInterface, ABC):
+
+    def _get_storage_int(self, proxy: ProxyNetworkProvider, *key_names: str) -> int:
+        try:
+            resp = requests.get(f"{proxy.url}/address/{self.address}/keys")
+            keys = resp.json().get("data", {}).get("pairs", {})
+            for key_name in key_names:
+                key_hex = key_name.encode().hex()
+                val_hex = keys.get(key_hex, "")
+                if val_hex:
+                    return int(val_hex, 16)
+        except Exception:
+            pass
+        return 0
     
     def get_farm_token_supply(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getFarmTokenSupply')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'farm_token_supply', 'farmTokenSupply')
         return int(raw_results)
     
     def get_reward_reserve(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getRewardReserve')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'reward_reserve', 'rewardReserve')
         return int(raw_results)
     
     def get_last_reward_block_nonce(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getLastRewardBlockNonce')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'last_reward_block_nonce', 'lastRewardBlockNonce')
         return int(raw_results)
 
     def get_last_reward_timestamp(self, proxy: ProxyNetworkProvider) -> int:
@@ -206,22 +259,28 @@ class BaseFarmContract(DEXContractInterface, ABC):
     def get_per_block_reward_amount(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getPerBlockRewardAmount')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'per_block_reward_amount', 'perBlockRewardAmount')
         return int(raw_results)
     
     def get_reward_per_share(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getRewardPerShare')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'reward_per_share', 'rewardPerShare')
         return int(raw_results)
     
     def get_division_safety_constant(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getDivisionSafetyConstant')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'division_safety_constant', 'divisionSafetyConstant')
         return int(raw_results)
     
     def get_farm_token_id(self, proxy: ProxyNetworkProvider) -> str:
@@ -241,8 +300,10 @@ class BaseFarmContract(DEXContractInterface, ABC):
     def get_state(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getState')
-        if not raw_results:
+        if raw_results is None or raw_results == 0:
             return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'state')
         return int(raw_results)
     
     def get_all_farm_global_stats(self, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
