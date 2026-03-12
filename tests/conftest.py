@@ -425,6 +425,7 @@ def _ensure_farm_state_loaded(context: Context, env):
             env.chain_sim.ensure_contract_state_from_mainnet(
                 farm.address,
                 filter_boosted_yields_weeks=True,
+                reset_last_reward_timestamps=True,
             )
         except Exception as e:
             logger.warning(f"Could not load farm state for {farm.address}: {e}")
@@ -462,8 +463,10 @@ def _ensure_staking_state_loaded(context: Context, env):
         try:
             env.chain_sim.ensure_contract_state_from_mainnet(
                 staking.address,
-                filter_first_week_epoch=True,       # Override week start for chain sim
-                filter_boosted_yields_weeks=True,   # CRITICAL: Remove week keys for both V2 and V3
+                filter_first_week_epoch=True,          # Override week start for chain sim
+                filter_boosted_yields_weeks=True,      # CRITICAL: Remove week keys for both V2 and V3
+                reset_last_reward_timestamps=True,     # Reset to 0: chain sim starts at timestamp ~0,
+                                                       # mainnet timestamps ~1.7B → elapsed underflows
             )
         except Exception as e:
             logger.warning(f"Could not load staking state for {staking.address}: {e}")

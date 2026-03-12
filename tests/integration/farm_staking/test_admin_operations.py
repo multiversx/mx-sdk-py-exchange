@@ -366,27 +366,30 @@ class TestAdminOperations:
             )
             logger.info(f"✓ topUpRewards: capacity {capacity_before} → {capacity_after}")
         finally:
+            # withdrawRewards calls generate_aggregated_rewards internally before checking
+            # amount <= remaining_uncollected. This means accumulated_rewards is updated by
+            # (blocks_since_last_update * per_block_reward) at execution time, not at read time.
+            # Re-read everything fresh and subtract headroom for the blocks that wait_for_tx
+            # will generate (chain sim generates ~5 blocks for tx finalization).
+            per_block_reward = staking_contract.get_per_block_reward_amount(network_providers.proxy)
             current_capacity = staking_contract.get_reward_capacity(network_providers.proxy)
             current_accumulated = staking_contract.get_accumulated_rewards(network_providers.proxy)
-            remaining_after = max(0, current_capacity - current_accumulated)
-            excess_remaining = max(0, remaining_after - remaining_before)
-            if excess_remaining > 0:
-                # Clamp to actual remaining with a safety margin — rewards accumulate between
-                # this read and the tx landing on-chain, so we may not be able to withdraw
-                # the full excess without hitting "Withdraw amount is higher than remaining".
-                safe_withdraw = min(excess_remaining, remaining_after) * 99 // 100
-                if safe_withdraw > 0:
-                    deployer_account.sync_nonce(network_providers.proxy)
-                    tx_restore = endpoint_call(
-                        network_providers.proxy,
-                        50_000_000,
-                        deployer_account,
-                        Address(staking_contract.address),
-                        "withdrawRewards",
-                        [safe_withdraw],
-                    )
-                    blockchain_controller.wait_for_tx(tx_restore)
-                    TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
+            remaining_now = max(0, current_capacity - current_accumulated)
+            excess_remaining = max(0, remaining_now - remaining_before)
+            # Subtract headroom for 5 blocks of reward accumulation during tx finalization
+            safe_withdraw = max(0, excess_remaining - per_block_reward * 5)
+            if safe_withdraw > 0:
+                deployer_account.sync_nonce(network_providers.proxy)
+                tx_restore = endpoint_call(
+                    network_providers.proxy,
+                    50_000_000,
+                    deployer_account,
+                    Address(staking_contract.address),
+                    "withdrawRewards",
+                    [safe_withdraw],
+                )
+                blockchain_controller.wait_for_tx(tx_restore)
+                TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
 
     def test_withdraw_rewards(
         self,

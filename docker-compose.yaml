@@ -7,8 +7,7 @@ services:
     entrypoint: /bin/bash -c " sed -i 's|http://localhost:9200|http://elasticsearch:9200|g'
       ./config/node/config/external.toml && sed -i '11i\    { File = \"enableEpochs.toml\",
       Path = \"EnableEpochs.StakingV2EnableEpoch\", Value = 0},' ./config/nodeOverrideDefault.toml
-      && ./start-with-services.sh -log-level *:INFO --initial-round=29487962 --initial-nonce=29458978
-      --initial-epoch=2031 --rounds-per-epoch=100"
+      && ./start-with-services.sh -log-level *:INFO --rounds-per-epoch=10"
     healthcheck:
       test:
       - CMD

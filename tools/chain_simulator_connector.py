@@ -39,6 +39,15 @@ SAFE_PRICE_KEY_PREFIXES = [
 # Overriding to 0 means epoch 7+ suffices for week >= 1.
 FIRST_WEEK_START_EPOCH_KEY = "66697273745765656b537461727445706f6368"  # "firstWeekStartEpoch"
 
+# Hex-encoded storage keys for last reward timestamps in farm/staking contracts.
+# These store Unix timestamps from mainnet (e.g. ~1.74 billion seconds).
+# When chain sim starts at round 0 (timestamp ~0), the elapsed time calculation
+# underflows: elapsed = 0 - mainnet_timestamp wraps to a huge u64, exhausting the
+# reward capacity in a single claim. Resetting to 0 means elapsed = current_timestamp
+# which is a small positive number, and rewards accrue correctly from chain sim start.
+LAST_REWARD_TIMESTAMP_KEY = "6c61737452657761726454696d657374616d70"   # "lastRewardTimestamp"
+LAST_REWARD_BLOCK_NONCE_KEY = "6c617374526577617264426c6f636b4e6f6e6365"  # "lastRewardBlockNonce"
+
 # Hex-encoded storage key prefixes for boosted yields week-dependent data.
 # These keys store mainnet week numbers (e.g. week 169) which are incompatible with
 # chain simulator epochs (epoch ~10 → week ~2). The boostedYieldsConfig contains
@@ -56,6 +65,7 @@ BOOSTED_YIELDS_WEEK_KEY_PREFIXES = [
     "616363756d756c6174656452657761726473466f725765656b",                      # "accumulatedRewardsForWeek"
     "6c6f636b6564546f6b656e73496e4275636b6574",                                # "lockedTokensInBucket"
     "66697273744275636b65744964",                                              # "firstBucketId"
+    "6c617374436f6c6c656374556e646973745765656b",                              # "lastCollectUndistWeek"
 ]
 
 SIMULATOR_URL = "http://localhost:8085"
@@ -64,7 +74,7 @@ GENERATE_BLOCKS_URL = f"{SIMULATOR_URL}/simulator/generate-blocks/"
 SET_STATE_URL = f"{SIMULATOR_URL}/simulator/set-state"
 SEND_USER_FUNDS_URL = f"{SIMULATOR_URL}/transaction/send-user-funds"
 STATES_FOLDER = "states"
-BLOCKS_PER_EPOCH = 100
+BLOCKS_PER_EPOCH = 10
 
 
 def is_valid_address(address: str) -> bool:
@@ -475,7 +485,8 @@ class ChainSimulator:
     def ensure_contract_state_from_mainnet(self, contract_address: str,
                                               mainnet_gateway: str = "https://gateway.multiversx.com",
                                               filter_first_week_epoch: bool = True,
-                                              filter_boosted_yields_weeks: bool = False):
+                                              filter_boosted_yields_weeks: bool = False,
+                                              reset_last_reward_timestamps: bool = False):
         """Load a contract's full state (bytecode + storage) from mainnet onto the chain simulator.
 
         Checks if the contract has code on the chain sim. If not, fetches the account data
@@ -489,6 +500,11 @@ class ChainSimulator:
             mainnet_gateway: Mainnet proxy gateway URL
             filter_first_week_epoch: If True, override firstWeekStartEpoch to 0
             filter_boosted_yields_weeks: If True, remove all boosted yields week keys
+            reset_last_reward_timestamps: If True, reset lastRewardTimestamp and
+                lastRewardBlockNonce to 0. Required when chain sim starts at round 0
+                (timestamp ~0) but mainnet state has high Unix timestamps — without
+                this, elapsed = 0 - mainnet_timestamp wraps to a huge u64, exhausting
+                the reward capacity instantly on the first claim.
         """
         # 1. Check if contract already has code on chain sim
         resp = requests.get(f"{self.proxy_url}/address/{contract_address}")
@@ -529,6 +545,16 @@ class ChainSimulator:
                 del keys[k]
             if keys_to_remove:
                 logger.info(f"Filtered {len(keys_to_remove)} boosted yields week keys for {contract_address}")
+
+        if reset_last_reward_timestamps and keys:
+            for key, label in [
+                (LAST_REWARD_TIMESTAMP_KEY, "lastRewardTimestamp"),
+                (LAST_REWARD_BLOCK_NONCE_KEY, "lastRewardBlockNonce"),
+            ]:
+                if key in keys:
+                    old_value = keys[key]
+                    keys[key] = ""
+                    logger.info(f"Reset {label} for {contract_address}: {old_value} -> 0")
 
         # 4. Build set-state payload
         account_data.pop("rootHash", None)
