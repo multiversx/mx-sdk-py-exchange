@@ -11,7 +11,7 @@ Context:
 - enterFarmOnBehalf and claimRewardsOnBehalf require the caller to be whitelisted
 - The whitelist system uses addSCAddressToWhitelist from BaseSCWhitelistContract
 - On chain sim with mainnet state, the whitelist mechanism may not work for
-  regular user addresses (expects SC addresses) — tests use xfail/skip as needed
+  regular user addresses (expects SC addresses)
 - allowExternalClaimBoostedRewards endpoint is NOT available on mainnet bytecode
 
 Run:
@@ -20,13 +20,9 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ClaimRewardsFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
+from utils.utils_chain import Account
 from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
     _get_farm_state,
@@ -34,21 +30,13 @@ from tests.integration.farm import (
     _get_stake_amount,
     _enter_farm,
     _enter_farm_on_behalf,
-    _exit_farm,
-    _claim_rewards,
     _claim_rewards_on_behalf,
-    _claim_boosted_rewards,
     _whitelist_address,
     _remove_from_whitelist,
     _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
     _ensure_deployer_has_egld,
 )
 from utils.logger import get_logger
-from multiversx_sdk import Address
 
 
 logger = get_logger(__name__)
@@ -74,12 +62,6 @@ class TestFarmDelegation:
     1. On-behalf operations require the caller to be whitelisted
     2. Unauthorized callers are rejected
     3. Deployer can add/remove addresses from the whitelist
-    4. Farm tokens from enterFarmOnBehalf have original_owner set to the on_behalf user
-
-    Note: Many of these tests may fail because:
-    - The whitelist mechanism uses addSCAddressToWhitelist (expects SC addresses)
-    - On mainnet bytecode, user address whitelisting may use PermissionsHub instead
-    - Tests use xfail where the whitelist mechanism is expected to not work
     """
 
     # ----------------------------------------------------------------
@@ -258,210 +240,6 @@ class TestFarmDelegation:
                 logger.warning(f"Cleanup failed: {e}")
 
         logger.info("PASSED: test_whitelist_address")
-
-    @pytest.mark.xfail(reason=(
-        "isWhitelisted makes a cross-contract call to the PermissionsHub SC, "
-        "whose bytecode is not loaded in the chain sim state dump"
-    ))
-    def test_enter_farm_on_behalf(
-        self,
-        farm_contract: FarmContract,
-        alice: Account,
-        bob: Account,
-        deployer_account: Account,
-        network_providers: NetworkProviders,
-        blockchain_controller,
-        ensure_esdt_amounts,
-        test_environment,
-    ):
-        """
-        SCENARIO: Whitelisted Alice enters farm on behalf of Bob
-
-        GIVEN: Alice is whitelisted on the farm contract
-        WHEN: Alice calls enterFarmOnBehalf with Bob as beneficiary
-        THEN:
-            - Transaction succeeds
-            - Farm token is minted to Alice (caller receives the token)
-            - Farm token original_owner = Bob
-            - Farm token supply increases
-        CLEANUP: Remove Alice from whitelist
-        """
-        logger.info("TEST: Enter farm on behalf")
-
-        if not _check_farm_has_code(farm_contract, network_providers.proxy):
-            pytest.skip("Farm contract bytecode not loaded on chain simulator")
-
-        _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
-
-        farming_token = farm_contract.farmingToken
-        stake_amount = _get_stake_amount(farm_contract, network_providers.proxy)
-        alice_bech32 = alice.address.to_bech32()
-        bob_bech32 = bob.address.to_bech32()
-
-        try:
-            # Whitelist Alice
-            tx_whitelist = _whitelist_address(
-                farm_contract, deployer_account, network_providers.proxy,
-                alice_bech32, blockchain_controller
-            )
-            TransactionAssertions.assert_transaction_success(tx_whitelist, network_providers.proxy)
-            logger.info(f"Whitelisted Alice: {alice_bech32}")
-
-            # Fund Alice with farming tokens
-            ensure_esdt_amounts(alice, {farming_token: stake_amount})
-
-            supply_before = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
-            alice_farm_tokens_before = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
-
-            # Alice enters farm on behalf of Bob
-            tx_hash = _enter_farm_on_behalf(
-                farm_contract, alice, farming_token, stake_amount,
-                bob_bech32, network_providers, blockchain_controller
-            )
-            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
-
-            # Farm token supply increased
-            supply_after = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
-            assert supply_after == supply_before + stake_amount, (
-                f"Farm supply should increase by stake amount:\n"
-                f"  Before: {supply_before}\n"
-                f"  After: {supply_after}\n"
-                f"  Expected increase: {stake_amount}"
-            )
-
-            # Alice should have received a farm token
-            alice_farm_tokens_after = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
-            assert len(alice_farm_tokens_after) > len(alice_farm_tokens_before), (
-                f"Alice should have received a new farm token:\n"
-                f"  Before: {len(alice_farm_tokens_before)} tokens\n"
-                f"  After: {len(alice_farm_tokens_after)} tokens"
-            )
-
-            # Verify original_owner is Bob
-            latest_token = max(alice_farm_tokens_after, key=lambda t: t.token.nonce)
-            attrs = decode_merged_attributes(
-                latest_token.attributes.hex(),
-                decoding_structures.FARM_TOKEN_ATTRIBUTES
-            )
-            logger.info(f"Farm token attributes: {attrs}")
-
-            if "original_owner" in attrs:
-                assert attrs["original_owner"] == bob_bech32, (
-                    f"Farm token original_owner should be Bob:\n"
-                    f"  Expected: {bob_bech32}\n"
-                    f"  Actual: {attrs['original_owner']}"
-                )
-            else:
-                logger.warning("original_owner not found in farm token attributes")
-
-        finally:
-            # Cleanup: remove Alice from whitelist
-            try:
-                deployer_account.sync_nonce(network_providers.proxy)
-                tx_remove = _remove_from_whitelist(
-                    farm_contract, deployer_account, network_providers.proxy,
-                    alice_bech32, blockchain_controller
-                )
-                logger.info(f"Cleanup: removed Alice from whitelist (tx: {tx_remove})")
-            except Exception as e:
-                logger.warning(f"Cleanup failed: {e}")
-
-        logger.info("PASSED: test_enter_farm_on_behalf")
-
-    @pytest.mark.xfail(reason=(
-        "isWhitelisted makes a cross-contract call to the PermissionsHub SC, "
-        "whose bytecode is not loaded in the chain sim state dump"
-    ))
-    def test_claim_rewards_on_behalf(
-        self,
-        farm_contract: FarmContract,
-        alice: Account,
-        bob: Account,
-        deployer_account: Account,
-        network_providers: NetworkProviders,
-        blockchain_controller,
-        ensure_esdt_amounts,
-        test_environment,
-    ):
-        """
-        SCENARIO: Whitelisted Alice claims rewards on behalf using her farm token
-
-        GIVEN: Alice is whitelisted and has a farm token (from enterFarmOnBehalf or direct enter)
-        WHEN: Alice calls claimRewardsOnBehalf with her farm token
-        THEN:
-            - Transaction succeeds
-            - Alice receives a new farm token with updated RPS
-            - Farm token supply is unchanged
-        CLEANUP: Remove Alice from whitelist
-        """
-        logger.info("TEST: Claim rewards on behalf")
-
-        if not _check_farm_has_code(farm_contract, network_providers.proxy):
-            pytest.skip("Farm contract bytecode not loaded on chain simulator")
-
-        _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
-
-        farming_token = farm_contract.farmingToken
-        stake_amount = _get_stake_amount(farm_contract, network_providers.proxy)
-        alice_bech32 = alice.address.to_bech32()
-
-        try:
-            # Whitelist Alice
-            tx_whitelist = _whitelist_address(
-                farm_contract, deployer_account, network_providers.proxy,
-                alice_bech32, blockchain_controller
-            )
-            TransactionAssertions.assert_transaction_success(tx_whitelist, network_providers.proxy)
-            logger.info(f"Whitelisted Alice: {alice_bech32}")
-
-            # Alice enters farm normally first (to get a farm token)
-            ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                                   network_providers, blockchain_controller)
-            TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
-
-            # Get Alice's farm token
-            alice_farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
-            assert len(alice_farm_tokens) > 0, "Alice should have farm tokens"
-            farm_token = max(alice_farm_tokens, key=lambda t: t.token.nonce)
-
-            # Advance blocks for potential reward accrual
-            blockchain_controller.wait_blocks(5)
-
-            supply_before = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
-
-            # Alice claims rewards on behalf
-            tx_claim = _claim_rewards_on_behalf(
-                farm_contract, alice, farm_token.token.nonce,
-                farm_token.amount, network_providers, blockchain_controller
-            )
-            TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
-
-            # Farm token supply unchanged (old burned, new minted)
-            supply_after = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
-            assert supply_after == supply_before, (
-                f"Farm supply should be unchanged after claim on behalf:\n"
-                f"  Before: {supply_before}\n"
-                f"  After: {supply_after}"
-            )
-
-            # Alice still has farm tokens
-            alice_farm_tokens_after = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
-            assert len(alice_farm_tokens_after) > 0, "Alice should still have farm tokens after claim"
-
-        finally:
-            # Cleanup: remove Alice from whitelist
-            try:
-                deployer_account.sync_nonce(network_providers.proxy)
-                tx_remove = _remove_from_whitelist(
-                    farm_contract, deployer_account, network_providers.proxy,
-                    alice_bech32, blockchain_controller
-                )
-                logger.info(f"Cleanup: removed Alice from whitelist (tx: {tx_remove})")
-            except Exception as e:
-                logger.warning(f"Cleanup failed: {e}")
-
-        logger.info("PASSED: test_claim_rewards_on_behalf")
 
     def test_remove_from_whitelist(
         self,

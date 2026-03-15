@@ -150,6 +150,7 @@ class TestFarmClaimBoostedRewards:
         self,
         farm_contract: FarmContract,
         bob: Account,
+        test_accounts,
         network_providers: NetworkProviders,
         blockchain_controller,
     ):
@@ -165,13 +166,20 @@ class TestFarmClaimBoostedRewards:
         if not _check_farm_has_code(farm_contract, network_providers.proxy):
             pytest.skip("Farm contract bytecode not loaded on chain simulator")
 
-        # Verify Bob has no farm position
-        position = _get_user_total_farm_position(farm_contract, bob, network_providers.proxy)
-        if position > 0:
-            pytest.skip("Bob already has a farm position from prior tests")
+        # Use Bob if he has no position; otherwise use a higher-index account
+        # that no farm test uses, guaranteeing no prior farm entry.
+        test_user = bob
+        position = _get_user_total_farm_position(farm_contract, test_user, network_providers.proxy)
+        if position > 0 and len(test_accounts) > 3:
+            test_user = test_accounts[3]
+            test_user.sync_nonce(network_providers.proxy)
 
-        # Bob tries to claim boosted rewards
-        tx_claim = _claim_boosted_rewards(farm_contract, bob, network_providers,
+        position = _get_user_total_farm_position(farm_contract, test_user, network_providers.proxy)
+        if position > 0:
+            pytest.skip("All available test accounts already have farm positions")
+
+        # User without position tries to claim boosted rewards
+        tx_claim = _claim_boosted_rewards(farm_contract, test_user, network_providers,
                                           blockchain_controller)
         TransactionAssertions.assert_transaction_failed(tx_claim, network_providers.proxy)
 

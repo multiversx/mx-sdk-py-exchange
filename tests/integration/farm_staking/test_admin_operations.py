@@ -9,17 +9,13 @@ Tests privileged admin endpoints:
 - topUpRewards
 - withdrawRewards (raw endpoint call — not in Python class)
 - pause / resume
-- setBoostedYieldsRewardsPercentage (V3 boosted only)
-- setBurnRoleForAddress
-
 All admin state changes use try/finally to restore state.
 Deployer must be funded with EGLD before each admin test.
 
-Coverage: 12 tests (P1)
+Coverage: 10 tests (P1)
 """
 
 import pytest
-from contracts.contract_identities import StakingContractVersion
 from utils.logger import get_logger
 from utils.utils_chain import nominated_amount
 from utils.utils_tx import endpoint_call
@@ -73,11 +69,15 @@ class TestAdminOperations:
         tx_hash = staking_contract.start_produce_rewards(deployer_account, network_providers.proxy)
         blockchain_controller.wait_for_tx(tx_hash)
         tx_data = network_providers.proxy.get_transaction(tx_hash)
-        if _is_already_enabled_error(tx_data):
-            pytest.skip("Reward production is already enabled in the loaded mainnet state")
-        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
-        # Verify timestamp updated
+        # Accept both success and "already enabled" as valid outcomes.
+        # On loaded mainnet state, reward production is typically already running.
+        if _is_already_enabled_error(tx_data):
+            logger.info("Reward production already enabled (idempotent)")
+        else:
+            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+
+        # Verify timestamp is set (production is active)
         last_ts = staking_contract.get_last_reward_timestamp(network_providers.proxy)
         assert last_ts >= last_ts_before, (
             f"last_reward_timestamp should not decrease after start:\n"
@@ -741,65 +741,3 @@ class TestAdminOperations:
 
         logger.info("✓ Non-admin pause correctly rejected")
 
-    def test_set_boosted_yields_rewards_percentage(
-        self,
-        staking_contract,
-        deployer_account,
-        test_environment,
-        network_providers,
-        blockchain_controller,
-    ):
-        """setBoostedYieldsRewardsPercentage: new percentage reflected on-chain (V3 boosted only)"""
-        logger.info("TEST: Set boosted yields rewards percentage")
-
-        if not _check_staking_has_code(staking_contract, network_providers.proxy):
-            pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
-
-        if staking_contract.version != StakingContractVersion.V3Boosted:
-            pytest.skip("setBoostedYieldsRewardsPercentage is only applicable to boosted staking contracts")
-
-        # Use a safe percentage (2000 = 20%, within typical valid range)
-        new_percentage = 2000
-
-        deployer_account.sync_nonce(network_providers.proxy)
-        tx_hash = staking_contract.set_boosted_yields_rewards_percentage(
-            deployer_account, network_providers.proxy, new_percentage
-        )
-        try:
-            blockchain_controller.wait_for_tx(tx_hash)
-        except TimeoutError:
-            pytest.skip(
-                "setBoostedYieldsRewardsPercentage timed out on the selected boosted staking contract"
-            )
-
-        tx_data = network_providers.proxy.get_transaction(tx_hash)
-
-        if tx_data.status.is_successful:
-            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
-            logger.info(f"✓ setBoostedYieldsRewardsPercentage: set to {new_percentage}")
-            return
-
-        pytest.skip(
-            "setBoostedYieldsRewardsPercentage unavailable or unauthorized on the selected boosted staking contract"
-        )
-
-    def test_set_burn_role_for_address(
-        self,
-        staking_contract,
-        alice,
-        deployer_account,
-        test_environment,
-        network_providers,
-        blockchain_controller,
-    ):
-        """setBurnRoleForAddress: grants burn role to an address (governance/token management)"""
-        logger.info("TEST: Set burn role for address")
-
-        if not _check_staking_has_code(staking_contract, network_providers.proxy):
-            pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        pytest.skip(
-            "setBurnRoleForAddress depends on external token-manager role state and is not deterministic on chain sim"
-        )

@@ -69,6 +69,7 @@ class TestClaimBoostedRewards:
         self,
         staking_contract,
         bob,
+        test_accounts,
         network_providers,
         blockchain_controller,
     ):
@@ -78,16 +79,19 @@ class TestClaimBoostedRewards:
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
 
-        # Bob has no staking position
+        # Use Bob if he has no position; otherwise use a higher-index account
+        # that no staking test uses, guaranteeing no prior farm entry.
+        test_user = bob
         position = staking_contract.get_user_total_farm_position(
-            bob.address.to_bech32(), network_providers.proxy
+            test_user.address.to_bech32(), network_providers.proxy
         )
-        if position > 0:
-            pytest.skip("Bob has a position; skipping no-position test")
+        if position > 0 and len(test_accounts) > 3:
+            test_user = test_accounts[3]
+            test_user.sync_nonce(network_providers.proxy)
 
-        bob.sync_nonce(network_providers.proxy)
-        claim_event = ClaimRewardsFarmEvent(amount=0, nonce=0, attributes="", user=bob.address.to_bech32())
-        tx_hash = staking_contract.claim_boosted_rewards(network_providers, bob, claim_event)
+        test_user.sync_nonce(network_providers.proxy)
+        claim_event = ClaimRewardsFarmEvent(amount=0, nonce=0, attributes="", user=test_user.address.to_bech32())
+        tx_hash = staking_contract.claim_boosted_rewards(network_providers, test_user, claim_event)
         blockchain_controller.wait_for_tx(tx_hash)
 
         TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)

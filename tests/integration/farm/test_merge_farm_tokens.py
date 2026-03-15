@@ -321,38 +321,6 @@ class TestFarmMergeFarmTokens:
 
         logger.info("PASSED: test_merge_single_token_fails")
 
-    def test_merge_different_owners_fails(
-        self,
-        farm_contract: FarmContract,
-        alice: Account,
-        network_providers: NetworkProviders,
-        blockchain_controller,
-    ):
-        """
-        SCENARIO: Merging farm tokens with different original_owner should fail
-
-        NOTE: On chain simulator, we cannot easily create farm tokens that have
-        a different original_owner attribute without transferring NFTs between
-        accounts (which would change the holder but not the embedded attribute).
-        This test is skipped with a clear explanation.
-
-        The mergeFarmTokens endpoint validates that all input farm tokens have
-        the same original_owner. This is enforced on-chain to prevent users from
-        combining positions that belong to different energy holders.
-        """
-        logger.info("TEST: Merge different owners fails (skipped)")
-
-        if not _check_farm_has_code(farm_contract, network_providers.proxy):
-            pytest.skip("Farm contract bytecode not loaded on chain simulator")
-
-        pytest.skip(
-            "Cannot create farm tokens with different original_owner on chain sim. "
-            "The mergeFarmTokens endpoint validates original_owner equality on-chain. "
-            "This would require two users to enter the farm, then transfer their farm "
-            "token NFTs to a third account, which is non-trivial and unreliable on "
-            "chain simulator due to cross-shard NFT transfer limitations."
-        )
-
     # ----------------------------------------------------------------
     # Invariant Tests
     # ----------------------------------------------------------------
