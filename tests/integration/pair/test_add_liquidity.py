@@ -146,6 +146,13 @@ class TestPairAddLiquidity:
             0                 # special fee percentage
         ]
 
+        # Advance router nonce to a session-unique value to avoid deploying to an
+        # address already occupied by a pair from a previous test run.
+        if test_environment.supports_time_control():
+            from tests.environments import ChainsimEnvironment
+            if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+                test_environment.chain_sim.advance_nonce_for_deploys(router_contract.address)
+
         logger.info(f"Deploying new pair: {first_token} / {second_token}")
         tx_hash, pair_address = router_contract.pair_contract_deploy(alice, network_providers.proxy, deploy_args)
 
@@ -153,6 +160,7 @@ class TestPairAddLiquidity:
             raise RuntimeError(f"Failed to deploy pair. Transaction: {tx_hash}")
 
         blockchain_controller.wait_for_tx(tx_hash)
+        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
         logger.info(f"Pair deployed at: {pair_address}")
 
         # Issue LP token for the new pair
@@ -163,6 +171,7 @@ class TestPairAddLiquidity:
         logger.info(f"Issuing LP token: {lp_token_name} ({lp_token_ticker})")
         tx_hash = router_contract.issue_lp_token(alice, network_providers.proxy, [pair_address, lp_token_name, lp_token_ticker])
         blockchain_controller.wait_for_tx(tx_hash, blocks=8)
+        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
         # Get LP token identifier from pair
         pair_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address), network_providers.proxy.url)
@@ -175,67 +184,88 @@ class TestPairAddLiquidity:
         logger.info("Setting LP token local roles")
         tx_hash = router_contract.set_lp_token_local_roles(alice, network_providers.proxy, pair_address)
         blockchain_controller.wait_for_tx(tx_hash, blocks=8)
+        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
         # Create PairContract instance for the new pair
         new_pair = PairContract(first_token, second_token, PairContractVersion.V2, lpToken=lp_token, address=pair_address)
 
-        # 2. Verify pool is empty
-        old_reserves = (0,0,0)
-        logger.info(f"Initial reserves: {old_reserves}")
+        try:
+            # 2. Capture reserves before (fresh pair, should be zero)
+            old_reserves = PairAssertions.get_reserves(new_pair.address, network_providers.proxy)
+            logger.info(f"Initial reserves: {old_reserves}")
 
-        assert old_reserves[0] == 0 and old_reserves[1] == 0, (
-            f"Freshly deployed pair should have zero reserves, got {old_reserves}"
-        )
-
-        event = AddLiquidityEvent(
-            tokenA=first_token,
-            amountA=liquidity_amount,
-            amountAmin=liquidity_amount,  # No slippage for initial liquidity
-            tokenB=second_token,
-            amountB=liquidity_amount,
-            amountBmin=liquidity_amount
-        )
-
-        # 5. Sync nonce and execute transaction
-        alice.sync_nonce(network_providers.proxy)
-        logger.info(f"Alice adding liquidity: {liquidity_amount} of each token")
-
-        # Use addInitialLiquidity for empty pool
-        tx_hash = new_pair.add_initial_liquidity(network_providers, alice, event)
-
-        logger.info(f"Transaction hash: {tx_hash}")
-
-        # 6. Wait for transaction to be processed
-        blockchain_controller.wait_for_tx(tx_hash)
-
-        # 7. Verify transaction succeeded
-        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
-
-        # 8. Verify reserves increased (BLACK-BOX)
-        new_reserves = PairAssertions.assert_reserves_increased(
-            new_pair.address,
-            old_reserves,
-            network_providers.proxy
-        )
-        logger.info(f"New reserves: {new_reserves}")
-
-        # 7. Verify constant product invariant (if pool had liquidity)
-        if old_reserves[0] > 0 and old_reserves[1] > 0:
-            k_before = old_reserves[0] * old_reserves[1]
-            PairAssertions.assert_constant_product_holds(
-                new_pair.address,
-                k_before,
-                network_providers.proxy
+            assert old_reserves[0] == 0 and old_reserves[1] == 0, (
+                f"Freshly deployed pair should have zero reserves, got {old_reserves}"
             )
 
-        # 8. Verify LP tokens were minted
-        assert new_reserves[2] > old_reserves[2], (
-            f"LP token supply should have increased:\n"
-            f"  Before: {old_reserves[2]}\n"
-            f"  After: {new_reserves[2]}"
-        )
+            event = AddLiquidityEvent(
+                tokenA=first_token,
+                amountA=liquidity_amount,
+                amountAmin=liquidity_amount,  # No slippage for initial liquidity
+                tokenB=second_token,
+                amountB=liquidity_amount,
+                amountBmin=liquidity_amount
+            )
 
-        logger.info("✅ Test passed: Initial liquidity added successfully")
+            # Get LP balance before
+            lp_token_obj = Token(new_pair.lpToken, 0)
+            lp_before = network_providers.proxy.get_token_of_account(alice.address, lp_token_obj).amount
+
+            # 5. Sync nonce and execute transaction
+            alice.sync_nonce(network_providers.proxy)
+            logger.info(f"Alice adding liquidity: {liquidity_amount} of each token")
+
+            # Use addInitialLiquidity for empty pool
+            tx_hash = new_pair.add_initial_liquidity(network_providers, alice, event)
+
+            logger.info(f"Transaction hash: {tx_hash}")
+
+            # 6. Wait for transaction to be processed
+            blockchain_controller.wait_for_tx(tx_hash)
+
+            # 7. Verify transaction succeeded
+            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+
+            # 8. Verify reserves increased by exact amounts
+            new_reserves = PairAssertions.get_reserves(new_pair.address, network_providers.proxy)
+            logger.info(f"New reserves: {new_reserves}")
+
+            assert new_reserves[0] - old_reserves[0] == liquidity_amount, (
+                f"First reserve should increase by exactly {liquidity_amount}\n"
+                f"Before: {old_reserves[0]}, After: {new_reserves[0]}"
+            )
+            assert new_reserves[1] - old_reserves[1] == liquidity_amount, (
+                f"Second reserve should increase by exactly {liquidity_amount}\n"
+                f"Before: {old_reserves[1]}, After: {new_reserves[1]}"
+            )
+
+            # 9. Verify LP tokens were minted (delta > 0)
+            lp_after = network_providers.proxy.get_token_of_account(alice.address, lp_token_obj).amount
+            lp_minted = lp_after - lp_before
+            assert lp_minted > 0, (
+                f"LP tokens should have been minted:\n"
+                f"  Before: {lp_before}\n"
+                f"  After: {lp_after}"
+            )
+
+            logger.info("✅ Test passed: Initial liquidity added successfully")
+        finally:
+            # Clear deployed pair code so chain simulator does not retain it
+            # across sessions (prevents "cannot deploy over existing account"
+            # when router nonce resets to mainnet value on next run).
+            if test_environment.supports_time_control():
+                from tests.environments import ChainsimEnvironment
+                if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+                    try:
+                        test_environment.chain_sim.apply_states([[{
+                            "address": pair_address,
+                            "code": "",
+                            "codeHash": "",
+                            "codeMetadata": "",
+                        }]])
+                        logger.info(f"Cleared test pair code at {pair_address}")
+                    except Exception as exc:
+                        logger.warning(f"Could not clear test pair code: {exc}")
 
     @pytest.mark.happy_path
     def test_add_liquidity_to_existing_pool(
@@ -356,12 +386,19 @@ class TestPairAddLiquidity:
         )
         logger.info(f"✓ Constant product: {k_before} → {k_after}")
 
-        # 7. Verify LP tokens minted and Alice received them
+        # 7. Verify LP tokens minted and Alice received exactly the expected amount
         lp_balance_after = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
         lp_minted = lp_balance_after - lp_balance_before
 
-        assert lp_minted > 0, "LP tokens should be minted"
-        logger.info(f"✓ LP tokens minted: {lp_minted}")
+        # LP minted = min(amountA * lp_supply / reserveA, amountB * lp_supply / reserveB)
+        expected_lp_minted = min(
+            amount * reserves_before[2] // reserves_before[0],
+            equivalent_amount * reserves_before[2] // reserves_before[1]
+        )
+        assert lp_minted == expected_lp_minted, (
+            f"LP tokens minted should be exactly {expected_lp_minted}, got {lp_minted}"
+        )
+        logger.info(f"✓ LP tokens minted: {lp_minted} (expected {expected_lp_minted})")
 
         logger.info("✅ Test passed: Liquidity added to existing pool successfully")
 
@@ -457,11 +494,15 @@ class TestPairAddLiquidity:
         # Verify success
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
-        # Verify reserves increased
-        PairAssertions.assert_reserves_increased(
-            pair_contract.address,
-            old_reserves,
-            network_providers.proxy
+        # Verify reserves increased by exact amounts
+        new_reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        assert new_reserves[0] - old_reserves[0] == amount, (
+            f"First reserve should increase by exactly {amount}\n"
+            f"Before: {old_reserves[0]}, After: {new_reserves[0]}, Delta: {new_reserves[0] - old_reserves[0]}"
+        )
+        assert new_reserves[1] - old_reserves[1] == equivalent_amount, (
+            f"Second reserve should increase by exactly {equivalent_amount}\n"
+            f"Before: {old_reserves[1]}, After: {new_reserves[1]}, Delta: {new_reserves[1] - old_reserves[1]}"
         )
 
         # Verify constant product
@@ -536,6 +577,10 @@ class TestPairAddLiquidity:
             pair_contract.secondToken: equivalent_amount
         })
 
+        # Capture LP balance before
+        lp_token_obj = Token(pair_contract.lpToken, 0)
+        lp_balance_before = network_providers.proxy.get_token_of_account(alice.address, lp_token_obj).amount
+
         event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
             amountA=min_amount,
@@ -568,13 +613,13 @@ class TestPairAddLiquidity:
                 f"Before: {old_reserves[1]}, After: {new_reserves[1]}, Actual increase: {new_reserves[1] - old_reserves[1]}"
             )
 
-            # Verify LP tokens were minted
-            lp_token = Token(pair_contract.lpToken, 0)
-            lp_balance = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-            assert lp_balance > 0, "LP tokens should be minted even for minimum amounts"
+            # Verify LP tokens were minted (delta > 0)
+            lp_balance_after = network_providers.proxy.get_token_of_account(alice.address, lp_token_obj).amount
+            lp_minted = lp_balance_after - lp_balance_before
+            assert lp_minted > 0, "LP tokens should be minted even for minimum amounts"
 
             logger.info(f"✓ Reserves increased by: {min_amount}, {equivalent_amount}")
-            logger.info(f"✓ LP tokens minted: {lp_balance}")
+            logger.info(f"✓ LP tokens minted: {lp_minted}")
             logger.info("✅ Test passed: Minimum amount add liquidity succeeded")
 
         else:
@@ -1039,10 +1084,16 @@ class TestPairAddLiquidity:
         )
         logger.info("✓ Constant product invariant holds")
 
-        # Verify LP tokens were minted
+        # Verify LP tokens were minted (exact amount: limiting token determines LP)
         lp_minted = new_reserves[2] - old_reserves[2]
-        assert lp_minted > 0, f"LP tokens should have been minted, got {lp_minted}"
-        logger.info(f"✓ LP tokens minted: {lp_minted}")
+        expected_lp_minted = min(
+            expected_first_used * old_reserves[2] // old_reserves[0],
+            expected_second_used * old_reserves[2] // old_reserves[1]
+        )
+        assert lp_minted == expected_lp_minted, (
+            f"LP tokens minted should be exactly {expected_lp_minted}, got {lp_minted}"
+        )
+        logger.info(f"✓ LP tokens minted: {lp_minted} (expected {expected_lp_minted})")
 
         logger.info("✅ Test passed: Imbalanced amounts handled correctly")
 
@@ -1256,7 +1307,13 @@ class TestPairAddLiquidity:
         logger.info(f"After Bob: reserves=({reserves_after_bob[0]}, {reserves_after_bob[1]}), LP minted={lp_minted_bob}")
         logger.info(f"Bob LP received (delta): {bob_lp}")
 
-        assert bob_lp > 0, "Bob should have received LP tokens"
+        expected_bob_lp = min(
+            bob_amount_first * lp_supply_initial // reserves_after_alice[0],
+            bob_equivalent_second * lp_supply_initial // reserves_after_alice[1]
+        )
+        assert bob_lp == expected_bob_lp, (
+            f"Bob LP minted should be exactly {expected_bob_lp}, got {bob_lp}"
+        )
 
         # Charlie adds 200 tokens
         charlie_amount_first = nominated_amount(200)
@@ -1287,10 +1344,17 @@ class TestPairAddLiquidity:
 
         reserves_after_charlie = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         charlie_lp = network_providers.proxy.get_token_of_account(charlie.address, lp_token).amount - charlie_lp_before
+        lp_supply_after_bob = reserves_after_bob[2]
         logger.info(f"After Charlie: reserves=({reserves_after_charlie[0]}, {reserves_after_charlie[1]})")
-        logger.info(f"Charlie LP balance: {charlie_lp}")
+        logger.info(f"Charlie LP received (delta): {charlie_lp}")
 
-        assert charlie_lp > 0, "Charlie should have received LP tokens"
+        expected_charlie_lp = min(
+            charlie_amount_first * lp_supply_after_bob // reserves_after_bob[0],
+            charlie_equivalent_second * lp_supply_after_bob // reserves_after_bob[1]
+        )
+        assert charlie_lp == expected_charlie_lp, (
+            f"Charlie LP minted should be exactly {expected_charlie_lp}, got {charlie_lp}"
+        )
 
         # Verify proportional LP distribution
         # Alice added 1000, Bob added 500, Charlie added 200 (of first token)
@@ -1454,20 +1518,17 @@ class TestPairAddLiquidity:
         logger.info(f"LP minted for Alice's new addition: {lp_minted}")
         logger.info(f"Final reserves: ({reserves_final[0]}, {reserves_final[1]}), LP={reserves_final[2]}")
 
-        assert lp_minted > 0, "Alice should have received LP tokens"
-
-        # Key invariant: LP minted should be proportional to contribution relative to reserves
+        # Key invariant: LP minted should be exactly proportional to contribution relative to reserves
         # LP_minted = min(amountA * totalSupply / reserveA, amountB * totalSupply / reserveB)
         expected_lp_from_first = add_amount_first * lp_supply_after_swaps // reserves_after_swaps[0]
         expected_lp_from_second = equivalent_second * lp_supply_after_swaps // reserves_after_swaps[1]
         expected_lp = min(expected_lp_from_first, expected_lp_from_second)
 
-        tolerance_pct = 0.01  # 1% tolerance for rounding
-        assert abs(lp_minted - expected_lp) <= expected_lp * tolerance_pct + 1, (
-            f"LP minted should be ~{expected_lp}, got {lp_minted}\n"
+        assert lp_minted == expected_lp, (
+            f"LP minted should be exactly {expected_lp}, got {lp_minted}\n"
             f"From first: {expected_lp_from_first}, from second: {expected_lp_from_second}"
         )
-        logger.info(f"LP minted matches expected: {lp_minted} ~= {expected_lp}")
+        logger.info(f"LP minted matches expected exactly: {lp_minted} == {expected_lp}")
 
         # Verify pool ratio maintained
         ratio_before = reserves_after_swaps[0] / reserves_after_swaps[1]

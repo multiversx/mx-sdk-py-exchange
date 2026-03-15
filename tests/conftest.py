@@ -994,6 +994,15 @@ def isolated_pair_factory(
         logger.info(f"Second token issued: {second_token}")
 
         # Deploy new pair via router
+        # Advance router nonce to a session-unique value to avoid deploying to an
+        # address already occupied by a pair from a previous test run (chain sim
+        # retains bytecode between sessions; mainnet state reload resets the router
+        # nonce back to ~684 which would otherwise collide).
+        if test_environment.supports_time_control():
+            from tests.environments import ChainsimEnvironment
+            if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+                test_environment.chain_sim.advance_nonce_for_deploys(router_contract.address)
+
         owner.sync_nonce(network_providers.proxy)
         deploy_args = [
             first_token,
@@ -1038,4 +1047,22 @@ def isolated_pair_factory(
         logger.info(f"Isolated pair ready: {pair_address}")
         return pair, first_token, second_token
 
-    return _create_isolated_pair
+    yield _create_isolated_pair
+
+    # Teardown: clear code of all deployed isolated pairs so chain simulator
+    # does not retain them across test sessions (prevents "cannot deploy over
+    # existing account" on next run when router nonce resets to mainnet value).
+    if created_pairs and test_environment.supports_time_control():
+        from tests.environments import ChainsimEnvironment
+        if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+            for pair in created_pairs:
+                try:
+                    test_environment.chain_sim.apply_states([[{
+                        "address": pair.address,
+                        "code": "",
+                        "codeHash": "",
+                        "codeMetadata": "",
+                    }]])
+                    logger.info(f"Cleared code for isolated pair {pair.address}")
+                except Exception as exc:
+                    logger.warning(f"Could not clear isolated pair code {pair.address}: {exc}")

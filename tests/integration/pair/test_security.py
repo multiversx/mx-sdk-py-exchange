@@ -383,6 +383,7 @@ class TestSecurity:
 
         lp_token = Token(pair_contract.lpToken, 0)
         alice_lp_before_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        reserves_before_add = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
 
         add_event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
@@ -398,6 +399,13 @@ class TestSecurity:
         TransactionAssertions.assert_transaction_success(tx_add, network_providers.proxy)
 
         alice_lp = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount - alice_lp_before_add
+        expected_alice_lp = min(
+            add_amount * reserves_before_add[2] // reserves_before_add[0],
+            equivalent * reserves_before_add[2] // reserves_before_add[1]
+        )
+        assert alice_lp == expected_alice_lp, (
+            f"Alice LP minted should be exactly {expected_alice_lp}, got {alice_lp}"
+        )
         logger.info(f"Alice LP tokens from add: {alice_lp}")
 
         # Calculate expected returns at current ratio
@@ -424,9 +432,6 @@ class TestSecurity:
 
         reserves_after_front = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         logger.info(f"After front-run: reserves=({reserves_after_front[0]}, {reserves_after_front[1]})")
-
-        # Alice tries to remove with TIGHT min amounts (pre-attack expectations)
-        assert alice_lp > 0, "Alice should have LP tokens to remove"
 
         remove_event = RemoveLiquidityEvent(
             amount=alice_lp,

@@ -407,6 +407,32 @@ class ChainSimulator:
         else:
             logger.error(f"Failed to load pair template bytecode: {resp.text}")
 
+    def advance_nonce_for_deploys(self, contract_address: str):
+        """Advance a deployer contract's nonce to a session-unique value.
+
+        Prevents "cannot deploy over existing account" errors when the same
+        docker session is reused across multiple test runs. Chain simulator
+        retains deployed contract bytecode between runs; when mainnet state
+        is reloaded the router nonce resets to ~684, which would cause the
+        next createPair to target an address already occupied by a prior run.
+
+        Uses the current Unix timestamp to produce a nonce unique to this
+        second-level time slot (range 10,000,000 – 19,999,999). Collision
+        probability is negligible for typical CI/dev workflows.
+
+        Only advances if the current nonce is below the computed value.
+        """
+        import time
+        proxy = ProxyNetworkProvider(self.proxy_url)
+        try:
+            acct = proxy.get_account(Address.new_from_bech32(contract_address))
+            session_nonce = int(time.time()) % 10_000_000 + 10_000_000
+            if acct.nonce < session_nonce:
+                self.apply_states([[{"address": contract_address, "nonce": session_nonce}]])
+                logger.info(f"Advanced {contract_address} nonce from {acct.nonce} to {session_nonce} for deploy isolation")
+        except Exception as exc:
+            logger.warning(f"Could not advance nonce for {contract_address}: {exc}")
+
     def advance_blocks(self, number_of_blocks: int):
         url = f"{self.proxy_url}/simulator/generate-blocks/{number_of_blocks}"
         response = requests.post(url)

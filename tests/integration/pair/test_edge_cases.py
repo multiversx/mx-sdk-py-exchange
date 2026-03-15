@@ -157,22 +157,26 @@ class TestEdgeCases:
         )
         logger.info(f"Pool ratio maintained: {ratio_before:.6f} -> {ratio_after:.6f}")
 
-        # Verify Bob got excess tokens back (contract used only proportional amounts)
+        # Verify Bob spent exactly equivalent_second (contract refunds the excess bob_second - equivalent_second)
         bob_second_after = network_providers.proxy.get_token_of_account(bob.address, token_second).amount
         bob_second_spent = bob_second_before - bob_second_after
 
-        # Bob should have spent approximately equivalent_second, not bob_second (2x)
-        tolerance = nominated_amount(5)
-        assert abs(bob_second_spent - equivalent_second) < tolerance, (
-            f"Bob should have spent ~{equivalent_second} second tokens.\n"
+        assert bob_second_spent == equivalent_second, (
+            f"Bob should have spent exactly {equivalent_second} second tokens.\n"
             f"Actually spent: {bob_second_spent}\n"
             f"Sent: {bob_second} (excess should be returned)"
         )
 
-        # Bob should have received LP tokens
+        # Verify Bob received exactly the expected LP amount
         bob_lp_after = network_providers.proxy.get_token_of_account(bob.address, lp_token).amount
         bob_lp_delta = bob_lp_after - bob_lp_before
-        assert bob_lp_delta > 0, "Bob should have received LP tokens"
+        expected_bob_lp = min(
+            bob_first * reserves_before[2] // reserves_before[0],
+            equivalent_second * reserves_before[2] // reserves_before[1]
+        )
+        assert bob_lp_delta == expected_bob_lp, (
+            f"Bob LP minted should be exactly {expected_bob_lp}, got {bob_lp_delta}"
+        )
 
         logger.info("Test passed: Subsequent LPs must match existing ratio, excess returned")
 

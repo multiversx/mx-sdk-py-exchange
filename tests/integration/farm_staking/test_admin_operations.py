@@ -429,12 +429,24 @@ class TestAdminOperations:
                 "getRewardCapacity",
             )
             accumulated = staking_contract.get_accumulated_rewards(network_providers.proxy)
+            per_block = staking_contract.get_per_block_reward_amount(network_providers.proxy)
             remaining = capacity_before - accumulated
 
-            # Withdraw half of remaining
-            withdraw_amount = remaining // 2
-            if withdraw_amount == 0:
-                pytest.skip("No remaining rewards to withdraw")
+            # Per-block rewards accrue continuously. Between our query and the
+            # withdrawRewards TX execution, blocks are generated (for nonce sync,
+            # tx processing, cross-shard finalization). This increases accumulated
+            # and shrinks remaining. We must subtract a safety margin to ensure
+            # the SC's own remaining >= withdraw_amount at execution time.
+            safety_blocks = 50
+            safety_margin = per_block * safety_blocks
+            safe_remaining = remaining - safety_margin
+
+            withdraw_amount = safe_remaining // 2
+            if withdraw_amount <= 0:
+                pytest.skip(
+                    f"Not enough withdrawable rewards after safety margin "
+                    f"(remaining={remaining}, per_block={per_block}, margin={safety_margin})"
+                )
 
             deployer_account.sync_nonce(network_providers.proxy)
             tx_hash = endpoint_call(
@@ -444,6 +456,9 @@ class TestAdminOperations:
             blockchain_controller.wait_for_tx(tx_hash)
             TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
+            # withdrawRewards reduces reward_capacity by exactly the withdrawn
+            # amount. accumulated grows independently (per-block rewards) but
+            # does not affect capacity.
             capacity_after = _require_supported_view(
                 staking_contract.get_reward_capacity(network_providers.proxy),
                 "getRewardCapacity",
@@ -456,6 +471,9 @@ class TestAdminOperations:
             )
             logger.info(f"✓ withdrawRewards: capacity {capacity_before} → {capacity_after}")
         finally:
+            # Restore capacity to original value. Topup is always safe;
+            # withdraw excess is best-effort (may fail if remaining < excess
+            # due to continued per-block accrual).
             current_capacity = staking_contract.get_reward_capacity(network_providers.proxy)
             if current_capacity < original_capacity:
                 restore_amount = original_capacity - current_capacity
@@ -468,17 +486,19 @@ class TestAdminOperations:
                 TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
             elif current_capacity > original_capacity:
                 reduce_amount = current_capacity - original_capacity
-                deployer_account.sync_nonce(network_providers.proxy)
-                tx_restore = endpoint_call(
-                    network_providers.proxy,
-                    50_000_000,
-                    deployer_account,
-                    Address(staking_contract.address),
-                    "withdrawRewards",
-                    [reduce_amount],
-                )
-                blockchain_controller.wait_for_tx(tx_restore)
-                TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
+                try:
+                    deployer_account.sync_nonce(network_providers.proxy)
+                    tx_restore = endpoint_call(
+                        network_providers.proxy,
+                        50_000_000,
+                        deployer_account,
+                        Address(staking_contract.address),
+                        "withdrawRewards",
+                        [reduce_amount],
+                    )
+                    blockchain_controller.wait_for_tx(tx_restore)
+                except Exception as exc:
+                    logger.warning(f"Could not withdraw excess capacity during cleanup: {exc}")
 
     def test_withdraw_exceeds_remaining_fails(
         self,

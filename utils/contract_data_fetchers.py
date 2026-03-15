@@ -48,7 +48,7 @@ class DataFetcher:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            return [int(elem.hex(), base=16) for elem in result.return_data_parts]
+            return [int(elem.hex(), base=16) if elem else 0 for elem in result.return_data_parts]
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
             if result:
