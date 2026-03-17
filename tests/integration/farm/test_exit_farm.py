@@ -43,7 +43,7 @@ from tests.integration.farm import (
     _ensure_deployer_has_egld,
 )
 from utils.logger import get_logger
-from multiversx_sdk import Address, Token
+from multiversx_sdk import Address
 
 
 logger = get_logger(__name__)
@@ -304,11 +304,8 @@ class TestFarmExitFarm:
         )
 
         # Record raw MEX before exit
-        mex_token = Token(reward_token, 0)
-        try:
-            mex_before = network_providers.proxy.get_token_of_account(alice.address, mex_token).amount
-        except Exception:
-            mex_before = 0
+        all_fungible_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+        mex_before = sum(t.balance for t in all_fungible_before if t.identifier == reward_token)
 
         # Advance blocks. Small windows can still round down to 0 rewards on
         # loaded mainnet state, so use a larger accrual interval here.
@@ -322,10 +319,8 @@ class TestFarmExitFarm:
         TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
 
         # Check raw MEX not received
-        try:
-            mex_after = network_providers.proxy.get_token_of_account(alice.address, mex_token).amount
-        except Exception:
-            mex_after = 0
+        all_fungible_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+        mex_after = sum(t.balance for t in all_fungible_after if t.identifier == reward_token)
 
         mex_received = mex_after - mex_before
         logger.info(f"Raw MEX received: {mex_received} (should be 0)")

@@ -3,7 +3,7 @@ Farm integration test helpers shared across the locked-rewards suite.
 """
 
 import requests
-from multiversx_sdk import Address, Token
+from multiversx_sdk import Address
 
 from contracts.farm_contract import FarmContract
 from events.farm_events import (
@@ -44,14 +44,11 @@ def _get_farm_state(farm_contract: FarmContract, proxy):
 
 def _check_farm_has_code(farm_contract: FarmContract, proxy):
     """Check if farm contract has bytecode loaded on chain simulator."""
-    try:
-        resp = requests.get(f"{proxy.url}/address/{farm_contract.address}")
-        if resp.status_code != 200:
-            return False
-        acct = resp.json()["data"]["account"]
-        return bool(acct.get("code"))
-    except Exception:
+    resp = requests.get(f"{proxy.url}/address/{farm_contract.address}")
+    if resp.status_code != 200:
         return False
+    acct = resp.json()["data"]["account"]
+    return bool(acct.get("code"))
 
 
 def _get_stake_amount(farm_contract: FarmContract, proxy):
@@ -246,25 +243,22 @@ def _get_farm_tokens_for_user(farm_contract, user, proxy):
 
 def _get_minimum_farming_epochs(farm_contract, proxy):
     """Get minimum farming epochs from farm contract storage."""
-    try:
-        resp = requests.get(f"{proxy.url}/address/{farm_contract.address}/keys")
-        keys = resp.json().get("data", {}).get("pairs", {})
-        key_hex = "minimum_farming_epochs".encode().hex()
-        val_hex = keys.get(key_hex, "")
-        if val_hex:
-            return int(val_hex, 16)
-        return 0
-    except Exception:
-        return 0
+    resp = requests.get(f"{proxy.url}/address/{farm_contract.address}/keys")
+    keys = resp.json().get("data", {}).get("pairs", {})
+    key_hex = "minimum_farming_epochs".encode().hex()
+    val_hex = keys.get(key_hex, "")
+    if val_hex:
+        return int(val_hex, 16)
+    return 0
 
 
 def _get_farming_token_balance(farm_contract, user, proxy):
     """Get user's balance of the farming token (LP token)."""
-    try:
-        token = Token(farm_contract.farmingToken, 0)
-        return proxy.get_token_of_account(user.address, token).amount
-    except Exception:
-        return 0
+    all_tokens = proxy.get_fungible_tokens_of_account(user.address)
+    for t in all_tokens:
+        if t.identifier == farm_contract.farmingToken:
+            return t.balance
+    return 0
 
 
 def _get_user_total_farm_position(farm_contract, user, proxy):
@@ -297,58 +291,47 @@ def _get_claim_progress(farm_contract, user, proxy):
 
 def _get_boosted_yields_percentage(farm_contract, proxy):
     """Get boosted rewards percentage, with storage fallback."""
-    try:
-        fetcher = FarmContractDataFetcher(Address.new_from_bech32(farm_contract.address), proxy.url)
-        boosted_pct = fetcher.get_data("getBoostedYieldsRewardsPercentage")
-        if boosted_pct >= 0:
-            return boosted_pct
-    except Exception:
-        pass
-
-    try:
-        resp = requests.get(f"{proxy.url}/address/{farm_contract.address}/keys")
-        keys = resp.json().get("data", {}).get("pairs", {})
-        key_hex = "boostedYieldsRewardsPercentage".encode().hex()
-        val_hex = keys.get(key_hex, "")
-        if val_hex:
-            return int(val_hex, 16)
-    except Exception:
-        pass
-
+    fetcher = FarmContractDataFetcher(Address.new_from_bech32(farm_contract.address), proxy.url)
+    boosted_pct = fetcher.get_data("getBoostedYieldsRewardsPercentage")
+    if boosted_pct >= 0:
+        return boosted_pct
+    # Fallback to storage key
+    resp = requests.get(f"{proxy.url}/address/{farm_contract.address}/keys")
+    keys = resp.json().get("data", {}).get("pairs", {})
+    key_hex = "boostedYieldsRewardsPercentage".encode().hex()
+    val_hex = keys.get(key_hex, "")
+    if val_hex:
+        return int(val_hex, 16)
     return 0
 
 
 def _get_locked_token_id(farm_contract, proxy):
     """Get the locked reward token ID (XMEX) from the farm's locking SC."""
-    try:
-        fetcher = FarmContractDataFetcher(Address.new_from_bech32(farm_contract.address), proxy.url)
-        locking_hex = fetcher.get_data("getLockingScAddress")
-        if not locking_hex:
-            resp = requests.get(f"{proxy.url}/address/{farm_contract.address}/keys")
-            keys = resp.json().get("data", {}).get("pairs", {})
-            locking_key = "lockingScAddress".encode().hex()
-            locking_hex = keys.get(locking_key)
-        if not locking_hex:
-            return None
-        locking_addr = Address(bytes.fromhex(locking_hex), "erd").to_bech32()
-
-        lock_fetcher = SimpleLockEnergyContractDataFetcher(
-            Address.new_from_bech32(locking_addr), proxy.url
-        )
-        locked_token_hex = lock_fetcher.get_data("getLockedTokenId")
-        if locked_token_hex:
-            return hex_to_string(locked_token_hex)
-
-        resp2 = requests.get(f"{proxy.url}/address/{locking_addr}/keys")
-        keys2 = resp2.json().get("data", {}).get("pairs", {})
-        for key_name in ["lockedTokenId", "locked_token_id"]:
-            hex_key = key_name.encode().hex()
-            if hex_key in keys2:
-                return hex_to_string(keys2[hex_key])
+    fetcher = FarmContractDataFetcher(Address.new_from_bech32(farm_contract.address), proxy.url)
+    locking_hex = fetcher.get_data("getLockingScAddress")
+    if not locking_hex:
+        resp = requests.get(f"{proxy.url}/address/{farm_contract.address}/keys")
+        keys = resp.json().get("data", {}).get("pairs", {})
+        locking_key = "lockingScAddress".encode().hex()
+        locking_hex = keys.get(locking_key)
+    if not locking_hex:
         return None
-    except Exception as exc:
-        logger.warning(f"Could not get locked token ID: {exc}")
-        return None
+    locking_addr = Address(bytes.fromhex(locking_hex), "erd").to_bech32()
+
+    lock_fetcher = SimpleLockEnergyContractDataFetcher(
+        Address.new_from_bech32(locking_addr), proxy.url
+    )
+    locked_token_hex = lock_fetcher.get_data("getLockedTokenId")
+    if locked_token_hex:
+        return hex_to_string(locked_token_hex)
+
+    resp2 = requests.get(f"{proxy.url}/address/{locking_addr}/keys")
+    keys2 = resp2.json().get("data", {}).get("pairs", {})
+    for key_name in ["lockedTokenId", "locked_token_id"]:
+        hex_key = key_name.encode().hex()
+        if hex_key in keys2:
+            return hex_to_string(keys2[hex_key])
+    return None
 
 
 def _get_locked_tokens_for_user(farm_contract, user, proxy):

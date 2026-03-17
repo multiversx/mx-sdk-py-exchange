@@ -567,19 +567,9 @@ class TestSecurity:
 
         # Try to query safe price - it should resist the manipulation
         # The safe price uses TWAP which smooths over multiple observations
-        try:
-            # Query updateAndGetSafePrice via view
-            from multiversx_sdk.abi import Serializer, AddressValue, U64Value
-            safe_price_interval = pair_data_fetcher.get_data("getSafePriceRoundSaveInterval")
-            logger.info(f"Safe price round interval: {safe_price_interval}")
-
-            # The key insight: safe price is a TWAP, so it should NOT reflect
-            # the single-block manipulation as dramatically as spot price
-            logger.info("Safe price oracle uses TWAP - single-block manipulation resistance verified by design")
-
-        except Exception as e:
-            logger.info(f"Safe price query info: {e}")
-            logger.info("Safe price mechanism exists but detailed query requires ABI encoding")
+        safe_price_interval = pair_data_fetcher.get_data("getSafePriceRoundSaveInterval")
+        logger.info(f"Safe price round interval: {safe_price_interval}")
+        logger.info("Safe price oracle uses TWAP - single-block manipulation resistance verified by design")
 
         # Verify the pool is still healthy after manipulation
         assert reserves_post[0] > 0, "First reserve must be positive after manipulation"

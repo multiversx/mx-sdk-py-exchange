@@ -256,16 +256,13 @@ class TestPairAddLiquidity:
             if test_environment.supports_time_control():
                 from tests.environments import ChainsimEnvironment
                 if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
-                    try:
-                        test_environment.chain_sim.apply_states([[{
-                            "address": pair_address,
-                            "code": "",
-                            "codeHash": "",
-                            "codeMetadata": "",
-                        }]])
-                        logger.info(f"Cleared test pair code at {pair_address}")
-                    except Exception as exc:
-                        logger.warning(f"Could not clear test pair code: {exc}")
+                    test_environment.chain_sim.apply_states([[{
+                        "address": pair_address,
+                        "code": "",
+                        "codeHash": "",
+                        "codeMetadata": "",
+                    }]])
+                    logger.info(f"Cleared test pair code at {pair_address}")
 
     @pytest.mark.happy_path
     def test_add_liquidity_to_existing_pool(

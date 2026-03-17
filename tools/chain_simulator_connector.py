@@ -494,12 +494,11 @@ class ChainSimulator:
         # Locate the chain-simulator service
         chain_simulator = docker_compose['services'].get('chain-simulator', {})
         
-        # Update the entrypoint
+        # Update the entrypoint — supernova image doesn't have the old config
+        # file paths; skip sed commands and non-zero initial epoch/round/nonce
+        # (non-zero values break cross-shard transactions permanently).
         chain_simulator['entrypoint'] = (
-            "/bin/bash -c \" sed -i 's|http://localhost:9200|http://elasticsearch:9200|g' ./config/node/config/external.toml "
-            "&& sed -i '11i\\    { File = \\\"enableEpochs.toml\\\", Path = \\\"EnableEpochs.StakingV2EnableEpoch\\\", Value = 0},' ./config/nodeOverrideDefault.toml "
-            # f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
-            f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch} --rounds-per-epoch={BLOCKS_PER_EPOCH}\""
+            f"/bin/bash -c \"./start-with-services.sh -log-level *:INFO --rounds-per-epoch={BLOCKS_PER_EPOCH} --supernova-rounds-per-epoch={BLOCKS_PER_EPOCH}\""
         )
         
         # Save the modified docker-compose.yaml file

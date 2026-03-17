@@ -73,14 +73,10 @@ class TestUnstakeFarm:
         blockchain_controller.wait_blocks(5)
 
         # Get farming token balance before unstaking
-        farming_balance_before = 0
-        try:
-            all_tokens = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            farming_balance_before = sum(
-                t.balance for t in all_tokens if t.identifier == farming_token
-            )
-        except Exception:
-            pass
+        all_tokens = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+        farming_balance_before = sum(
+            t.balance for t in all_tokens if t.identifier == farming_token
+        )
 
         blockchain_controller.wait_blocks(5)
 

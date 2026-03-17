@@ -158,18 +158,11 @@ class TestFarmDelegation:
 
         # Alice tries to claim on behalf with Bob's farm token nonce.
         # This will fail either because Alice doesn't have the token or isn't whitelisted.
-        # If Alice doesn't hold the NFT, the transaction may never be processed
-        # (ESDT validation failure at node level), causing a timeout.
-        try:
-            tx_hash = _claim_rewards_on_behalf(
-                farm_contract, alice, bob_ft.token.nonce,
-                bob_ft.amount, network_providers, blockchain_controller
-            )
-            TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
-        except TimeoutError:
-            # Transaction was rejected at node level (Alice doesn't have the NFT)
-            # This is the expected behavior — unauthorized claim is rejected
-            logger.info("Transaction timed out (rejected at node level) — expected for missing NFT")
+        tx_hash = _claim_rewards_on_behalf(
+            farm_contract, alice, bob_ft.token.nonce,
+            bob_ft.amount, network_providers, blockchain_controller
+        )
+        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
 
         # Farm state unchanged
         supply_after = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
@@ -229,15 +222,12 @@ class TestFarmDelegation:
 
         finally:
             # Cleanup: remove Alice from whitelist
-            try:
-                deployer_account.sync_nonce(network_providers.proxy)
-                tx_remove = _remove_from_whitelist(
-                    farm_contract, deployer_account, network_providers.proxy,
-                    alice_bech32, blockchain_controller
-                )
-                logger.info(f"Cleanup: removed Alice from whitelist (tx: {tx_remove})")
-            except Exception as e:
-                logger.warning(f"Cleanup failed: {e}")
+            deployer_account.sync_nonce(network_providers.proxy)
+            tx_remove = _remove_from_whitelist(
+                farm_contract, deployer_account, network_providers.proxy,
+                alice_bech32, blockchain_controller
+            )
+            logger.info(f"Cleanup: removed Alice from whitelist (tx: {tx_remove})")
 
         logger.info("PASSED: test_whitelist_address")
 

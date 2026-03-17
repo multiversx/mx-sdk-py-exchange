@@ -583,12 +583,8 @@ class TestFarmClaimRewards:
         )
 
         # Record raw MEX balance before claim
-        from multiversx_sdk import Token
-        mex_token = Token(reward_token, 0)
-        try:
-            mex_before = network_providers.proxy.get_token_of_account(alice.address, mex_token).amount
-        except Exception:
-            mex_before = 0
+        all_fungible_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+        mex_before = sum(t.balance for t in all_fungible_before if t.identifier == reward_token)
 
         # Advance blocks for reward accrual
         blockchain_controller.wait_blocks(5)
@@ -607,10 +603,8 @@ class TestFarmClaimRewards:
         logger.info(f"Reward paid from reserve: {reward_paid}")
 
         # Check that Alice did NOT receive raw MEX (rewards should be locked)
-        try:
-            mex_after = network_providers.proxy.get_token_of_account(alice.address, mex_token).amount
-        except Exception:
-            mex_after = 0
+        all_fungible_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+        mex_after = sum(t.balance for t in all_fungible_after if t.identifier == reward_token)
 
         mex_received = mex_after - mex_before
         logger.info(f"Raw MEX received: {mex_received} (should be 0 — rewards are locked)")

@@ -314,12 +314,11 @@ class TestStateTransitions:
                 f"restarted rps={rps_stopped}→{rps_restarted}"
             )
 
-        except Exception:
-            # Ensure production is restarted in error case
+        finally:
+            # Always ensure production is restarted
             deployer_account.sync_nonce(network_providers.proxy)
             tx_final = staking_contract.start_produce_rewards(deployer_account, network_providers.proxy)
             blockchain_controller.wait_for_tx(tx_final)
-            raise
 
     def test_reward_rate_change_mid_operation(
         self,

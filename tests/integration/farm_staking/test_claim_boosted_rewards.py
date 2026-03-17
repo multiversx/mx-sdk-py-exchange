@@ -70,6 +70,7 @@ class TestClaimBoostedRewards:
         staking_contract,
         bob,
         test_accounts,
+        test_environment,
         network_providers,
         blockchain_controller,
     ):
@@ -87,6 +88,13 @@ class TestClaimBoostedRewards:
         )
         if position > 0 and len(test_accounts) > 3:
             test_user = test_accounts[3]
+            # Ensure account is funded on chain sim
+            from tests.environments import ChainsimEnvironment
+            if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+                from utils.utils_chain import nominated_amount
+                test_environment.chain_sim.fund_users_w_egld(
+                    [test_user.address.to_bech32()], nominated_amount(1)
+                )
             test_user.sync_nonce(network_providers.proxy)
 
         test_user.sync_nonce(network_providers.proxy)

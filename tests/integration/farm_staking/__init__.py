@@ -22,8 +22,7 @@ import requests
 from multiversx_sdk import Address
 from multiversx_sdk.network_providers.resources import TokenAmountOnNetwork
 from contracts.staking_contract import StakingContract
-from utils import decoding_structures
-from utils.utils_chain import decode_merged_attributes, hex_to_string, nominated_amount
+from utils.utils_chain import hex_to_string, nominated_amount
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.logger import get_logger
 from tests.helpers import TransactionAssertions
@@ -88,15 +87,11 @@ def _check_staking_has_code(staking_contract: StakingContract, proxy):
     Returns:
         bool: True if contract has code, False otherwise
     """
-    try:
-        resp = requests.get(f"{proxy.url}/address/{staking_contract.address}")
-        if resp.status_code != 200:
-            return False
-        acct = resp.json()["data"]["account"]
-        return bool(acct.get("code"))
-    except Exception as e:
-        logger.warning(f"Failed to check staking contract code: {e}")
+    resp = requests.get(f"{proxy.url}/address/{staking_contract.address}")
+    if resp.status_code != 200:
         return False
+    acct = resp.json()["data"]["account"]
+    return bool(acct.get("code"))
 
 
 def _get_stake_amount(staking_contract: StakingContract, proxy):
@@ -303,43 +298,35 @@ def _get_farm_tokens_for_user(staking_contract, user, proxy):
         List of AccountNFT objects that decode as active farm positions
     """
     all_nfts = proxy.get_non_fungible_tokens_of_account(user.address)
-    farm_token_prefix = staking_contract.farm_token.split("-")[0]
+    farm_token_id = staking_contract.farm_token  # e.g. "SRIDE-4ab1d4"
     farm_tokens = []
     for token in all_nfts:
-        if not token.token.identifier.startswith(farm_token_prefix):
+        # token.token.identifier includes nonce hex (e.g. "SRIDE-4ab1d4-01")
+        # Extract collection (base ID) by stripping the nonce suffix
+        collection = token.token.identifier.rsplit('-', 1)[0]
+        if collection != farm_token_id:
             continue
-        try:
-            decode_merged_attributes(
-                token.attributes.hex(),
-                decoding_structures.STAKE_V2_TOKEN_ATTRIBUTES,
-            )
-            farm_tokens.append(token)
-        except Exception:
+        # Unbond tokens share the same collection but have exactly 8 bytes
+        # attributes (a single u64 unlock_epoch). Active farm tokens have
+        # longer attributes (reward_per_share + compounded_reward + other fields).
+        if len(token.attributes) == 8:
             continue
+        farm_tokens.append(token)
     return farm_tokens
 
 
 def _get_unbond_tokens_for_user(staking_contract, user, proxy):
     """Get unbond NFTs held by user."""
     all_nfts = proxy.get_non_fungible_tokens_of_account(user.address)
-    farm_token_prefix = staking_contract.farm_token.split("-")[0]
+    farm_token_id = staking_contract.farm_token
     unbond_tokens = []
     for token in all_nfts:
-        if not token.token.identifier.startswith(farm_token_prefix):
+        collection = token.token.identifier.rsplit('-', 1)[0]
+        if collection != farm_token_id:
             continue
-        # STAKE_UNBOND_TOKEN_ATTRIBUTES is exactly one u64 unlock_epoch.
-        # Guard on exact byte length first, otherwise active farm tokens can
-        # falsely decode by consuming only their first 8 bytes.
-        if len(token.attributes.hex()) != 16:
-            continue
-        try:
-            decode_merged_attributes(
-                token.attributes.hex(),
-                decoding_structures.STAKE_UNBOND_TOKEN_ATTRIBUTES,
-            )
+        # Unbond tokens have exactly 8 bytes attributes (u64 unlock_epoch).
+        if len(token.attributes) == 8:
             unbond_tokens.append(token)
-        except Exception:
-            continue
     return unbond_tokens
 
 

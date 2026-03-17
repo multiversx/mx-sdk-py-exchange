@@ -206,23 +206,20 @@ class TestEdgeCases:
         for i in range(cycles):
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
 
-            try:
-                tx_stake = _stake_farm(
-                    staking_contract, alice, farming_token, stake_amount,
-                    network_providers, blockchain_controller,
-                )
-                TransactionAssertions.assert_transaction_success(tx_stake, network_providers.proxy)
+            tx_stake = _stake_farm(
+                staking_contract, alice, farming_token, stake_amount,
+                network_providers, blockchain_controller,
+            )
+            TransactionAssertions.assert_transaction_success(tx_stake, network_providers.proxy)
 
-                farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
-                farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
+            farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
+            farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
-                tx_unstake = _unstake_farm(
-                    staking_contract, alice, farm_token.token.nonce, farm_token.balance,
-                    network_providers, blockchain_controller,
-                )
-                TransactionAssertions.assert_transaction_success(tx_unstake, network_providers.proxy)
-            except TimeoutError:
-                pytest.skip("Rapid cycle tx finalization timed out on chain simulator")
+            tx_unstake = _unstake_farm(
+                staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+                network_providers, blockchain_controller,
+            )
+            TransactionAssertions.assert_transaction_success(tx_unstake, network_providers.proxy)
 
             logger.info(f"  Cycle {i+1}/{cycles} complete")
 

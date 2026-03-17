@@ -151,6 +151,7 @@ class TestFarmClaimBoostedRewards:
         farm_contract: FarmContract,
         bob: Account,
         test_accounts,
+        test_environment,
         network_providers: NetworkProviders,
         blockchain_controller,
     ):
@@ -172,11 +173,13 @@ class TestFarmClaimBoostedRewards:
         position = _get_user_total_farm_position(farm_contract, test_user, network_providers.proxy)
         if position > 0 and len(test_accounts) > 3:
             test_user = test_accounts[3]
+            # Ensure this account is funded on chain sim
+            from tests.environments import ChainsimEnvironment
+            if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+                test_environment.chain_sim.fund_users_w_egld(
+                    [test_user.address.to_bech32()], nominated_amount(1)
+                )
             test_user.sync_nonce(network_providers.proxy)
-
-        position = _get_user_total_farm_position(farm_contract, test_user, network_providers.proxy)
-        if position > 0:
-            pytest.skip("All available test accounts already have farm positions")
 
         # User without position tries to claim boosted rewards
         tx_claim = _claim_boosted_rewards(farm_contract, test_user, network_providers,

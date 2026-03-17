@@ -115,8 +115,9 @@ class TestFarmAdminOperations:
         blockchain_controller.wait_for_tx(tx_hash)
         tx_data = network_providers.proxy.get_transaction(tx_hash)
         if tx_data.status.is_failed and "Producing rewards is already enabled" in str(tx_data):
-            pytest.skip("Reward production is already enabled in the loaded mainnet state")
-        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+            logger.info("Reward production already enabled (idempotent)")
+        else:
+            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
         # Verify last reward block nonce is set
         last_block = farm_contract.get_last_reward_block_nonce(network_providers.proxy)
@@ -406,10 +407,7 @@ class TestFarmAdminOperations:
         # Pause the farm
         deployer_account.sync_nonce(network_providers.proxy)
         tx_pause = farm_contract.pause(deployer_account, network_providers.proxy)
-        try:
-            blockchain_controller.wait_for_tx(tx_pause)
-        except TimeoutError:
-            pytest.skip("pause tx timed out — chain sim under load or cross-shard delay")
+        blockchain_controller.wait_for_tx(tx_pause)
         TransactionAssertions.assert_transaction_success(tx_pause, network_providers.proxy)
         logger.info("Farm paused")
 

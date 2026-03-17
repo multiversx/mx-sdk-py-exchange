@@ -376,8 +376,8 @@ class TestAdminOperations:
             current_accumulated = staking_contract.get_accumulated_rewards(network_providers.proxy)
             remaining_now = max(0, current_capacity - current_accumulated)
             excess_remaining = max(0, remaining_now - remaining_before)
-            # Subtract headroom for 5 blocks of reward accumulation during tx finalization
-            safe_withdraw = max(0, excess_remaining - per_block_reward * 5)
+            # Subtract headroom for reward accumulation during tx finalization
+            safe_withdraw = max(0, excess_remaining - per_block_reward * 10)
             if safe_withdraw > 0:
                 deployer_account.sync_nonce(network_providers.proxy)
                 tx_restore = endpoint_call(
@@ -486,19 +486,17 @@ class TestAdminOperations:
                 TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
             elif current_capacity > original_capacity:
                 reduce_amount = current_capacity - original_capacity
-                try:
-                    deployer_account.sync_nonce(network_providers.proxy)
-                    tx_restore = endpoint_call(
-                        network_providers.proxy,
-                        50_000_000,
-                        deployer_account,
-                        Address(staking_contract.address),
-                        "withdrawRewards",
-                        [reduce_amount],
-                    )
-                    blockchain_controller.wait_for_tx(tx_restore)
-                except Exception as exc:
-                    logger.warning(f"Could not withdraw excess capacity during cleanup: {exc}")
+                deployer_account.sync_nonce(network_providers.proxy)
+                tx_restore = endpoint_call(
+                    network_providers.proxy,
+                    50_000_000,
+                    deployer_account,
+                    Address(staking_contract.address),
+                    "withdrawRewards",
+                    [reduce_amount],
+                )
+                blockchain_controller.wait_for_tx(tx_restore)
+                TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
 
     def test_withdraw_exceeds_remaining_fails(
         self,
