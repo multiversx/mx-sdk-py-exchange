@@ -299,12 +299,71 @@ class ChainSimulator:
                 pass
         return process_running or instance_running
 
-    def apply_states(self, states: list[list[dict[str, Any]]]):
-        for state in states:
-            response = requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
+    # Maximum storage keys per set-state request. Larger payloads cause the
+    # chain simulator to silently fail or create storage that the VM trie
+    # cannot access for cross-contract reads.
+    STATE_CHUNK_SIZE = 10000
+
+    def _send_single_state(self, state_entry: dict[str, Any]) -> bool:
+        """Send a single contract state, chunking storage keys if needed.
+
+        For contracts with many storage keys (>STATE_CHUNK_SIZE), the keys are
+        split into multiple set-state requests. Account metadata (code, balance,
+        ownerAddress) is sent first, then storage keys in chunks. The chain
+        simulator's set-state API merges fields, so each chunk adds to the
+        existing trie.
+
+        Args:
+            state_entry: Contract state dict with optional 'pairs' storage keys
+
+        Returns:
+            True if all requests succeeded
+        """
+        pairs = state_entry.get("pairs", {})
+        if len(pairs) <= self.STATE_CHUNK_SIZE:
+            # Small enough to send in one request
+            response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[state_entry])
             if response.status_code != 200:
-                logger.error(f"Failed to apply states: {response.text}")
+                logger.error(f"Failed to apply state: {response.text}")
                 return False
+            return True
+
+        address = state_entry.get("address", "unknown")
+        logger.info(f"Chunking {len(pairs)} storage keys for {address} ({len(pairs) // self.STATE_CHUNK_SIZE + 1} chunks)")
+
+        # Send account metadata first (code, balance, etc.) without storage keys
+        account_entry = {k: v for k, v in state_entry.items() if k != "pairs"}
+        response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[account_entry])
+        if response.status_code != 200:
+            logger.error(f"Failed to apply account metadata: {response.text}")
+            return False
+
+        # Send storage keys in chunks
+        keys_list = list(pairs.items())
+        for start in range(0, len(keys_list), self.STATE_CHUNK_SIZE):
+            chunk = dict(keys_list[start:start + self.STATE_CHUNK_SIZE])
+            response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[{
+                "address": state_entry["address"],
+                "pairs": chunk,
+            }])
+            if response.status_code != 200:
+                logger.error(f"Failed to apply storage chunk at offset {start}: {response.text}")
+                return False
+
+        # Re-apply code + owner after chunked loading to ensure they weren't cleared
+        response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[account_entry])
+        if response.status_code != 200:
+            logger.error(f"Failed to re-apply account metadata: {response.text}")
+            return False
+
+        logger.info(f"Loaded {len(pairs)} storage keys for {address}")
+        return True
+
+    def apply_states(self, states: list[list[dict[str, Any]]]):
+        for state_batch in states:
+            for state_entry in state_batch:
+                if not self._send_single_state(state_entry):
+                    return False
         return True
 
     def init_state_from_folder(self, state_folder: Path, filter_safe_price: bool = False) -> list[str]:
@@ -605,15 +664,12 @@ class ChainSimulator:
         if keys:
             state_entry["pairs"] = keys
 
-        # 5. Load onto chain sim
-        resp = requests.post(f"{self.proxy_url}/simulator/set-state", json=[state_entry])
-        if resp.status_code == 200:
-            key_count = len(keys) if keys else 0
-            logger.info(f"Loaded contract state for {contract_address} ({key_count} storage keys)")
+        # 5. Load onto chain sim (auto-chunks large storage)
+        if self._send_single_state(state_entry):
             self.advance_blocks(1)
             return True
         else:
-            logger.error(f"Failed to load contract state: {resp.text}")
+            logger.error(f"Failed to load contract state for {contract_address}")
             return False
 
     def fund_users_w_egld(self, users: list[str], amount: int):

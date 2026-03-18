@@ -299,97 +299,62 @@ class TestFarmMigration:
         # Upgrade the energy factory (simple_lock_energy) to supernova.
         # The farm's enterFarm calls lock_virtual on this SC, so it must
         # be on the supernova version for post-upgrade farm operations to work.
-        # The session setup loads its code but may fail to load its 350k storage
-        # keys (too large for a single set-state). Load keys in chunks here.
         assert ENERGY_FACTORY_WASM.exists(), f"Energy factory WASM not found at {ENERGY_FACTORY_WASM}"
         locking_scs = dex_context.get_contracts(config.SIMPLE_LOCKS_ENERGY)
         if locking_scs:
             locking_sc = locking_scs[0]
 
-            # Ensure storage keys are loaded (session setup may have skipped them)
-            key_check = http_requests.get(
-                f"{network_providers.proxy.url}/address/{locking_sc.address}/key/"
-                + "6c6f636b6564546f6b656e4964"  # lockedTokenId
-            )
-            key_data = key_check.json() if key_check.json() else {}
-            has_storage = key_data.get("data", {}).get("value", "") if key_data.get("data") else ""
-            if not has_storage:
-                import json
-                state_file = Path(config.DEFAULT_WORKSPACE) / "states" / "0_simple_locks_energy_0_chain_config_state.json"
-                if state_file.exists():
-                    with open(state_file) as f:
-                        full_state = json.load(f)
-                    entry = full_state[0] if isinstance(full_state, list) else full_state
-                    all_pairs = entry.get("pairs", {})
-                    # Load storage keys in chunks (350k keys too large for one request)
-                    chunk_size = 10000
-                    keys_list = list(all_pairs.items())
-                    for start in range(0, len(keys_list), chunk_size):
-                        chunk = dict(keys_list[start:start + chunk_size])
-                        test_environment.chain_sim.apply_states([[{
-                            "address": entry["address"],
-                            "pairs": chunk,
-                        }]])
-                    # Re-apply code + owner after chunked loading (chunks may clear code)
-                    test_environment.chain_sim.apply_states([[{
-                        "address": entry["address"],
-                        "code": entry.get("code", ""),
-                        "codeHash": entry.get("codeHash", ""),
-                        "codeMetadata": entry.get("codeMetadata", ""),
-                        "ownerAddress": deployer_account.address.to_bech32(),
-                    }]])
-                    test_environment.chain_sim.advance_blocks(1)
-                    logger.info(f"Loaded energy factory storage: {len(all_pairs)} keys in chunks")
+            # Ensure energy factory has full state loaded (350k keys — apply_states
+            # auto-chunks large states now, so this will work reliably).
+            if test_environment.supports_time_control():
+                from tests.environments import ChainsimEnvironment
+                if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+                    import json
+                    state_file = Path(config.DEFAULT_WORKSPACE) / "states" / "0_simple_locks_energy_0_chain_config_state.json"
+                    if state_file.exists():
+                        with open(state_file) as f:
+                            full_state = json.load(f)
+                        # apply_states handles chunking automatically
+                        test_environment.chain_sim.apply_states([full_state if isinstance(full_state, list) else [full_state]])
+                        test_environment.chain_sim.advance_blocks(1)
 
-            # Replace energy factory bytecode directly via set-state.
-            # upgradeContract TX fails on chain sim due to owner resolution issues,
-            # but set-state code replacement works and preserves storage.
+            # Replace bytecode with supernova version via set-state
+            _ensure_contract_owner(locking_sc.address, deployer_account, network_providers.proxy.url)
             code_hex = ENERGY_FACTORY_WASM.read_bytes().hex()
             http_requests.post(f"{network_providers.proxy.url}/simulator/set-state", json=[{
                 "address": locking_sc.address,
                 "code": code_hex,
-                "ownerAddress": deployer_account.address.to_bech32(),
             }])
             http_requests.post(f"{network_providers.proxy.url}/simulator/generate-blocks/1")
-            logger.info("Energy factory upgraded to supernova (via set-state)")
+            logger.info("Energy factory upgraded to supernova")
 
         farming_token = farm_contract.farmingToken
         stake_amount = _get_stake_amount(farm_contract, network_providers.proxy)
 
-        # Post-upgrade operations: enterFarm calls lock_virtual on the energy
-        # factory SC via cross-contract call. On chain sim with set-state loaded
-        # contracts, cross-contract calls may fail. Test what we can.
+        # Enter
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
         tx = _enter_farm(farm_contract, alice, farming_token, stake_amount,
                          network_providers, blockchain_controller)
-        tx_data = network_providers.proxy.get_transaction(tx)
-        if tx_data.status.is_successful:
-            logger.info("Enter farm post-upgrade: OK")
+        TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
+        logger.info("Enter farm post-upgrade: OK")
 
-            # Claim
-            blockchain_controller.wait_blocks(5)
-            farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
-            assert len(farm_tokens) > 0, "Alice should have farm tokens"
-            ft = max(farm_tokens, key=lambda t: t.token.nonce)
-            tx = _claim_rewards(farm_contract, alice, ft.token.nonce, ft.amount,
-                                network_providers, blockchain_controller)
-            TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
-            logger.info("Claim rewards post-upgrade: OK")
-
-            # Exit
-            farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
-            ft = max(farm_tokens, key=lambda t: t.token.nonce)
-            tx = _exit_farm(farm_contract, alice, ft.token.nonce, ft.amount,
+        # Claim
+        blockchain_controller.wait_blocks(5)
+        farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
+        assert len(farm_tokens) > 0, "Alice should have farm tokens"
+        ft = max(farm_tokens, key=lambda t: t.token.nonce)
+        tx = _claim_rewards(farm_contract, alice, ft.token.nonce, ft.amount,
                             network_providers, blockchain_controller)
-            TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
-            logger.info("Exit farm post-upgrade: OK")
-        else:
-            error_msg = TransactionAssertions._extract_error_from_tx(tx_data)
-            logger.warning(
-                f"enterFarm failed post-upgrade (cross-contract locking dependency): {error_msg}\n"
-                f"This is expected on chain sim when the energy factory SC state "
-                f"was loaded via set-state rather than deployed natively."
-            )
+        TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
+        logger.info("Claim rewards post-upgrade: OK")
+
+        # Exit
+        farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
+        ft = max(farm_tokens, key=lambda t: t.token.nonce)
+        tx = _exit_farm(farm_contract, alice, ft.token.nonce, ft.amount,
+                        network_providers, blockchain_controller)
+        TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
+        logger.info("Exit farm post-upgrade: OK")
 
 
 # ============================================================================

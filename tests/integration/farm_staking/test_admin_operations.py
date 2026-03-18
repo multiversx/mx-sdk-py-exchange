@@ -416,8 +416,9 @@ class TestAdminOperations:
         )
 
         try:
-            # First top up to ensure there are rewards to withdraw
-            topup_amount = nominated_amount(100)
+            # First top up to ensure there are rewards to withdraw.
+            # Must be large enough to survive per-block accrual during tx processing.
+            topup_amount = nominated_amount(10000)
             ensure_esdt_amounts(deployer_account, {farming_token: topup_amount})
             deployer_account.sync_nonce(network_providers.proxy)
             tx_topup = staking_contract.topup_rewards(deployer_account, network_providers.proxy, topup_amount)
@@ -435,17 +436,13 @@ class TestAdminOperations:
             # Per-block rewards accrue continuously. Between our query and the
             # withdrawRewards TX execution, blocks are generated (for nonce sync,
             # tx processing, cross-shard finalization). This increases accumulated
-            # and shrinks remaining. We must subtract a safety margin to ensure
-            # the SC's own remaining >= withdraw_amount at execution time.
-            safety_blocks = 50
-            safety_margin = per_block * safety_blocks
-            safe_remaining = remaining - safety_margin
-
-            withdraw_amount = safe_remaining // 2
+            # and shrinks remaining. Withdraw a small fixed amount (1 token) that
+            # is well within the topup we just added, leaving plenty of headroom.
+            withdraw_amount = min(nominated_amount(1), remaining // 10)
             if withdraw_amount <= 0:
                 pytest.skip(
-                    f"Not enough withdrawable rewards after safety margin "
-                    f"(remaining={remaining}, per_block={per_block}, margin={safety_margin})"
+                    f"Not enough withdrawable rewards "
+                    f"(remaining={remaining}, per_block={per_block})"
                 )
 
             deployer_account.sync_nonce(network_providers.proxy)
@@ -485,18 +482,24 @@ class TestAdminOperations:
                 blockchain_controller.wait_for_tx(tx_restore)
                 TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
             elif current_capacity > original_capacity:
-                reduce_amount = current_capacity - original_capacity
-                deployer_account.sync_nonce(network_providers.proxy)
-                tx_restore = endpoint_call(
-                    network_providers.proxy,
-                    50_000_000,
-                    deployer_account,
-                    Address(staking_contract.address),
-                    "withdrawRewards",
-                    [reduce_amount],
-                )
-                blockchain_controller.wait_for_tx(tx_restore)
-                TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
+                # Account for rewards accrued between query and TX execution
+                current_accumulated = staking_contract.get_accumulated_rewards(network_providers.proxy)
+                current_remaining = max(0, current_capacity - current_accumulated)
+                excess = current_capacity - original_capacity
+                per_block = staking_contract.get_per_block_reward_amount(network_providers.proxy)
+                safe_excess = min(excess, current_remaining - per_block * 10)
+                if safe_excess > 0:
+                    deployer_account.sync_nonce(network_providers.proxy)
+                    tx_restore = endpoint_call(
+                        network_providers.proxy,
+                        50_000_000,
+                        deployer_account,
+                        Address(staking_contract.address),
+                        "withdrawRewards",
+                        [safe_excess],
+                    )
+                    blockchain_controller.wait_for_tx(tx_restore)
+                    TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
 
     def test_withdraw_exceeds_remaining_fails(
         self,
