@@ -45,8 +45,16 @@ FIRST_WEEK_START_EPOCH_KEY = "66697273745765656b537461727445706f6368"  # "firstW
 # underflows: elapsed = 0 - mainnet_timestamp wraps to a huge u64, exhausting the
 # reward capacity in a single claim. Resetting to 0 means elapsed = current_timestamp
 # which is a small positive number, and rewards accrue correctly from chain sim start.
-LAST_REWARD_TIMESTAMP_KEY = "6c61737452657761726454696d657374616d70"   # "lastRewardTimestamp"
-LAST_REWARD_BLOCK_NONCE_KEY = "6c617374526577617264426c6f636b4e6f6e6365"  # "lastRewardBlockNonce"
+# Contracts may use either camelCase or snake_case storage keys depending on version.
+# Filter both variants to ensure mainnet values are always reset.
+LAST_REWARD_TIMESTAMP_KEYS = [
+    "6c61737452657761726454696d657374616d70",       # "lastRewardTimestamp" (camelCase)
+    "6c6173745f7265776172645f74696d657374616d70",   # "last_reward_timestamp" (snake_case)
+]
+LAST_REWARD_BLOCK_NONCE_KEYS = [
+    "6c617374526577617264426c6f636b4e6f6e6365",           # "lastRewardBlockNonce" (camelCase)
+    "6c6173745f7265776172645f626c6f636b5f6e6f6e6365",     # "last_reward_block_nonce" (snake_case)
+]
 
 # Hex-encoded storage key prefixes for boosted yields week-dependent data.
 # These keys store mainnet week numbers (e.g. week 169) which are incompatible with
@@ -572,14 +580,15 @@ class ChainSimulator:
                 logger.info(f"Filtered {len(keys_to_remove)} boosted yields week keys for {contract_address}")
 
         if reset_last_reward_timestamps and keys:
-            for key, label in [
-                (LAST_REWARD_TIMESTAMP_KEY, "lastRewardTimestamp"),
-                (LAST_REWARD_BLOCK_NONCE_KEY, "lastRewardBlockNonce"),
+            for key_variants, label in [
+                (LAST_REWARD_TIMESTAMP_KEYS, "lastRewardTimestamp"),
+                (LAST_REWARD_BLOCK_NONCE_KEYS, "lastRewardBlockNonce"),
             ]:
-                if key in keys:
-                    old_value = keys[key]
-                    keys[key] = ""
-                    logger.info(f"Reset {label} for {contract_address}: {old_value} -> 0")
+                for key in key_variants:
+                    if key in keys:
+                        old_value = keys[key]
+                        keys[key] = ""
+                        logger.info(f"Reset {label} for {contract_address}: {old_value} -> 0")
 
         # 4. Build set-state payload
         account_data.pop("rootHash", None)
