@@ -252,25 +252,21 @@ class RouterContract(DEXContractInterface):
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setFeeOff", sc_args)
 
-    def pair_contract_pause(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contract: str):
+    def pair_contract_pause(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contracts: list):
         function_purpose = f"Pause pair contract"
         logger.info(function_purpose)
 
-        gas_limit = 60000000
-        sc_args = [
-            Address(pair_contract)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "pause", sc_args)
+        gas_limit = 600000000
 
-    def pair_contract_resume(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contract: str):
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "pause", pair_contracts)
+
+    def pair_contract_resume(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contracts: list):
         function_purpose = f"Resume pair contract"
         logger.info(function_purpose)
 
-        gas_limit = 60000000
-        sc_args = [
-            Address(pair_contract)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
+        gas_limit = 600000000
+
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", pair_contracts)
     
     def pause(self, deployer: Account, proxy: ProxyNetworkProvider):
         function_purpose = f"Pause router contract"
@@ -302,7 +298,7 @@ class RouterContract(DEXContractInterface):
             1 if args[0] else 0
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPairCreationEnabled", sc_args)
-    
+
     def claim_developer_rewards_pairs(self, deployer: Account, proxy: ProxyNetworkProvider, pair_contracts: list[str]):
         function_purpose = f"Claim developer rewards for pairs"
         logger.info(function_purpose)
@@ -327,7 +323,7 @@ class RouterContract(DEXContractInterface):
         function_purpose = f"Set safe price round save interval"
         logger.info(function_purpose)
 
-        gas_limit = 10000000
+        gas_limit = 4000000
         sc_args = [
             interval
         ]
