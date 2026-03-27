@@ -153,7 +153,7 @@ def resume_pair_contracts(_):
     chunks = [resume_addresses[i:i + chunk_size] for i in range(0, len(resume_addresses), chunk_size)]
     for chunk in chunks:
         tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, chunk)
-        if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contracts: {len(chunk)}"):
+        if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contracts: {len(chunk)}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
 
