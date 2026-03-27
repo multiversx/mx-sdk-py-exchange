@@ -600,7 +600,7 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
     if "localhost" in proxy.url:
-        proxy.do_post_generic(f"{proxy.url}/simulator/generate-blocks/1", {})
+        proxy.do_post_generic(f"simulator/generate-blocks/1", {})
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""

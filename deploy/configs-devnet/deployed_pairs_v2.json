@@ -89,5 +89,12 @@
         "lpToken": "USHWEGLD-0b8b66",
         "address": "erd1qqqqqqqqqqqqqpgq2uxpprk08dn6523s0cre2v86h9cd57vf0n4ss7r54t",
         "version": 2
+    },
+    {
+        "firstToken": "MEX-a659d0",
+        "secondToken": "USDC-350c4e",
+        "lpToken": "MEXUSDC-fe3eb4",
+        "address": "erd1qqqqqqqqqqqqqpgqlmwaf993zd0ukglm5m59w4fd8mwp95us0n4sl223md",
+        "version": 2
     }
 ]
