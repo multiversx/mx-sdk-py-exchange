@@ -156,15 +156,20 @@ class TestSwapFixedInput:
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
         logger.info("Transaction succeeded")
 
-        # 6. ASSERT: Reserves changed correctly
+        # 6. ASSERT: Reserves changed by exact amounts
+        # Special fee is deducted from input and sent to the fees collector, NOT added to the reserve.
+        # reserve_increase = swap_amount * (100000 - special_fee) / 100000
+        special_fee = pair_data_fetcher.get_data("getSpecialFee") or 0
+        expected_input_delta = swap_amount * (100000 - special_fee) // 100000
         reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
-        assert reserves_after[0] > reserves_before[0], (
-            f"First reserve should increase (input token added).\n"
-            f"Before: {reserves_before[0]}, After: {reserves_after[0]}"
+        assert reserves_after[0] - reserves_before[0] == expected_input_delta, (
+            f"First reserve should increase by exactly {expected_input_delta} "
+            f"(swap_amount={swap_amount} minus special_fee={swap_amount - expected_input_delta}).\n"
+            f"Before: {reserves_before[0]}, After: {reserves_after[0]}, Delta: {reserves_after[0] - reserves_before[0]}"
         )
-        assert reserves_after[1] < reserves_before[1], (
-            f"Second reserve should decrease (output token removed).\n"
-            f"Before: {reserves_before[1]}, After: {reserves_after[1]}"
+        assert reserves_before[1] - reserves_after[1] == expected_output, (
+            f"Second reserve should decrease by exactly {expected_output} (output token removed).\n"
+            f"Before: {reserves_before[1]}, After: {reserves_after[1]}, Delta: {reserves_before[1] - reserves_after[1]}"
         )
         logger.info(f"Reserves after: ({reserves_after[0]}, {reserves_after[1]})")
 
@@ -174,18 +179,15 @@ class TestSwapFixedInput:
         )
         logger.info(f"k: {k_before} -> {k_after} (increase from fees)")
 
-        # 8. ASSERT: Alice received tokens
+        # 8. ASSERT: Alice received exactly the expected output
         alice_second_after = network_providers.proxy.get_token_of_account(alice.address, token_second).amount
         actual_output = alice_second_after - alice_second_before
 
-        assert actual_output >= min_output, (
-            f"Output below minimum slippage protection.\n"
-            f"Min expected: {min_output}, Got: {actual_output}"
+        assert actual_output == expected_output, (
+            f"Output does not match getAmountOut query result.\n"
+            f"Expected: {expected_output}, Got: {actual_output}"
         )
-
-        # 9. ASSERT: Output within slippage bounds
-        PairAssertions.assert_slippage_within_bounds(expected_output, actual_output, 0.05)
-        logger.info(f"Alice received {actual_output / 10**18:.4f} secondToken (expected ~{expected_output / 10**18:.4f})")
+        logger.info(f"Alice received {actual_output / 10**18:.4f} secondToken (expected {expected_output / 10**18:.4f})")
 
         logger.info("Test passed: Swap fixed input first->second successful")
 
@@ -257,15 +259,19 @@ class TestSwapFixedInput:
         # 5. ASSERT: Transaction success
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
-        # 6. ASSERT: Reserves changed correctly (mirrored from first_to_second)
+        # 6. ASSERT: Reserves changed by exact amounts
+        # Special fee portion goes to fees collector, not to the reserve.
+        special_fee = pair_data_fetcher.get_data("getSpecialFee") or 0
+        expected_input_delta = swap_amount * (100000 - special_fee) // 100000
         reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
-        assert reserves_after[1] > reserves_before[1], (
-            f"Second reserve should increase (input token added).\n"
-            f"Before: {reserves_before[1]}, After: {reserves_after[1]}"
+        assert reserves_after[1] - reserves_before[1] == expected_input_delta, (
+            f"Second reserve should increase by exactly {expected_input_delta} "
+            f"(swap_amount={swap_amount} minus special_fee={swap_amount - expected_input_delta}).\n"
+            f"Before: {reserves_before[1]}, After: {reserves_after[1]}, Delta: {reserves_after[1] - reserves_before[1]}"
         )
-        assert reserves_after[0] < reserves_before[0], (
-            f"First reserve should decrease (output token removed).\n"
-            f"Before: {reserves_before[0]}, After: {reserves_after[0]}"
+        assert reserves_before[0] - reserves_after[0] == expected_output, (
+            f"First reserve should decrease by exactly {expected_output} (output token removed).\n"
+            f"Before: {reserves_before[0]}, After: {reserves_after[0]}, Delta: {reserves_before[0] - reserves_after[0]}"
         )
 
         # 7. ASSERT: Constant product holds
@@ -273,14 +279,14 @@ class TestSwapFixedInput:
             pair_contract.address, k_before, network_providers.proxy
         )
 
-        # 8. ASSERT: Alice received first tokens
+        # 8. ASSERT: Alice received exactly the expected output
         alice_first_after = network_providers.proxy.get_token_of_account(alice.address, token_first).amount
         actual_output = alice_first_after - alice_first_before
 
-        assert actual_output >= min_output, (
-            f"Output below minimum.\nMin: {min_output}, Got: {actual_output}"
+        assert actual_output == expected_output, (
+            f"Output does not match getAmountOut query result.\n"
+            f"Expected: {expected_output}, Got: {actual_output}"
         )
-        PairAssertions.assert_slippage_within_bounds(expected_output, actual_output, 0.05)
         logger.info(f"Alice received {actual_output / 10**18:.4f} firstToken")
 
         logger.info("Test passed: Swap fixed input second->first successful")
@@ -355,14 +361,13 @@ class TestSwapFixedInput:
         alice_second_after = network_providers.proxy.get_token_of_account(alice.address, token_second).amount
         actual_output = alice_second_after - alice_second_before
 
-        assert actual_output >= min_output, (
-            f"Received less than getAmountOut query result!\n"
+        assert actual_output == expected_output, (
+            f"Output does not match getAmountOut query result!\n"
             f"getAmountOut returned: {expected_output}\n"
-            f"amountBmin set to: {min_output}\n"
             f"Actually received: {actual_output}\n"
             f"CRITICAL: View function and execution disagree."
         )
-        logger.info(f"Received {actual_output / 10**18:.4f} >= min {min_output / 10**18:.4f}")
+        logger.info(f"Received {actual_output / 10**18:.4f} == expected {expected_output / 10**18:.4f}")
 
         logger.info("Test passed: Minimum output (0% slippage) swap successful")
 
@@ -606,7 +611,7 @@ class TestSwapFixedInput:
         # 3. ASSERT: Check outcome
         tx_result = network_providers.proxy.get_transaction(tx_hash)
 
-        if tx_result.status.is_successful():
+        if tx_result.status.is_successful:
             logger.info("Dust swap succeeded")
 
             reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
@@ -679,8 +684,10 @@ class TestSwapFixedInput:
         tx_hash = pair_contract.swap_fixed_input(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (protocol rejects 0-amount ESDT transfer)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="negative value"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -747,8 +754,10 @@ class TestSwapFixedInput:
         tx_hash = pair_contract.swap_fixed_input(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED with slippage error
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Slippage exceeded"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -808,8 +817,10 @@ class TestSwapFixedInput:
         tx_hash = pair_contract.swap_fixed_input(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (user doesn't have FAKE token)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="insufficient funds"
+        )
         logger.info("Transaction failed as expected (wrong token)")
 
         # 4. ASSERT: Reserves unchanged

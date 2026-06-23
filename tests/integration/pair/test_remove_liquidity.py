@@ -20,6 +20,7 @@ from contracts.builtin_contracts import ESDTContract
 from contracts.pair_contract import PairContract, AddLiquidityEvent, RemoveLiquidityEvent, SwapFixedInputEvent, PairContractVersion
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import nominated_amount, Account, hex_to_string
+from utils.utils_tx import multi_esdt_transfer, ESDTToken
 from tests.helpers import PairAssertions, TransactionAssertions
 from utils.logger import get_logger
 from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
@@ -86,6 +87,10 @@ class TestRemoveLiquidity:
             pair_contract.secondToken: setup_amount_second
         })
 
+        # Track LP balance BEFORE adding liquidity to compute delta
+        lp_token = Token(pair_contract.lpToken, 0)
+        lp_balance_before_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+
         # Add liquidity to get LP tokens
         add_event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
@@ -116,12 +121,13 @@ class TestRemoveLiquidity:
         k_before = reserve_first_before * reserve_second_before
         ratio_before = reserve_first_before / reserve_second_before if reserve_second_before > 0 else 0
 
-        lp_token = Token(pair_contract.lpToken, 0)
-        lp_balance_total = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        # Use LP delta from THIS test's addLiquidity, not absolute balance
+        lp_balance_after_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        lp_balance_total = lp_balance_after_add - lp_balance_before_add
 
         logger.info(f"Reserves before removal: ({reserve_first_before}, {reserve_second_before})")
         logger.info(f"LP supply: {lp_supply}")
-        logger.info(f"Alice LP tokens: {lp_balance_total}")
+        logger.info(f"Alice LP minted in this test: {lp_balance_total}")
         logger.info(f"Pool ratio: {ratio_before:.6f}")
 
         # Get Alice's token balances before removal
@@ -221,8 +227,8 @@ class TestRemoveLiquidity:
         logger.info(f"✓ Pool ratio maintained: {ratio_before:.6f} → {ratio_after:.6f}")
 
         # VERIFICATION 5: LP tokens burned
-        lp_balance_after = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-        lp_burned = lp_balance_total - lp_balance_after
+        lp_absolute_after = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        lp_burned = lp_balance_after_add - lp_absolute_after
 
         assert lp_burned == lp_amount_to_burn, (
             f"LP tokens should be burned\n"
@@ -231,12 +237,13 @@ class TestRemoveLiquidity:
         logger.info(f"✓ LP tokens burned: {lp_burned}")
 
         # VERIFICATION 6: Remaining LP tokens still valid (50% left)
-        assert lp_balance_after > 0, "Alice should still have remaining LP tokens"
-        assert lp_balance_after == lp_balance_total - lp_amount_to_burn, (
+        lp_remaining_delta = lp_absolute_after - lp_balance_before_add
+        assert lp_remaining_delta > 0, "Alice should still have remaining LP tokens from this test"
+        assert lp_remaining_delta == lp_balance_total - lp_amount_to_burn, (
             f"Remaining LP should be 50%\n"
-            f"Total: {lp_balance_total}, Burned: {lp_amount_to_burn}, Remaining: {lp_balance_after}"
+            f"Total minted: {lp_balance_total}, Burned: {lp_amount_to_burn}, Remaining: {lp_remaining_delta}"
         )
-        logger.info(f"✓ Remaining LP tokens: {lp_balance_after} (50%)")
+        logger.info(f"✓ Remaining LP tokens: {lp_remaining_delta} (50%)")
 
         # VERIFICATION 7: Constant product maintained
         k_after = reserve_first_after * reserve_second_after
@@ -481,6 +488,10 @@ class TestRemoveLiquidity:
             pair_contract.secondToken: setup_amount_second
         })
 
+        # Track LP balance before add to compute delta
+        lp_token = Token(pair_contract.lpToken, 0)
+        lp_before_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+
         add_event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
             amountA=setup_amount_first,
@@ -505,8 +516,8 @@ class TestRemoveLiquidity:
         reserve_second_before = reserves_data[1]
         lp_supply = reserves_data[2]
 
-        lp_token = Token(pair_contract.lpToken, 0)
-        lp_balance = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        # Use LP delta from THIS test's addLiquidity
+        lp_balance = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount - lp_before_add
 
         # Remove 25% of LP tokens with strict minimum amounts
         lp_amount_to_burn = lp_balance // 4
@@ -628,6 +639,10 @@ class TestRemoveLiquidity:
             pair_contract.secondToken: setup_amount_second
         })
 
+        # Track LP before add to compute delta
+        lp_token = Token(pair_contract.lpToken, 0)
+        lp_before_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+
         add_event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
             amountA=setup_amount_first,
@@ -658,8 +673,8 @@ class TestRemoveLiquidity:
             reserve_second = reserves_data[1]
             lp_supply = reserves_data[2]
 
-            lp_token = Token(pair_contract.lpToken, 0)
-            lp_balance = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+            # Use LP delta from this test only (exclude pre-existing LP from other tests)
+            lp_balance = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount - lp_before_add
 
             if lp_balance < 1000:
                 logger.warning(f"Insufficient LP tokens for {slippage:.0%} test, skipping")
@@ -757,6 +772,10 @@ class TestRemoveLiquidity:
             pair_contract.secondToken: setup_amount_second
         })
 
+        # Track LP before add to compute delta
+        lp_token = Token(pair_contract.lpToken, 0)
+        lp_before_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+
         add_event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
             amountA=setup_amount_first,
@@ -781,8 +800,8 @@ class TestRemoveLiquidity:
         reserve_second = reserves_data[1]
         lp_supply = reserves_data[2]
 
-        lp_token = Token(pair_contract.lpToken, 0)
-        lp_balance_before = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        # Use LP delta from this test only
+        lp_balance_before = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount - lp_before_add
 
         # Remove 25% of LP with impossible minimum amounts (200% of possible)
         lp_to_burn = lp_balance_before // 4
@@ -821,11 +840,12 @@ class TestRemoveLiquidity:
         TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy, "slippage")
         logger.info("✓ Transaction failed as expected (slippage protection)")
 
-        # VERIFICATION 2: LP tokens NOT burned
-        lp_balance_after = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-        assert lp_balance_after == lp_balance_before, (
+        # VERIFICATION 2: LP tokens NOT burned (compare absolute balances)
+        lp_absolute_before = lp_before_add + lp_balance_before  # absolute balance before remove attempt
+        lp_absolute_after = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        assert lp_absolute_after == lp_absolute_before, (
             f"LP tokens should NOT be burned on failed transaction\n"
-            f"Before: {lp_balance_before}, After: {lp_balance_after}"
+            f"Before: {lp_absolute_before}, After: {lp_absolute_after}"
         )
         logger.info("✓ LP tokens preserved")
 
@@ -926,8 +946,10 @@ class TestRemoveLiquidity:
         tx_hash = pair_contract.remove_liquidity(network_providers, alice, remove_event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # VERIFICATION 1: Transaction should fail
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # VERIFICATION 1: Transaction should fail (protocol rejects 0-amount ESDT transfer)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="negative value"
+        )
         logger.info("✓ Transaction failed as expected")
 
         # VERIFICATION 2: LP balance unchanged
@@ -1044,8 +1066,10 @@ class TestRemoveLiquidity:
         tx_hash = pair_contract.remove_liquidity(network_providers, alice, remove_event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # VERIFICATION 1: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # VERIFICATION 1: Transaction FAILED (user doesn't have enough LP tokens)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="insufficient funds"
+        )
         logger.info("✓ Transaction failed as expected (insufficient LP tokens)")
 
         # VERIFICATION 2: LP balance unchanged
@@ -1122,6 +1146,10 @@ class TestRemoveLiquidity:
             pair_contract.secondToken: setup_amount_second
         })
 
+        # Track LP balance BEFORE addLiquidity to compute delta (pool has pre-existing mainnet state)
+        lp_token = Token(pair_contract.lpToken, 0)
+        lp_before_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+
         add_event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
             amountA=setup_amount_first,
@@ -1140,9 +1168,8 @@ class TestRemoveLiquidity:
         blockchain_controller.wait_for_tx(tx_add)
         TransactionAssertions.assert_transaction_success(tx_add, network_providers.proxy)
 
-        # Record Alice's LP tokens and initial state
-        lp_token = Token(pair_contract.lpToken, 0)
-        alice_lp_balance = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
+        # Record Alice's LP tokens from THIS add only (delta, not absolute)
+        alice_lp_balance = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount - lp_before_add
 
         reserves_after_add = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         k_after_add = reserves_after_add[0] * reserves_after_add[1]
@@ -1287,29 +1314,26 @@ class TestRemoveLiquidity:
         logger.info(f"Isolated pair created: {pair_contract.address}")
         logger.info(f"Tokens: {first_token} / {second_token}")
 
-        # Fund Bob and Charlie with the same tokens
-        if test_environment.supports_time_control():
-            from tests.environments import ChainsimEnvironment
-            if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
-                # Fund Bob
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [bob.address.to_bech32()], first_token, nominated_amount(200)
-                )
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [bob.address.to_bech32()], second_token, nominated_amount(200)
-                )
-                # Fund Charlie
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [charlie.address.to_bech32()], first_token, nominated_amount(150)
-                )
-                test_environment.chain_sim.fund_users_w_esdt_from_mainnet(
-                    [charlie.address.to_bech32()], second_token, nominated_amount(150)
-                )
-
         # Define contribution amounts
         alice_amount = nominated_amount(10)
         bob_amount = nominated_amount(20)
         charlie_amount = nominated_amount(15)
+
+        # Fund Bob and Charlie via ESDT transfers from Alice
+        # (tokens are locally issued, can't use fund_users_w_esdt_from_mainnet)
+        alice.sync_nonce(network_providers.proxy)
+        tx_hash = multi_esdt_transfer(
+            network_providers.proxy, 10000000, alice, bob.address,
+            [ESDTToken(first_token, 0, bob_amount), ESDTToken(second_token, 0, bob_amount)]
+        )
+        blockchain_controller.wait_for_tx(tx_hash)
+
+        alice.sync_nonce(network_providers.proxy)
+        tx_hash = multi_esdt_transfer(
+            network_providers.proxy, 10000000, alice, charlie.address,
+            [ESDTToken(first_token, 0, charlie_amount), ESDTToken(second_token, 0, charlie_amount)]
+        )
+        blockchain_controller.wait_for_tx(tx_hash)
 
         lp_token = Token(pair_contract.lpToken, 0)
 

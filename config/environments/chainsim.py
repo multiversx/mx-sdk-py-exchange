@@ -3,10 +3,11 @@ from .base import BaseEnvironmentSettings
 
 class ChainSimSettings(BaseEnvironmentSettings):
     """Chain simulator environment settings."""
-    
+
     # Override defaults for chain simulator
     DEFAULT_PROXY: str = "http://localhost:8085"
     DEFAULT_API: str = "http://localhost:3001"
+    FORCE_CONTINUE_PROMPT: bool = True
     GRAPHQL: str = "https://graph.xexchange.com/graphql"
 
     DEFAULT_OWNER: str = "wallets/C1.pem"

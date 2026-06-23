@@ -24,13 +24,65 @@ from utils.utils_tx import ESDTToken
 logger = get_logger(__name__)
 
 
+# Hex-encoded storage key prefixes for safe price observations in pair contracts.
+# These keys store round-dependent TWAP data that causes "cast to i64 error" when
+# loaded mainnet state has round numbers higher than the chain simulator's current round.
+# Filtering these keys lets pair contracts reinitialize safe price from scratch.
+SAFE_PRICE_KEY_PREFIXES = [
+    "70726963655f6f62736572766174696f6e73",              # "price_observations" (covers .item* and .len)
+    "736166655f70726963655f63757272656e745f696e646578",  # "safe_price_current_index"
+]
+
+# Hex-encoded storage key for firstWeekStartEpoch in fees collector and boosted contracts.
+# Week calculation: week = (current_epoch - first_week_start_epoch) / 7
+# When mainnet state has first_week_start_epoch=862, the chain simulator needs epoch 869+.
+# Overriding to 0 means epoch 7+ suffices for week >= 1.
+FIRST_WEEK_START_EPOCH_KEY = "66697273745765656b537461727445706f6368"  # "firstWeekStartEpoch"
+
+# Hex-encoded storage keys for last reward timestamps in farm/staking contracts.
+# These store Unix timestamps from mainnet (e.g. ~1.74 billion seconds).
+# When chain sim starts at round 0 (timestamp ~0), the elapsed time calculation
+# underflows: elapsed = 0 - mainnet_timestamp wraps to a huge u64, exhausting the
+# reward capacity in a single claim. Resetting to 0 means elapsed = current_timestamp
+# which is a small positive number, and rewards accrue correctly from chain sim start.
+# Contracts may use either camelCase or snake_case storage keys depending on version.
+# Filter both variants to ensure mainnet values are always reset.
+LAST_REWARD_TIMESTAMP_KEYS = [
+    "6c61737452657761726454696d657374616d70",       # "lastRewardTimestamp" (camelCase)
+    "6c6173745f7265776172645f74696d657374616d70",   # "last_reward_timestamp" (snake_case)
+]
+LAST_REWARD_BLOCK_NONCE_KEYS = [
+    "6c617374526577617264426c6f636b4e6f6e6365",           # "lastRewardBlockNonce" (camelCase)
+    "6c6173745f7265776172645f626c6f636b5f6e6f6e6365",     # "last_reward_block_nonce" (snake_case)
+]
+
+# Hex-encoded storage key prefixes for boosted yields week-dependent data.
+# These keys store mainnet week numbers (e.g. week 169) which are incompatible with
+# chain simulator epochs (epoch ~10 → week ~2). The boostedYieldsConfig contains
+# last_update_week which triggers "Invalid config week" when current_week < last_update_week.
+# Clearing all week-dependent keys lets the contract reinitialize from scratch.
+BOOSTED_YIELDS_WEEK_KEY_PREFIXES = [
+    "626f6f737465645969656c6473436f6e666967",                                  # "boostedYieldsConfig"
+    "6c617374476c6f62616c5570646174655765656b",                                # "lastGlobalUpdateWeek"
+    "6661726d537570706c79466f725765656b",                                      # "farmSupplyForWeek"
+    "746f74616c456e65726779466f725765656b",                                    # "totalEnergyForWeek"
+    "746f74616c52657761726473466f725765656b",                                  # "totalRewardsForWeek"
+    "746f74616c4c6f636b6564546f6b656e73466f725765656b",                        # "totalLockedTokensForWeek"
+    "72656d61696e696e67426f6f7374656452657761726473546f44697374726962757465",  # "remainingBoostedRewardsToDistribute"
+    "63757272656e74436c61696d50726f6772657373",                                # "currentClaimProgress"
+    "616363756d756c6174656452657761726473466f725765656b",                      # "accumulatedRewardsForWeek"
+    "6c6f636b6564546f6b656e73496e4275636b6574",                                # "lockedTokensInBucket"
+    "66697273744275636b65744964",                                              # "firstBucketId"
+    "6c617374436f6c6c656374556e646973745765656b",                              # "lastCollectUndistWeek"
+]
+
 SIMULATOR_URL = "http://localhost:8085"
 API_URL = "http://localhost:3001"
 GENERATE_BLOCKS_URL = f"{SIMULATOR_URL}/simulator/generate-blocks/"
 SET_STATE_URL = f"{SIMULATOR_URL}/simulator/set-state"
 SEND_USER_FUNDS_URL = f"{SIMULATOR_URL}/transaction/send-user-funds"
 STATES_FOLDER = "states"
-BLOCKS_PER_EPOCH = 100
+BLOCKS_PER_EPOCH = 10
 
 
 def is_valid_address(address: str) -> bool:
@@ -123,11 +175,77 @@ def get_shard_chronology_in_folder(state_folder: Path) -> dict[str, int] | None:
     return None
 
 
+def filter_safe_price_keys(states: list[Any], key_prefixes: list[str] = None) -> tuple[list[Any], int]:
+    """Filter round-dependent safe price storage keys from account states.
+
+    Pair contracts store TWAP price observations tagged with mainnet round numbers.
+    When loaded into a chain simulator with much lower round numbers, arithmetic
+    underflow occurs (current_round - stored_round < 0 → "cast to i64 error").
+
+    Removing these keys lets the contract reinitialize safe price observations
+    using the chain simulator's current round numbers.
+
+    Args:
+        states: List of account state dicts (each with optional 'pairs' storage dict)
+        key_prefixes: Hex key prefixes to filter (defaults to SAFE_PRICE_KEY_PREFIXES)
+
+    Returns:
+        Tuple of (filtered_states, count_of_removed_keys)
+    """
+    if key_prefixes is None:
+        key_prefixes = SAFE_PRICE_KEY_PREFIXES
+
+    total_removed = 0
+    for account_state in states:
+        if not isinstance(account_state, dict) or 'pairs' not in account_state:
+            continue
+        pairs = account_state['pairs']
+        keys_to_remove = [
+            k for k in pairs
+            if any(k.startswith(prefix) for prefix in key_prefixes)
+        ]
+        for k in keys_to_remove:
+            del pairs[k]
+        total_removed += len(keys_to_remove)
+
+    return states, total_removed
+
+
+def override_first_week_start_epoch(states: list[Any], new_value: str = "") -> tuple[list[Any], int]:
+    """Override firstWeekStartEpoch storage key to 0 in all account states.
+
+    Fees collector (and boosted contracts) compute the current week as:
+        week = (current_epoch - first_week_start_epoch) / 7
+    When mainnet state has first_week_start_epoch=862, the chain simulator needs
+    to be at epoch 869+ for valid weeks. By overriding to 0, epoch 7+ suffices.
+
+    Args:
+        states: List of account state dicts (each with optional 'pairs' storage dict)
+        new_value: Hex-encoded new value (default "" = 0 for u64)
+
+    Returns:
+        Tuple of (modified_states, count_of_overridden_keys)
+    """
+    total_overridden = 0
+    for account_state in states:
+        if not isinstance(account_state, dict) or 'pairs' not in account_state:
+            continue
+        pairs = account_state['pairs']
+        if FIRST_WEEK_START_EPOCH_KEY in pairs:
+            old_value = pairs[FIRST_WEEK_START_EPOCH_KEY]
+            pairs[FIRST_WEEK_START_EPOCH_KEY] = new_value
+            total_overridden += 1
+            address = account_state.get('address', 'unknown')
+            logger.info(f"Overrode firstWeekStartEpoch for {address}: {old_value} -> 0")
+
+    return states, total_overridden
+
+
 def get_all_sc_states_in_folder(state_folder: Path) -> list[Any]:
     state_file_paths = get_sc_states_files_in_folder(state_folder)
     if len(state_file_paths) == 0:
         return []
-    
+
     all_sc_states = []
     for file_path in state_file_paths:
         with open(file_path, 'r', encoding="UTF-8") as f:
@@ -181,19 +299,111 @@ class ChainSimulator:
                 pass
         return process_running or instance_running
 
-    def apply_states(self, states: list[list[dict[str, Any]]]):
-        for state in states:
-            response = requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
+    # Maximum storage keys per set-state request. Larger payloads cause the
+    # chain simulator to silently fail or create storage that the VM trie
+    # cannot access for cross-contract reads.
+    STATE_CHUNK_SIZE = 10000
+
+    def _send_single_state(self, state_entry: dict[str, Any]) -> bool:
+        """Send a single contract state, chunking storage keys if needed.
+
+        For contracts with many storage keys (>STATE_CHUNK_SIZE), the keys are
+        split into multiple set-state requests. Account metadata (code, balance,
+        ownerAddress) is sent first, then storage keys in chunks. The chain
+        simulator's set-state API merges fields, so each chunk adds to the
+        existing trie.
+
+        Args:
+            state_entry: Contract state dict with optional 'pairs' storage keys
+
+        Returns:
+            True if all requests succeeded
+        """
+        pairs = state_entry.get("pairs", {})
+        if len(pairs) <= self.STATE_CHUNK_SIZE:
+            # Small enough to send in one request
+            response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[state_entry])
             if response.status_code != 200:
-                logger.error(f"Failed to apply states: {response.text}")
+                logger.error(f"Failed to apply state: {response.text}")
                 return False
+            return True
+
+        address = state_entry.get("address", "unknown")
+        logger.info(f"Chunking {len(pairs)} storage keys for {address} ({len(pairs) // self.STATE_CHUNK_SIZE + 1} chunks)")
+
+        # Send account metadata first (code, balance, etc.) without storage keys
+        account_entry = {k: v for k, v in state_entry.items() if k != "pairs"}
+        response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[account_entry])
+        if response.status_code != 200:
+            logger.error(f"Failed to apply account metadata: {response.text}")
+            return False
+
+        # Send storage keys in chunks
+        keys_list = list(pairs.items())
+        for start in range(0, len(keys_list), self.STATE_CHUNK_SIZE):
+            chunk = dict(keys_list[start:start + self.STATE_CHUNK_SIZE])
+            response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[{
+                "address": state_entry["address"],
+                "pairs": chunk,
+            }])
+            if response.status_code != 200:
+                logger.error(f"Failed to apply storage chunk at offset {start}: {response.text}")
+                return False
+
+        # Re-apply code + owner after chunked loading to ensure they weren't cleared
+        response = requests.post(f"{self.proxy_url}/simulator/set-state", json=[account_entry])
+        if response.status_code != 200:
+            logger.error(f"Failed to re-apply account metadata: {response.text}")
+            return False
+
+        logger.info(f"Loaded {len(pairs)} storage keys for {address}")
         return True
 
-    def init_state_from_folder(self, state_folder: Path) -> list[str]:
+    def apply_states(self, states: list[list[dict[str, Any]]]):
+        for state_batch in states:
+            for state_entry in state_batch:
+                if not self._send_single_state(state_entry):
+                    return False
+        return True
+
+    def init_state_from_folder(self, state_folder: Path, filter_safe_price: bool = False) -> list[str]:
+        """Load all contract and account states from a folder into the chain simulator.
+
+        Args:
+            state_folder: Path to folder containing state JSON files
+            filter_safe_price: If True, remove safe price observation keys from contract
+                state before loading. This prevents "cast to i64 error" when mainnet state
+                has round numbers higher than the chain simulator's current round.
+
+        Returns:
+            List of loaded user addresses (bech32)
+        """
         all_sc_states = get_all_sc_states_in_folder(state_folder)
         user_addresses, contract_addresses = get_standalone_addresses_in_folder(state_folder)
         all_user_states = get_address_states_in_folder(state_folder, user_addresses)
         all_standalone_contract_states = get_address_states_in_folder(state_folder, contract_addresses)
+
+        if filter_safe_price:
+            total_removed = 0
+            for sc_states in all_sc_states:
+                _, removed = filter_safe_price_keys(sc_states)
+                total_removed += removed
+            for contract_states in all_standalone_contract_states:
+                _, removed = filter_safe_price_keys(contract_states)
+                total_removed += removed
+            if total_removed:
+                logger.info(f"Filtered {total_removed} safe price storage keys from loaded state")
+
+            # Override firstWeekStartEpoch to 0 so chain simulator only needs epoch 7+
+            total_overridden = 0
+            for sc_states in all_sc_states:
+                _, overridden = override_first_week_start_epoch(sc_states)
+                total_overridden += overridden
+            for contract_states in all_standalone_contract_states:
+                _, overridden = override_first_week_start_epoch(contract_states)
+                total_overridden += overridden
+            if total_overridden:
+                logger.info(f"Overrode firstWeekStartEpoch in {total_overridden} contract(s)")
 
         if all_sc_states:
             self.apply_states(all_sc_states)
@@ -205,13 +415,109 @@ class ChainSimulator:
 
         if all_user_states:
             self.apply_states(all_user_states)
-            logger.info("User states applied.") 
+            logger.info("User states applied.")
 
         # return found user addresses
         return user_addresses
 
+    def ensure_pair_template_has_code(self, router_address: str, source_pair_address: str):
+        """Ensure the Router's pair template contract has bytecode loaded.
+
+        The Router's createPair uses deployFromSourceContract to clone the pair template.
+        When loading mainnet state, the template contract's bytecode may not be included
+        in the state dump. This method copies bytecode from an existing pair contract
+        to the template address via the set-state API.
+
+        Args:
+            router_address: Bech32 address of the Router contract
+            source_pair_address: Bech32 address of an existing pair contract to copy code from
+        """
+        from utils.contract_data_fetchers import RouterContractDataFetcher
+
+        # 1. Query Router for pair template address
+        fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), self.proxy_url)
+        template_hex = fetcher.get_data("getPairTemplateAddress")
+        if not template_hex:
+            logger.warning("Router returned empty pair template address")
+            return
+        template_address = Address(bytes.fromhex(template_hex), "erd").to_bech32()
+
+        # 2. Check if template already has code
+        resp = requests.get(f"{self.proxy_url}/address/{template_address}")
+        template_acct = resp.json()["data"]["account"]
+        if template_acct.get("code"):
+            logger.info(f"Pair template already has code at {template_address}")
+            return
+
+        # 3. Copy code from source pair contract
+        resp = requests.get(f"{self.proxy_url}/address/{source_pair_address}")
+        source_acct = resp.json()["data"]["account"]
+        if not source_acct.get("code"):
+            logger.warning(f"Source pair {source_pair_address} has no code to copy")
+            return
+
+        state = [{
+            "address": template_address,
+            "nonce": 0,
+            "balance": "0",
+            "code": source_acct["code"],
+            "codeHash": source_acct["codeHash"],
+            "codeMetadata": source_acct["codeMetadata"],
+            "ownerAddress": source_acct["ownerAddress"],
+            "developerReward": "0"
+        }]
+
+        resp = requests.post(f"{self.proxy_url}/simulator/set-state", json=state)
+        if resp.status_code == 200:
+            logger.info(f"Loaded pair template bytecode at {template_address}")
+            self.advance_blocks(1)  # Finalize state change
+        else:
+            logger.error(f"Failed to load pair template bytecode: {resp.text}")
+
+    def advance_nonce_for_deploys(self, contract_address: str):
+        """Advance a deployer contract's nonce to a session-unique value.
+
+        Prevents "cannot deploy over existing account" errors when the same
+        docker session is reused across multiple test runs. Chain simulator
+        retains deployed contract bytecode between runs; when mainnet state
+        is reloaded the router nonce resets to ~684, which would cause the
+        next createPair to target an address already occupied by a prior run.
+
+        Uses the current Unix timestamp to produce a nonce unique to this
+        second-level time slot (range 10,000,000 – 19,999,999). Collision
+        probability is negligible for typical CI/dev workflows.
+
+        Only advances if the current nonce is below the computed value.
+        """
+        import time
+        proxy = ProxyNetworkProvider(self.proxy_url)
+        try:
+            acct = proxy.get_account(Address.new_from_bech32(contract_address))
+            session_nonce = int(time.time()) % 10_000_000 + 10_000_000
+            if acct.nonce < session_nonce:
+                self.apply_states([[{"address": contract_address, "nonce": session_nonce}]])
+                logger.info(f"Advanced {contract_address} nonce from {acct.nonce} to {session_nonce} for deploy isolation")
+        except Exception as exc:
+            logger.warning(f"Could not advance nonce for {contract_address}: {exc}")
+
     def advance_blocks(self, number_of_blocks: int):
         url = f"{self.proxy_url}/simulator/generate-blocks/{number_of_blocks}"
+        response = requests.post(url)
+        return response.json()
+
+    def generate_blocks_until_tx_processed(self, tx_hash: str, max_num_blocks: int = 30):
+        """Generate blocks until a transaction is fully processed (cross-shard included).
+
+        Uses the chain simulator's dedicated endpoint that generates blocks on ALL shards
+        until the transaction reaches a final state (success or failure).
+
+        Args:
+            tx_hash: Transaction hash to wait for
+            max_num_blocks: Maximum blocks to generate before stopping (default 30)
+        """
+        url = f"{self.proxy_url}/simulator/generate-blocks-until-transaction-processed/{tx_hash}"
+        if max_num_blocks != 20:  # 20 is the server default
+            url += f"?maxNumBlocks={max_num_blocks}"
         response = requests.post(url)
         return response.json()
     
@@ -219,13 +525,33 @@ class ChainSimulator:
         blocks_to_advance = self.blocks_per_epoch * number_of_epochs
         return self.advance_blocks(blocks_to_advance)
     
-    def advance_epochs_to_epoch(self, target_epoch: int):
+    def advance_epochs_to_epoch(self, target_epoch: int, chunk_size: int = 500):
+        """Advance the chain simulator to a specific epoch.
+
+        Uses the dedicated /simulator/generate-blocks-until-epoch-reached endpoint
+        which handles epoch transitions internally. For large jumps, advances in
+        chunks to avoid HTTP 500 errors from generating too many blocks at once.
+
+        Args:
+            target_epoch: Target epoch number to reach
+            chunk_size: Maximum epochs to advance per API call (default 500)
+        """
         proxy = ProxyNetworkProvider(self.proxy_url)
         current_epoch = proxy.get_network_status().current_epoch
         if current_epoch >= target_epoch:
             return
-        blocks_to_advance = (target_epoch - current_epoch) * self.blocks_per_epoch
-        return self.advance_blocks(blocks_to_advance)
+
+        logger.info(f"Advancing from epoch {current_epoch} to {target_epoch}...")
+        while current_epoch < target_epoch:
+            chunk_target = min(current_epoch + chunk_size, target_epoch)
+            url = f"{self.proxy_url}/simulator/generate-blocks-until-epoch-reached/{chunk_target}"
+            response = requests.post(url)
+            if response.status_code != 200:
+                logger.warning(f"Epoch advancement returned {response.status_code}, retrying...")
+            current_epoch = proxy.get_network_status().current_epoch
+            logger.info(f"  ... reached epoch {current_epoch}")
+
+        return current_epoch
 
     def _update_docker_compose(self, block: int, round: int, epoch: int):
         # Load the docker-compose.yaml file
@@ -235,12 +561,11 @@ class ChainSimulator:
         # Locate the chain-simulator service
         chain_simulator = docker_compose['services'].get('chain-simulator', {})
         
-        # Update the entrypoint
+        # Update the entrypoint — supernova image doesn't have the old config
+        # file paths; skip sed commands and non-zero initial epoch/round/nonce
+        # (non-zero values break cross-shard transactions permanently).
         chain_simulator['entrypoint'] = (
-            "/bin/bash -c \" sed -i 's|http://localhost:9200|http://elasticsearch:9200|g' ./config/node/config/external.toml "
-            "&& sed -i '11i\\    { File = \\\"enableEpochs.toml\\\", Path = \\\"EnableEpochs.StakingV2EnableEpoch\\\", Value = 0},' ./config/nodeOverrideDefault.toml "
-            # f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}\""
-            f"&& ./start-with-services.sh -log-level *:INFO --initial-round={round} --initial-nonce={block} --initial-epoch={epoch} --rounds-per-epoch={BLOCKS_PER_EPOCH}\""
+            f"/bin/bash -c \"./start-with-services.sh -log-level *:INFO --rounds-per-epoch={BLOCKS_PER_EPOCH} --supernova-rounds-per-epoch={BLOCKS_PER_EPOCH}\""
         )
         
         # Save the modified docker-compose.yaml file
@@ -248,6 +573,104 @@ class ChainSimulator:
             yaml.dump(docker_compose, file, default_flow_style=False, sort_keys=False)
         
         logger.info(f"Updated {self.docker_path / 'docker-compose.yaml'} with block {block}, round {round}, epoch {epoch}.")
+
+    def ensure_contract_state_from_mainnet(self, contract_address: str,
+                                              mainnet_gateway: str = "https://gateway.multiversx.com",
+                                              filter_first_week_epoch: bool = True,
+                                              filter_boosted_yields_weeks: bool = False,
+                                              reset_last_reward_timestamps: bool = False):
+        """Load a contract's full state (bytecode + storage) from mainnet onto the chain simulator.
+
+        Checks if the contract has code on the chain sim. If not, fetches the account data
+        and all storage keys from the mainnet gateway and loads them via set-state API.
+        Optionally overrides firstWeekStartEpoch to 0 for boosted contracts.
+        Optionally removes boosted yields week-dependent keys that reference mainnet week
+        numbers incompatible with chain simulator epochs.
+
+        Args:
+            contract_address: Bech32 address of the contract
+            mainnet_gateway: Mainnet proxy gateway URL
+            filter_first_week_epoch: If True, override firstWeekStartEpoch to 0
+            filter_boosted_yields_weeks: If True, remove all boosted yields week keys
+            reset_last_reward_timestamps: If True, reset lastRewardTimestamp and
+                lastRewardBlockNonce to 0. Required when chain sim starts at round 0
+                (timestamp ~0) but mainnet state has high Unix timestamps — without
+                this, elapsed = 0 - mainnet_timestamp wraps to a huge u64, exhausting
+                the reward capacity instantly on the first claim.
+        """
+        # 1. Check if contract already has code on chain sim
+        resp = requests.get(f"{self.proxy_url}/address/{contract_address}")
+        if resp.status_code != 200:
+            logger.warning(f"Cannot check contract {contract_address}: {resp.status_code}")
+            return False
+        local_acct = resp.json()["data"]["account"]
+        if local_acct.get("code"):
+            logger.info(f"Contract {contract_address} already has code on chain sim")
+            return True
+
+        # 2. Fetch account data from mainnet
+        logger.info(f"Fetching contract state from mainnet: {contract_address}")
+        mainnet_proxy = ProxyNetworkProvider(mainnet_gateway)
+
+        # Get account data (code, balance, nonce, etc.)
+        account_data = get_account_data_online(contract_address, mainnet_gateway)
+        if not account_data or not account_data.get("code"):
+            logger.error(f"Contract {contract_address} has no code on mainnet")
+            return False
+
+        # Get all storage keys
+        keys = get_account_keys_online(contract_address, mainnet_gateway)
+
+        # 3. Apply filtering
+        if filter_first_week_epoch and keys:
+            if FIRST_WEEK_START_EPOCH_KEY in keys:
+                old_value = keys[FIRST_WEEK_START_EPOCH_KEY]
+                keys[FIRST_WEEK_START_EPOCH_KEY] = ""
+                logger.info(f"Overrode firstWeekStartEpoch for {contract_address}: {old_value} -> 0")
+
+        if filter_boosted_yields_weeks and keys:
+            keys_to_remove = [
+                k for k in keys
+                if any(k.startswith(prefix) for prefix in BOOSTED_YIELDS_WEEK_KEY_PREFIXES)
+            ]
+            for k in keys_to_remove:
+                del keys[k]
+            if keys_to_remove:
+                logger.info(f"Filtered {len(keys_to_remove)} boosted yields week keys for {contract_address}")
+
+        if reset_last_reward_timestamps and keys:
+            for key_variants, label in [
+                (LAST_REWARD_TIMESTAMP_KEYS, "lastRewardTimestamp"),
+                (LAST_REWARD_BLOCK_NONCE_KEYS, "lastRewardBlockNonce"),
+            ]:
+                for key in key_variants:
+                    if key in keys:
+                        old_value = keys[key]
+                        keys[key] = ""
+                        logger.info(f"Reset {label} for {contract_address}: {old_value} -> 0")
+
+        # 4. Build set-state payload
+        account_data.pop("rootHash", None)
+        state_entry = {
+            "address": contract_address,
+            "nonce": account_data.get("nonce", 0),
+            "balance": account_data.get("balance", "0"),
+            "code": account_data.get("code", ""),
+            "codeHash": account_data.get("codeHash", ""),
+            "codeMetadata": account_data.get("codeMetadata", ""),
+            "ownerAddress": account_data.get("ownerAddress", ""),
+            "developerReward": account_data.get("developerReward", "0"),
+        }
+        if keys:
+            state_entry["pairs"] = keys
+
+        # 5. Load onto chain sim (auto-chunks large storage)
+        if self._send_single_state(state_entry):
+            self.advance_blocks(1)
+            return True
+        else:
+            logger.error(f"Failed to load contract state for {contract_address}")
+            return False
 
     def fund_users_w_egld(self, users: list[str], amount: int):
         for user in users:

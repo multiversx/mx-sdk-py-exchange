@@ -83,7 +83,7 @@ def _estimate_input_for_output(
     Uses the constant product formula:
     amount_in = (reserve_in * amount_out) / (reserve_out - amount_out) + 1
 
-    Then adds fee adjustment (0.3% fee -> multiply by 1000/997).
+    Then adds fee adjustment using the actual configured fee from the contract.
     """
     reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
 
@@ -97,11 +97,20 @@ def _estimate_input_for_output(
     if desired_output >= reserve_out:
         return reserve_in * 10  # Return a very large amount
 
-    # Constant product formula with fee (3% total fee = 300 basis points)
+    # Query actual fee from contract
+    pair_data_fetcher = PairContractDataFetcher(
+        Address.new_from_bech32(pair_contract.address),
+        network_providers.proxy.url
+    )
+    total_fee = pair_data_fetcher.get_data("getTotalFeePercent")
+    # total_fee is in /100000 units. Convert to /10000 for the formula.
+    fee_in_10k = total_fee // 10  # e.g., 300/100000 -> 30/10000
+
+    # Constant product formula with fee
     # amount_in_no_fee = (reserve_in * desired_output) / (reserve_out - desired_output)
-    # With fee: amount_in = amount_in_no_fee * 10000 / (10000 - total_fee)
+    # With fee: amount_in = amount_in_no_fee * 10000 / (10000 - fee_in_10k)
     numerator = reserve_in * desired_output * 10000
-    denominator = (reserve_out - desired_output) * (10000 - 300)
+    denominator = (reserve_out - desired_output) * (10000 - fee_in_10k)
     estimated_input = numerator // denominator + 1
 
     return estimated_input
@@ -165,15 +174,16 @@ class TestSwapFixedOutput:
         reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         k_before = reserves_before[0] * reserves_before[1]
 
-        # Desired output: a reasonable amount of second token
-        desired_output = nominated_amount(5)
+        # Desired output: 1% of the second token reserve (safe for any token decimals)
+        desired_output = reserves_before[1] // 100
+        assert desired_output > 0, "Pool must have non-zero second reserve"
 
         # Estimate input needed and set max to 2x for safety
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.firstToken, desired_output, network_providers
         )
         max_input = estimated_input * 2
-        logger.info(f"Requesting {desired_output / 10**18:.4f} secondToken, estimated input: {estimated_input / 10**18:.4f}, max: {max_input / 10**18:.4f}")
+        logger.info(f"Requesting {desired_output} secondToken (1% of reserve), estimated input: {estimated_input}, max: {max_input}")
 
         # 2. ARRANGE: Fund Alice
         ensure_esdt_amounts(alice, {pair_contract.firstToken: max_input})
@@ -209,21 +219,24 @@ class TestSwapFixedOutput:
         )
         logger.info(f"Alice received exactly {actual_output / 10**18:.4f} secondToken")
 
-        # 6. ASSERT: Input deducted <= max_input
+        # 6. ASSERT: Input deducted is exactly the estimated input (contract refunds excess)
         alice_first_after = network_providers.proxy.get_token_of_account(alice.address, token_first).amount
         actual_input_spent = alice_first_before - alice_first_after
 
-        assert actual_input_spent <= max_input, (
-            f"Input spent should not exceed max.\n"
-            f"Max: {max_input}, Spent: {actual_input_spent}"
+        assert actual_input_spent == estimated_input, (
+            f"Input spent does not match estimated input.\n"
+            f"Estimated: {estimated_input}, Spent: {actual_input_spent}"
         )
-        assert actual_input_spent > 0, "Some input should have been spent"
-        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} (max was {max_input / 10**18:.4f})")
+        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} (estimated {estimated_input / 10**18:.4f})")
 
-        # 7. ASSERT: Reserves consistent
+        # 7. ASSERT: Reserves changed by exact amounts
         reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
-        assert reserves_after[0] > reserves_before[0], "First reserve should increase"
-        assert reserves_after[1] < reserves_before[1], "Second reserve should decrease"
+        assert reserves_before[1] - reserves_after[1] == desired_output, (
+            f"Second reserve should decrease by exactly {desired_output} (output token removed).\n"
+            f"Before: {reserves_before[1]}, After: {reserves_after[1]}, Delta: {reserves_before[1] - reserves_after[1]}"
+        )
+        # Note: reserve increase for input < actual_input_spent because special fee goes to fee collector
+        assert reserves_after[0] > reserves_before[0], "First reserve should increase from input"
 
         # 8. ASSERT: Constant product holds
         PairAssertions.assert_constant_product_holds(
@@ -266,7 +279,10 @@ class TestSwapFixedOutput:
         reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         k_before = reserves_before[0] * reserves_before[1]
 
-        desired_output = nominated_amount(5)
+        # Desired output: 1% of the first token reserve (safe for any token decimals)
+        desired_output = reserves_before[0] // 100
+        assert desired_output > 0, "Pool must have non-zero first reserve"
+
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.secondToken, desired_output, network_providers
         )
@@ -303,14 +319,21 @@ class TestSwapFixedOutput:
             f"Requested: {desired_output}, Received: {actual_output}"
         )
 
-        # 6. ASSERT: Input deducted <= max_input
+        # 6. ASSERT: Input deducted is exactly the estimated input (contract refunds excess)
         alice_second_after = network_providers.proxy.get_token_of_account(alice.address, token_second).amount
         actual_input_spent = alice_second_before - alice_second_after
 
-        assert actual_input_spent <= max_input, (
-            f"Input spent exceeds max.\nMax: {max_input}, Spent: {actual_input_spent}"
+        assert actual_input_spent == estimated_input, (
+            f"Input spent does not match estimated input.\n"
+            f"Estimated: {estimated_input}, Spent: {actual_input_spent}"
         )
-        assert actual_input_spent > 0, "Some input should have been spent"
+
+        # 6b. ASSERT: Output reserve delta is exactly desired_output
+        reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        assert reserves_before[0] - reserves_after[0] == desired_output, (
+            f"First reserve should decrease by exactly {desired_output}.\n"
+            f"Before: {reserves_before[0]}, After: {reserves_after[0]}, Delta: {reserves_before[0] - reserves_after[0]}"
+        )
 
         # 7. ASSERT: Constant product holds
         PairAssertions.assert_constant_product_holds(
@@ -350,14 +373,17 @@ class TestSwapFixedOutput:
             blockchain_controller, ensure_esdt_amounts
         )
 
-        # 1. ARRANGE: Calculate amounts
-        desired_output = nominated_amount(5)
+        # 1. ARRANGE: Calculate amounts (1% of second reserve, safe for any token decimals)
+        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        desired_output = reserves[1] // 100
+        assert desired_output > 0, "Pool must have non-zero second reserve"
+
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.firstToken, desired_output, network_providers
         )
         # Tight max: only 5% above estimated
         tight_max_input = int(estimated_input * 1.05)
-        logger.info(f"Estimated input: {estimated_input / 10**18:.4f}, tight max: {tight_max_input / 10**18:.4f}")
+        logger.info(f"Estimated input: {estimated_input}, tight max: {tight_max_input}")
 
         # 2. ARRANGE: Fund Alice
         ensure_esdt_amounts(alice, {pair_contract.firstToken: tight_max_input})
@@ -379,19 +405,15 @@ class TestSwapFixedOutput:
         # 4. ASSERT: Transaction success
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
-        # 5. ASSERT: Input within tight max
+        # 5. ASSERT: Input spent is exactly the estimated input (contract refunds excess)
         alice_first_after = network_providers.proxy.get_token_of_account(alice.address, token_first).amount
         actual_input_spent = alice_first_before - alice_first_after
 
-        assert actual_input_spent <= tight_max_input, (
-            f"Input spent should be within tight max.\n"
-            f"Max: {tight_max_input}, Spent: {actual_input_spent}"
+        assert actual_input_spent == estimated_input, (
+            f"Input spent does not match estimated input.\n"
+            f"Estimated: {estimated_input}, Spent: {actual_input_spent}"
         )
-        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} <= max {tight_max_input / 10**18:.4f}")
-
-        # Verify input is close to estimated (within 10% tolerance)
-        input_variance = abs(actual_input_spent - estimated_input) / estimated_input if estimated_input > 0 else 0
-        logger.info(f"Input variance from estimate: {input_variance:.2%}")
+        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} == estimated {estimated_input / 10**18:.4f}")
 
         logger.info("Test passed: Tight max input swap successful")
 
@@ -429,13 +451,16 @@ class TestSwapFixedOutput:
         # 1. ARRANGE: Calculate amounts
         reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
 
-        desired_output = nominated_amount(5)
+        # Desired output: 1% of second reserve (safe for any token decimals)
+        desired_output = reserves_before[1] // 100
+        assert desired_output > 0, "Pool must have non-zero second reserve"
+
         estimated_input = _estimate_input_for_output(
             pair_contract, pair_contract.firstToken, desired_output, network_providers
         )
         # Set max to only 50% of estimated (too low)
         insufficient_max = estimated_input // 2
-        logger.info(f"Estimated input: {estimated_input / 10**18:.4f}, insufficient max: {insufficient_max / 10**18:.4f}")
+        logger.info(f"Estimated input: {estimated_input}, insufficient max: {insufficient_max}")
 
         # Fund Alice with the insufficient max
         ensure_esdt_amounts(alice, {pair_contract.firstToken: insufficient_max})
@@ -456,8 +481,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (max input too low for required amount)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Slippage exceeded"
+        )
         logger.info("Transaction failed as expected (insufficient max input)")
 
         # 4. ASSERT: Reserves unchanged
@@ -617,8 +644,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (output > reserve causes BigUint underflow)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Not enough reserve"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -677,8 +706,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (contract rejects 0 output)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Invalid args"
+        )
         logger.info("Transaction failed as expected")
 
         # 4. ASSERT: Reserves unchanged
@@ -739,8 +770,10 @@ class TestSwapFixedOutput:
         tx_hash = pair_contract.swap_fixed_output(network_providers, alice, event)
         blockchain_controller.wait_for_tx(tx_hash)
 
-        # 3. ASSERT: Transaction FAILED
-        TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
+        # 3. ASSERT: Transaction FAILED (contract rejects unknown output token)
+        TransactionAssertions.assert_transaction_failed(
+            tx_hash, network_providers.proxy, expected_error="Invalid tokens"
+        )
         logger.info("Transaction failed as expected (wrong output token)")
 
         # 4. ASSERT: Reserves unchanged

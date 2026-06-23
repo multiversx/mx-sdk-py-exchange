@@ -100,7 +100,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         gas_limit = 50000000
 
         tokens = [ESDTToken(event.farming_tk, event.farming_tk_nonce, event.farming_tk_amount)]
-        if event.farm_tk:
+        if event.farm_tk and event.farm_tk_amount > 0:
             tokens.append(ESDTToken(event.farm_tk, event.farm_tk_nonce, event.farm_tk_amount))
 
         sc_args = [tokens,

@@ -62,7 +62,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--docker-path",
         action="store",
-        default=str(Path.home() / "Projects/testing/full-stack-docker-compose/chain-simulator"),
+        default=str(Path(__file__).parent.parent),
         help="Path to chain simulator docker-compose directory (only for chainsim)"
     )
     parser.addoption(
@@ -224,13 +224,24 @@ def blockchain_controller(test_environment):
             """
             Wait for transaction to be processed.
 
+            For chain simulator: uses generate-blocks-until-transaction-processed
+            endpoint which handles cross-shard finalization automatically.
+            Falls back to generating fixed block count if endpoint unavailable.
+
             Args:
                 tx_hash: Transaction hash
-                blocks: Number of blocks to wait (default 1)
+                blocks: Number of blocks to wait (used as max for chainsim,
+                        multiplied by 6s for live networks)
             """
             if self.env.supports_time_control():
-                logger.debug(f"Advancing {blocks} block(s) for tx {tx_hash}")
-                self.env.advance_blocks(blocks)
+                from tests.environments import ChainsimEnvironment
+                if isinstance(self.env, ChainsimEnvironment):
+                    max_blocks = max(blocks, 30)
+                    logger.debug(f"Generating blocks until tx {tx_hash} processed (max {max_blocks})")
+                    self.env.generate_blocks_until_tx_processed(tx_hash, max_blocks)
+                else:
+                    logger.debug(f"Advancing {blocks} block(s) for tx {tx_hash}")
+                    self.env.advance_blocks(blocks)
             else:
                 wait_time = blocks * 6  # ~6 seconds per block
                 logger.debug(f"Waiting {wait_time}s for tx {tx_hash}")
@@ -371,7 +382,94 @@ def dex_context(test_environment, network_proxy, request) -> Context:
     # Verify we have contracts
     context.deploy_structure.print_deployed_contracts()
 
+    # Ensure pair template has bytecode (needed for Router.createPair on chain simulator)
+    if test_environment.supports_time_control() and test_environment.has_pre_existing_state():
+        _ensure_pair_template_loaded(context, test_environment)
+        _ensure_farm_state_loaded(context, test_environment)
+        _ensure_staking_state_loaded(context, test_environment)
+
     return context
+
+
+def _ensure_pair_template_loaded(context: Context, env):
+    """Ensure the Router's pair template contract has bytecode loaded on chain simulator.
+
+    When mainnet state is loaded, the Router references a pair template address for
+    deployFromSourceContract, but the template's own bytecode may not be in the state dump.
+    This copies bytecode from an existing pair contract to the template address.
+    """
+    routers = context.get_contracts(config.ROUTER_V2)
+    pairs = context.get_contracts(config.PAIRS_V2)
+    if routers and pairs and hasattr(env, 'chain_sim') and env.chain_sim:
+        env.chain_sim.ensure_pair_template_has_code(routers[0].address, pairs[0].address)
+
+
+def _ensure_farm_state_loaded(context: Context, env):
+    """Ensure farm contract state is loaded on chain simulator.
+
+    Farm contracts are not included in the default state dump. This fetches
+    their full state (bytecode + storage) from mainnet and loads it onto the
+    chain simulator via set-state API.
+    """
+    from tests.environments import ChainsimEnvironment
+    if not isinstance(env, ChainsimEnvironment) or not env.chain_sim:
+        return
+
+    farms = context.get_contracts(config.FARMS_LOCKED)
+    if not farms:
+        logger.debug("No farms_locked contracts configured, skipping farm state loading")
+        return
+
+    for farm in farms:
+        try:
+            env.chain_sim.ensure_contract_state_from_mainnet(
+                farm.address,
+                filter_boosted_yields_weeks=True,
+                reset_last_reward_timestamps=True,
+            )
+        except Exception as e:
+            logger.warning(f"Could not load farm state for {farm.address}: {e}")
+
+
+def _ensure_staking_state_loaded(context: Context, env):
+    """Ensure staking contract state is loaded on chain simulator.
+
+    Staking contracts are not included in the default state dump. This fetches
+    their full state (bytecode + storage) from mainnet and loads it onto the
+    chain simulator via set-state API.
+
+    Filters:
+    - filter_first_week_epoch=True: Override firstWeekStartEpoch to 0
+    - filter_boosted_yields_weeks=True: Remove week-dependent keys (CRITICAL for both V2 and V3Boosted)
+
+    Note: Even V2 staking contracts need boosted yields week filtering because
+    they store week-related state that's incompatible with chain sim epochs.
+    """
+    from tests.environments import ChainsimEnvironment
+    if not isinstance(env, ChainsimEnvironment) or not env.chain_sim:
+        return
+
+    # Try V2 staking contracts first
+    stakings = context.get_contracts(config.STAKINGS_V2)
+    if not stakings:
+        # Try V3Boosted staking contracts
+        stakings = context.get_contracts(config.STAKINGS_BOOSTED)
+
+    if not stakings:
+        logger.debug("No staking contracts configured, skipping staking state loading")
+        return
+
+    for staking in stakings:
+        try:
+            env.chain_sim.ensure_contract_state_from_mainnet(
+                staking.address,
+                filter_first_week_epoch=True,          # Override week start for chain sim
+                filter_boosted_yields_weeks=True,      # CRITICAL: Remove week keys for both V2 and V3
+                reset_last_reward_timestamps=True,     # Reset to 0: chain sim starts at timestamp ~0,
+                                                       # mainnet timestamps ~1.7B → elapsed underflows
+            )
+        except Exception as e:
+            logger.warning(f"Could not load staking state for {staking.address}: {e}")
 
 
 # ============================================================================
@@ -427,6 +525,48 @@ def farm_contract(dex_context) -> FarmContract:
     if not farms:
         pytest.skip("No Farm contracts deployed")
     return farms[0]
+
+
+@pytest.fixture
+def staking_contract(dex_context):
+    """
+    Get a Staking contract for testing.
+
+    Returns:
+        StakingContract: First deployed Staking contract (V2 or V3Boosted)
+
+    Raises:
+        pytest.skip: If no staking contracts deployed
+    """
+    # Try V2 staking contracts first
+    stakings = dex_context.get_contracts(config.STAKINGS_V2)
+    if not stakings:
+        # Try V3Boosted staking contracts
+        stakings = dex_context.get_contracts(config.STAKINGS_BOOSTED)
+    if not stakings:
+        pytest.skip("No Staking contracts deployed")
+    return stakings[0]
+
+
+@pytest.fixture
+def all_staking_contracts(dex_context):
+    """
+    Get all deployed Staking contracts.
+
+    Returns:
+        List[StakingContract]: All deployed Staking contracts (V2 or V3Boosted)
+
+    Raises:
+        pytest.skip: If no staking contracts deployed
+    """
+    # Try V2 staking contracts first
+    stakings = dex_context.get_contracts(config.STAKINGS_V2)
+    if not stakings:
+        # Try V3Boosted staking contracts
+        stakings = dex_context.get_contracts(config.STAKINGS_BOOSTED)
+    if not stakings:
+        pytest.skip("No Staking contracts deployed")
+    return stakings
 
 
 @pytest.fixture
@@ -830,7 +970,9 @@ def isolated_pair_factory(
         blockchain_controller.wait_for_tx(tx_hash_1, blocks=8)
 
         tx_data_1 = network_providers.proxy.get_transaction(tx_hash_1)
-        issue_event_1 = find_events_by_identifier(tx_data_1, "issue")[0]
+        issue_events_1 = find_events_by_identifier(tx_data_1, "issue")
+        assert issue_events_1, f"No 'issue' events found for token issuance tx {tx_hash_1}. Status: {tx_data_1.status}"
+        issue_event_1 = issue_events_1[0]
         first_token = issue_event_1.topics[0].decode('utf-8') if isinstance(issue_event_1.topics[0], bytes) else str(issue_event_1.topics[0])
         logger.info(f"First token issued: {first_token}")
 
@@ -845,11 +987,22 @@ def isolated_pair_factory(
         blockchain_controller.wait_for_tx(tx_hash_2, blocks=8)
 
         tx_data_2 = network_providers.proxy.get_transaction(tx_hash_2)
-        issue_event_2 = find_events_by_identifier(tx_data_2, "issue")[0]
+        issue_events_2 = find_events_by_identifier(tx_data_2, "issue")
+        assert issue_events_2, f"No 'issue' events found for token issuance tx {tx_hash_2}. Status: {tx_data_2.status}"
+        issue_event_2 = issue_events_2[0]
         second_token = issue_event_2.topics[0].decode('utf-8') if isinstance(issue_event_2.topics[0], bytes) else str(issue_event_2.topics[0])
         logger.info(f"Second token issued: {second_token}")
 
         # Deploy new pair via router
+        # Advance router nonce to a session-unique value to avoid deploying to an
+        # address already occupied by a pair from a previous test run (chain sim
+        # retains bytecode between sessions; mainnet state reload resets the router
+        # nonce back to ~684 which would otherwise collide).
+        if test_environment.supports_time_control():
+            from tests.environments import ChainsimEnvironment
+            if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+                test_environment.chain_sim.advance_nonce_for_deploys(router_contract.address)
+
         owner.sync_nonce(network_providers.proxy)
         deploy_args = [
             first_token,
@@ -894,4 +1047,22 @@ def isolated_pair_factory(
         logger.info(f"Isolated pair ready: {pair_address}")
         return pair, first_token, second_token
 
-    return _create_isolated_pair
+    yield _create_isolated_pair
+
+    # Teardown: clear code of all deployed isolated pairs so chain simulator
+    # does not retain them across test sessions (prevents "cannot deploy over
+    # existing account" on next run when router nonce resets to mainnet value).
+    if created_pairs and test_environment.supports_time_control():
+        from tests.environments import ChainsimEnvironment
+        if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+            for pair in created_pairs:
+                try:
+                    test_environment.chain_sim.apply_states([[{
+                        "address": pair.address,
+                        "code": "",
+                        "codeHash": "",
+                        "codeMetadata": "",
+                    }]])
+                    logger.info(f"Cleared code for isolated pair {pair.address}")
+                except Exception as exc:
+                    logger.warning(f"Could not clear isolated pair code {pair.address}: {exc}")

@@ -48,7 +48,7 @@ class DataFetcher:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            return [int(elem.hex(), base=16) for elem in result.return_data_parts]
+            return [int(elem.hex(), base=16) if elem else 0 for elem in result.return_data_parts]
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
             if result:
@@ -175,6 +175,7 @@ class FarmContractDataFetcher(DataFetcher):
             "getFarmTokenId": self._get_hex_view,
             "getFarmingTokenId": self._get_hex_view,
             "getRewardTokenId": self._get_hex_view,
+            "getLockingScAddress": self._get_hex_view,
             "getState": self._get_int_view,
             "getPairContractManagedAddress": self._get_hex_view,
             "getUserTotalFarmPosition": self._get_int_view,
@@ -188,6 +189,7 @@ class FarmContractDataFetcher(DataFetcher):
             "getTotalLockedTokensForWeek": self._get_int_view,
             "getTotalEnergyForWeek": self._get_int_view,
             "getTotalRewardsForWeek": self._get_int_view,
+            "getBoostedYieldsRewardsPercentage": self._get_int_view,
             "getRemainingBoostedRewardsToDistribute": self._get_int_view,
             "getUndistributedBoostedRewards": self._get_int_view,
             "getPermissions": self._get_int_view,
@@ -199,6 +201,7 @@ class PairContractDataFetcher(DataFetcher):
         super().__init__(contract_address, proxy_url)
         self.view_handler_map = {
             "getAmountOut": self._get_int_view,
+            "getAmountIn": self._get_int_view,
             "getEquivalent": self._get_int_view,
             "getTotalFeePercent": self._get_int_view,
             "getSpecialFee": self._get_int_view,
@@ -217,6 +220,11 @@ class PairContractDataFetcher(DataFetcher):
             "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
             "getPriceObservation": self._get_hex_list_view,
             "getSafePriceRoundSaveInterval": self._get_int_view,
+            "getSafePriceCurrentIndex": self._get_int_view,
+            "getSafePriceByDefaultOffset": self._get_hex_view,
+            "getLpTokensSafePriceByDefaultOffset": self._get_hex_list_view,
+            "getLpTokensSafePriceByRoundOffset": self._get_hex_list_view,
+            "getCurrentPriceObservation": self._get_hex_view,
             "getFeesCollectorAddress": self._get_hex_view
         }
 
