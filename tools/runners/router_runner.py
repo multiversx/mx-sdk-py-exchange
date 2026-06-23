@@ -119,7 +119,7 @@ def upgrade_template_pair_contract(args: Any):
     template_pair.version = PairContractVersion.V2
     args = [config.ZERO_CONTRACT_ADDRESS, config.ZERO_CONTRACT_ADDRESS,
             config.ZERO_CONTRACT_ADDRESS, 0, 0, config.ZERO_CONTRACT_ADDRESS]
-    tx_hash = template_pair.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, args)
+    tx_hash = template_pair.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, [], no_init=True)
 
     if not network_providers.check_complex_tx_status(tx_hash, f"upgrade template pair contract: {template_pair_address}"):
         if not get_user_continue():
