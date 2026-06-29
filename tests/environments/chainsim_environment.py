@@ -9,14 +9,13 @@ Provides a controllable local blockchain for testing with:
 """
 
 from pathlib import Path
-from typing import Optional, List
+
 from multiversx_sdk import NetworkProviderConfig, ProxyNetworkProvider
 
 from tests.environments.base_environment import TestEnvironment
 from tools.chain_simulator_connector import ChainSimulator
-from utils.utils_tx import NetworkProviders
 from utils.logger import get_logger
-
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -37,14 +36,16 @@ class ChainsimEnvironment(TestEnvironment):
     and user has proper permissions. State files may contain sensitive addresses.
     """
 
-    def __init__(self,
-                 docker_path: Path,
-                 state_path: Optional[Path] = None,
-                 initial_block: int = 0,
-                 initial_round: int = 0,
-                 initial_epoch: int = 0,
-                 proxy_url: str = "http://localhost:8085",
-                 api_url: str = "http://localhost:3001"):
+    def __init__(
+        self,
+        docker_path: Path,
+        state_path: Path | None = None,
+        initial_block: int = 0,
+        initial_round: int = 0,
+        initial_epoch: int = 0,
+        proxy_url: str = "http://localhost:8085",
+        api_url: str = "http://localhost:3001",
+    ):
         """
         Initialize chain simulator environment.
 
@@ -68,10 +69,10 @@ class ChainsimEnvironment(TestEnvironment):
         self.initial_epoch = initial_epoch
         self.proxy_url = proxy_url
         self.api_url = api_url
-        self.chain_sim: Optional[ChainSimulator] = None
-        self.loaded_accounts: List[str] = []
-        self._proxy: Optional[ProxyNetworkProvider] = None
-        self._network_providers: Optional[NetworkProviders] = None
+        self.chain_sim: ChainSimulator | None = None
+        self.loaded_accounts: list[str] = []
+        self._proxy: ProxyNetworkProvider | None = None
+        self._network_providers: NetworkProviders | None = None
         self._externally_started: bool = False
         self._state_loaded: bool = False
 
@@ -103,9 +104,7 @@ class ChainsimEnvironment(TestEnvironment):
         else:
             logger.info("Starting chain simulator...")
             self.chain_sim.start(
-                block=self.initial_block,
-                round=self.initial_round,
-                epoch=self.initial_epoch
+                block=self.initial_block, round=self.initial_round, epoch=self.initial_epoch
             )
 
             if not self.chain_sim.is_running():
@@ -121,7 +120,9 @@ class ChainsimEnvironment(TestEnvironment):
         logger.info("Chain simulator ready")
 
         # Initialize proxy (for internal use)
-        self._proxy = ProxyNetworkProvider(self.chain_sim.proxy_url, None, NetworkProviderConfig("py-sdk-exchange"))
+        self._proxy = ProxyNetworkProvider(
+            self.chain_sim.proxy_url, None, NetworkProviderConfig("py-sdk-exchange")
+        )
         assert self._proxy is not None, "Failed to initialize proxy"
 
         # Initialize network providers
@@ -131,7 +132,7 @@ class ChainsimEnvironment(TestEnvironment):
         if self.state_path and self.state_path.exists():
             logger.info(f"Loading state from {self.state_path}")
             self.loaded_accounts = self.chain_sim.init_state_from_folder(
-                self.state_path, filter_safe_price=True
+                self.state_path, filter_safe_price=False
             )
             self._state_loaded = True
             logger.info(f"Loaded state for {len(self.loaded_accounts)} accounts")
@@ -141,7 +142,9 @@ class ChainsimEnvironment(TestEnvironment):
 
         # Verify connectivity
         status = self._proxy.get_network_status()
-        logger.info(f"Chain simulator ready at epoch {status.current_epoch}, block {status.highest_final_block_nonce}")
+        logger.info(
+            f"Chain simulator ready at epoch {status.current_epoch}, block {status.highest_final_block_nonce}"
+        )
 
     def teardown(self) -> None:
         """
@@ -241,7 +244,7 @@ class ChainsimEnvironment(TestEnvironment):
 
         Example:
             >>> env.advance_to_epoch(10)  # Jump to epoch 10
-            >>> env.advance_to_epoch(5)   # No-op, already past epoch 5
+            >>> env.advance_to_epoch(5)  # No-op, already past epoch 5
         """
         if not self.chain_sim:
             raise RuntimeError("Chain simulator not running")
@@ -291,7 +294,7 @@ class ChainsimEnvironment(TestEnvironment):
 
         return self._proxy.get_network_status().highest_final_block_nonce
 
-    def get_loaded_accounts(self) -> List[str]:
+    def get_loaded_accounts(self) -> list[str]:
         """
         Get list of accounts loaded from state.
 

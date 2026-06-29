@@ -2,16 +2,15 @@ services:
   chain-simulator:
     container_name: chain-simulator
     ports:
-    - 8085:8085
-    image: chainsimulator:supernova
-    entrypoint: /bin/bash -c "./start-with-services.sh -log-level *:INFO --rounds-per-epoch=10
-      --supernova-rounds-per-epoch=10"
+      - 8085:8085
+    image: multiversx/chainsimulator:v1.11.3
+    entrypoint: /bin/bash -c "./start-with-services.sh -log-level *:INFO --rounds-per-epoch=10 --initial-round=31105820 --initial-nonce=31074633"
     healthcheck:
       test:
-      - CMD
-      - curl
-      - -f
-      - http://127.0.0.1:8085/simulator/observers
+        - CMD
+        - curl
+        - -f
+        - http://127.0.0.1:8085/simulator/observers
       interval: 10s
       timeout: 5s
       retries: 5
