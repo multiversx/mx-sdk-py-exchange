@@ -21,26 +21,52 @@ Run:
 """
 
 import math
-import time
-from multiversx_sdk import Address, Token
+
 import pytest
+from multiversx_sdk import Address
+from multiversx_sdk.abi import BigUIntValue, TokenIdentifierValue
 
 from contracts.pair_contract import (
-    PairContract, SwapFixedInputEvent, AddLiquidityEvent, RemoveLiquidityEvent
+    AddLiquidityEvent,
+    PairContract,
+    RemoveLiquidityEvent,
+    SwapFixedInputEvent,
+)
+from tests.helpers import PairAssertions, TransactionAssertions
+from tests.integration.pair.safe_price_helpers import (
+    build_recorded_observations as _build_recorded_observations,
+)
+from tests.integration.pair.safe_price_helpers import (
+    load_safe_price_abi as _load_safe_price_abi,
+)
+from tests.integration.pair.safe_price_helpers import (
+    pick_same_shard_account as _pick_same_shard_account,
+)
+from tests.integration.pair.safe_price_helpers import (
+    query_lp_safe_price_by_round_offset as _query_lp_safe_price_by_round_offset,
+)
+from tests.integration.pair.safe_price_helpers import (
+    query_price_observation as _query_price_observation,
+)
+from tests.integration.pair.safe_price_helpers import (
+    query_safe_price_by_offset,
+)
+from tests.integration.pair.safe_price_helpers import (
+    safe_price_vs_reference as _safe_price_vs_reference,
+)
+from tests.integration.pair.safe_price_helpers import (
+    spot_equivalent as _spot_equivalent,
 )
 from utils.contract_data_fetchers import PairContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, decode_merged_attributes
-from tests.helpers import PairAssertions, TransactionAssertions
 from utils.logger import get_logger
-from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue, AddressValue
-
+from utils.utils_chain import Account, decode_merged_attributes, nominated_amount
 
 logger = get_logger(__name__)
-
 
 # ============================================================================
 # Helpers
 # ============================================================================
+
 
 def _ensure_pool_has_liquidity(
     pair_contract: PairContract,
@@ -48,7 +74,7 @@ def _ensure_pool_has_liquidity(
     network_providers,
     blockchain_controller,
     ensure_esdt_amounts,
-    amount: int = None
+    amount: int = None,
 ):
     """Ensure pool has sufficient liquidity for tests."""
     if amount is None:
@@ -56,17 +82,16 @@ def _ensure_pool_has_liquidity(
 
     reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
     if reserves[0] == 0:
-        ensure_esdt_amounts(account, {
-            pair_contract.firstToken: amount,
-            pair_contract.secondToken: amount
-        })
+        ensure_esdt_amounts(
+            account, {pair_contract.firstToken: amount, pair_contract.secondToken: amount}
+        )
         event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
             amountA=amount,
             amountAmin=amount,
             tokenB=pair_contract.secondToken,
             amountB=amount,
-            amountBmin=amount
+            amountBmin=amount,
         )
         account.sync_nonce(network_providers.proxy)
         tx = pair_contract.add_initial_liquidity(network_providers, account, event)
@@ -84,14 +109,11 @@ def _perform_swap(
     token_in: str,
     token_out: str,
     amount: int,
-    amount_min: int = 1
+    amount_min: int = 1,
 ) -> str:
     """Perform a swap and wait for it to complete. Returns tx hash."""
     event = SwapFixedInputEvent(
-        tokenA=token_in,
-        amountA=amount,
-        tokenB=token_out,
-        amountBmin=amount_min
+        tokenA=token_in, amountA=amount, tokenB=token_out, amountBmin=amount_min
     )
     account.sync_nonce(network_providers.proxy)
     tx = pair_contract.swap_fixed_input(network_providers, account, event)
@@ -109,7 +131,7 @@ def _perform_swaps_with_block_advancement(
     num_swaps: int = 5,
     swap_amount: int = None,
     blocks_between: int = 5,
-    alternating: bool = True
+    alternating: bool = True,
 ):
     """Perform multiple swaps with block advancement between each to create observations.
 
@@ -123,10 +145,13 @@ def _perform_swaps_with_block_advancement(
     if swap_amount is None:
         swap_amount = reserves[0] // 1000  # 0.1% of first reserve
 
-    ensure_esdt_amounts(account, {
-        pair_contract.firstToken: swap_amount * num_swaps,
-        pair_contract.secondToken: swap_amount * num_swaps
-    })
+    ensure_esdt_amounts(
+        account,
+        {
+            pair_contract.firstToken: swap_amount * num_swaps,
+            pair_contract.secondToken: swap_amount * num_swaps,
+        },
+    )
 
     for i in range(num_swaps):
         if alternating and i % 2 == 1:
@@ -137,8 +162,13 @@ def _perform_swaps_with_block_advancement(
             token_out = pair_contract.secondToken
 
         _perform_swap(
-            pair_contract, account, network_providers, blockchain_controller,
-            token_in, token_out, swap_amount
+            pair_contract,
+            account,
+            network_providers,
+            blockchain_controller,
+            token_in,
+            token_out,
+            swap_amount,
         )
 
         if blocks_between > 0:
@@ -151,8 +181,7 @@ def _perform_swaps_with_block_advancement(
 def _get_safe_price_current_index(pair_contract, network_providers) -> int:
     """Query the safe price current index from the pair contract."""
     pair_data_fetcher = PairContractDataFetcher(
-        Address.new_from_bech32(pair_contract.address),
-        network_providers.proxy.url
+        Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
     )
     return pair_data_fetcher.get_data("getSafePriceCurrentIndex")
 
@@ -163,74 +192,23 @@ def _query_safe_price_legacy(pair_contract, network_providers, token_id, amount)
     Returns dict with 'token_identifier', 'token_nonce', 'amount' or None if query fails.
     """
     pair_data_fetcher = PairContractDataFetcher(
-        Address.new_from_bech32(pair_contract.address),
-        network_providers.proxy.url
+        Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
     )
 
-    from multiversx_sdk.abi import Abi
-    import config
-    abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
-
-    if not abi_path.exists():
-        logger.info(f"ABI file not found at {abi_path}")
+    abi = _load_safe_price_abi()
+    if abi is None:
         return None
-
-    abi = Abi.load(abi_path)
-    view_payload = abi.encode_custom_type(
-        "EsdtTokenPayment",
-        [token_id, 0, amount]
-    )
+    view_payload = abi.encode_custom_type("EsdtTokenPayment", [token_id, 0, amount])
 
     safe_price_hex = pair_data_fetcher.get_data(
-        "updateAndGetSafePrice",
-        [bytes.fromhex(view_payload)]
+        "updateAndGetSafePrice", [bytes.fromhex(view_payload)]
     )
 
     if safe_price_hex:
         esdt_token_payment_schema = {
-            'token_identifier': 'string',
-            'token_nonce': 'u64',
-            'amount': 'biguint',
-        }
-        return decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
-
-    return None
-
-
-def _query_safe_price_view(pair_contract, network_providers, pair_address_value,
-                           start_round, end_round, token_id, amount):
-    """Query getSafePrice view with round range. Returns decoded result or None."""
-    pair_data_fetcher = PairContractDataFetcher(
-        Address.new_from_bech32(pair_contract.address),
-        network_providers.proxy.url
-    )
-
-    from multiversx_sdk.abi import Abi, U64Value
-    import config
-    abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
-
-    if not abi_path.exists():
-        logger.info(f"ABI file not found at {abi_path}")
-        return None
-
-    abi = Abi.load(abi_path)
-    payment_payload = abi.encode_custom_type(
-        "EsdtTokenPayment",
-        [token_id, 0, amount]
-    )
-
-    pair_address = Address.new_from_bech32(pair_contract.address)
-    safe_price_hex = pair_data_fetcher.get_data(
-        "getSafePrice",
-        [AddressValue(pair_address), BigUIntValue(start_round),
-         BigUIntValue(end_round), bytes.fromhex(payment_payload)]
-    )
-
-    if safe_price_hex:
-        esdt_token_payment_schema = {
-            'token_identifier': 'string',
-            'token_nonce': 'u64',
-            'amount': 'biguint',
+            "token_identifier": "string",
+            "token_nonce": "u64",
+            "amount": "biguint",
         }
         return decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
 
@@ -240,21 +218,19 @@ def _query_safe_price_view(pair_contract, network_providers, pair_address_value,
 def _query_lp_safe_price(pair_contract, network_providers, lp_amount):
     """Query getLpTokensSafePriceByDefaultOffset. Returns list of decoded results or None."""
     pair_data_fetcher = PairContractDataFetcher(
-        Address.new_from_bech32(pair_contract.address),
-        network_providers.proxy.url
+        Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
     )
 
     pair_address = Address.new_from_bech32(pair_contract.address)
     result = pair_data_fetcher.get_data(
-        "updateAndGetTokensForGivenPositionWithSafePrice",
-        [BigUIntValue(lp_amount)]
+        "updateAndGetTokensForGivenPositionWithSafePrice", [BigUIntValue(lp_amount)]
     )
 
     if result and len(result) >= 2:
         esdt_schema = {
-            'token_identifier': 'string',
-            'token_nonce': 'u64',
-            'amount': 'biguint',
+            "token_identifier": "string",
+            "token_nonce": "u64",
+            "amount": "biguint",
         }
         first = decode_merged_attributes(result[0], esdt_schema)
         second = decode_merged_attributes(result[1], esdt_schema)
@@ -266,6 +242,7 @@ def _query_lp_safe_price(pair_contract, network_providers, lp_amount):
 # ============================================================================
 # Category 11: Safe Price Observations (6 tests)
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.pair
@@ -288,7 +265,7 @@ class TestSafePriceObservations:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Verify swap operations create price observations
@@ -308,9 +285,12 @@ class TestSafePriceObservations:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Get initial index
@@ -323,8 +303,13 @@ class TestSafePriceObservations:
         ensure_esdt_amounts(bob, {pair_contract.firstToken: swap_amount})
 
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, swap_amount
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.firstToken,
+            pair_contract.secondToken,
+            swap_amount,
         )
 
         # Advance blocks to allow observation finalization
@@ -333,8 +318,13 @@ class TestSafePriceObservations:
         # Perform another swap to trigger observation save
         ensure_esdt_amounts(bob, {pair_contract.secondToken: swap_amount})
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.secondToken, pair_contract.firstToken, swap_amount
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.secondToken,
+            pair_contract.firstToken,
+            swap_amount,
         )
         blockchain_controller.wait_blocks(5)
 
@@ -357,7 +347,7 @@ class TestSafePriceObservations:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Verify add liquidity creates price observations
@@ -375,16 +365,23 @@ class TestSafePriceObservations:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Create some initial observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=3, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=3,
+            blocks_between=5,
         )
 
         index_before = _get_safe_price_current_index(pair_contract, network_providers)
@@ -395,18 +392,16 @@ class TestSafePriceObservations:
         add_amount = reserves[0] // 100  # 1% of reserve
 
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
         equivalent = pair_data_fetcher.get_data(
             "getEquivalent",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(add_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(add_amount)],
         )
 
-        ensure_esdt_amounts(bob, {
-            pair_contract.firstToken: add_amount,
-            pair_contract.secondToken: equivalent
-        })
+        ensure_esdt_amounts(
+            bob, {pair_contract.firstToken: add_amount, pair_contract.secondToken: equivalent}
+        )
 
         event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
@@ -414,7 +409,7 @@ class TestSafePriceObservations:
             amountAmin=1,
             tokenB=pair_contract.secondToken,
             amountB=equivalent,
-            amountBmin=1
+            amountBmin=1,
         )
         bob.sync_nonce(network_providers.proxy)
         tx = pair_contract.add_liquidity(network_providers, bob, event)
@@ -426,8 +421,13 @@ class TestSafePriceObservations:
         # Trigger another operation to finalize observation
         ensure_esdt_amounts(bob, {pair_contract.firstToken: add_amount})
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, add_amount
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.firstToken,
+            pair_contract.secondToken,
+            add_amount,
         )
 
         index_after = _get_safe_price_current_index(pair_contract, network_providers)
@@ -449,7 +449,7 @@ class TestSafePriceObservations:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Verify remove liquidity creates price observations
@@ -467,9 +467,12 @@ class TestSafePriceObservations:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Bob adds liquidity to get LP tokens
@@ -477,18 +480,16 @@ class TestSafePriceObservations:
         add_amount = reserves[0] // 50  # 2% of reserve
 
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
         equivalent = pair_data_fetcher.get_data(
             "getEquivalent",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(add_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(add_amount)],
         )
 
-        ensure_esdt_amounts(bob, {
-            pair_contract.firstToken: add_amount,
-            pair_contract.secondToken: equivalent
-        })
+        ensure_esdt_amounts(
+            bob, {pair_contract.firstToken: add_amount, pair_contract.secondToken: equivalent}
+        )
 
         event = AddLiquidityEvent(
             tokenA=pair_contract.firstToken,
@@ -496,7 +497,7 @@ class TestSafePriceObservations:
             amountAmin=1,
             tokenB=pair_contract.secondToken,
             amountB=equivalent,
-            amountBmin=1
+            amountBmin=1,
         )
         bob.sync_nonce(network_providers.proxy)
         tx = pair_contract.add_liquidity(network_providers, bob, event)
@@ -520,7 +521,7 @@ class TestSafePriceObservations:
                 tokenA=pair_contract.firstToken,
                 amountA=1,
                 tokenB=pair_contract.secondToken,
-                amountB=1
+                amountB=1,
             )
             bob.sync_nonce(network_providers.proxy)
             tx = pair_contract.remove_liquidity(network_providers, bob, remove_event)
@@ -534,8 +535,13 @@ class TestSafePriceObservations:
             small_swap = reserves[0] // 1000
             ensure_esdt_amounts(bob, {pair_contract.firstToken: small_swap})
             _perform_swap(
-                pair_contract, bob, network_providers, blockchain_controller,
-                pair_contract.firstToken, pair_contract.secondToken, small_swap
+                pair_contract,
+                bob,
+                network_providers,
+                blockchain_controller,
+                pair_contract.firstToken,
+                pair_contract.secondToken,
+                small_swap,
             )
 
             index_after = _get_safe_price_current_index(pair_contract, network_providers)
@@ -559,7 +565,7 @@ class TestSafePriceObservations:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Multiple operations across blocks create multiple observations
@@ -579,9 +585,12 @@ class TestSafePriceObservations:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         index_start = _get_safe_price_current_index(pair_contract, network_providers)
@@ -589,9 +598,13 @@ class TestSafePriceObservations:
 
         # Perform 10 swaps with block gaps
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=10, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=10,
+            blocks_between=5,
         )
 
         # Extra blocks to finalize any pending observations
@@ -604,8 +617,7 @@ class TestSafePriceObservations:
         logger.info(f"Observations created: {observations_created}")
 
         assert observations_created > 0, (
-            f"Should have created observations over 10 swaps. "
-            f"Index: {index_start} -> {index_end}"
+            f"Should have created observations over 10 swaps. Index: {index_start} -> {index_end}"
         )
 
         # Verify pool is healthy after all operations
@@ -624,7 +636,7 @@ class TestSafePriceObservations:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Track index progression during series of operations
@@ -642,9 +654,12 @@ class TestSafePriceObservations:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         indices = []
@@ -655,9 +670,13 @@ class TestSafePriceObservations:
         # 3 batches of operations
         for batch in range(3):
             _perform_swaps_with_block_advancement(
-                pair_contract, bob, network_providers,
-                blockchain_controller, ensure_esdt_amounts,
-                num_swaps=3, blocks_between=5
+                pair_contract,
+                bob,
+                network_providers,
+                blockchain_controller,
+                ensure_esdt_amounts,
+                num_swaps=3,
+                blocks_between=5,
             )
             blockchain_controller.wait_blocks(5)
 
@@ -673,8 +692,7 @@ class TestSafePriceObservations:
             )
 
         assert indices[-1] > indices[0], (
-            f"Index should have increased overall. "
-            f"Start: {indices[0]}, End: {indices[-1]}"
+            f"Index should have increased overall. Start: {indices[0]}, End: {indices[-1]}"
         )
 
         logger.info(f"Index progression: {indices}")
@@ -682,9 +700,7 @@ class TestSafePriceObservations:
 
     @pytest.mark.happy_path
     def test_safe_price_round_save_interval_queryable(
-        self,
-        pair_contract: PairContract,
-        network_providers
+        self, pair_contract: PairContract, network_providers
     ):
         """
         SCENARIO: Query the safe price round save interval configuration
@@ -699,17 +715,14 @@ class TestSafePriceObservations:
         logger.info("TEST: Safe price round save interval queryable")
 
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
 
         save_interval = pair_data_fetcher.get_data("getSafePriceRoundSaveInterval")
         logger.info(f"Safe price round save interval: {save_interval}")
 
         assert save_interval is not None, "Save interval should be queryable"
-        assert save_interval >= 0, (
-            f"Save interval must be non-negative. Got: {save_interval}"
-        )
+        assert save_interval >= 0, f"Save interval must be non-negative. Got: {save_interval}"
 
         if save_interval == 0:
             logger.info("Save interval is 0 — Router uses default or immediate save mode")
@@ -722,6 +735,7 @@ class TestSafePriceObservations:
 # ============================================================================
 # Category 12: Safe Price View Functions (8 tests)
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.pair
@@ -737,23 +751,21 @@ class TestSafePriceViewFunctions:
     @pytest.mark.happy_path
     def test_get_safe_price_first_to_second_token(
         self,
+        dex_context,
         pair_contract: PairContract,
-        alice: Account,
-        bob: Account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
     ):
         """
         SCENARIO: Query safe price for first→second token conversion
 
-        GIVEN: Pool with observations from multiple swaps
-        WHEN: Query updateAndGetSafePrice with first token input
+        GIVEN: Same-shard swaps build a recent, stable observation window
+        WHEN: getSafePrice is queried over that window (on the pairs_view contract)
         THEN:
-            - Returns second token as output
-            - Output amount > 0
-            - Output within 50% of spot price (same order of magnitude)
+            - It equals the reference oracle exactly
+            - Under stable reserves it tracks the spot (reserve-ratio) price
 
         SECURITY: Safe price is the primary oracle for downstream DeFi contracts.
         """
@@ -762,55 +774,38 @@ class TestSafePriceViewFunctions:
         if not test_environment.supports_time_control():
             pytest.skip("Requires chain simulator for block control")
 
-        _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+        swapper = _pick_same_shard_account(
+            dex_context, pair_contract.address, test_environment, network_providers
+        )
+        recorder, captured, fetcher = _build_recorded_observations(
+            pair_contract,
+            swapper,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            directions=["first", "second"] * 3,
         )
 
-        _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+        amount = nominated_amount(1)
+        onchain, _reference, _start, _end = _safe_price_vs_reference(
+            dex_context,
+            network_providers,
+            pair_contract,
+            recorder,
+            captured,
+            input_is_first=True,
+            amount=amount,
         )
-        blockchain_controller.wait_blocks(10)
+        assert onchain > 0, "Safe price output should be non-zero"
 
-        test_amount = nominated_amount(1)
-        result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
-        )
-
-        if result is None:
-            logger.info("Safe price query requires ABI - verifying via indirect method")
-            # Fallback: verify observations exist and pool is healthy
-            index = _get_safe_price_current_index(pair_contract, network_providers)
-            assert index > 0, "Observations should exist after swaps"
-            logger.info("Test passed (indirect): Observations exist for safe price")
-            return
-
-        logger.info(f"Safe price result: {result['amount']} {result['token_identifier']}")
-
-        assert result['amount'] > 0, "Safe price output should be non-zero"
-
-        # Compare with spot price
-        pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
-        )
-        spot_price = pair_data_fetcher.get_data(
-            "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+        spot = _spot_equivalent(fetcher, pair_contract.firstToken, amount)
+        deviation = abs(onchain - spot) / spot
+        logger.info(f"safe={onchain} spot={spot} deviation={deviation:.4f}")
+        assert deviation < 0.05, (
+            f"under stable reserves the safe price should track spot (deviation {deviation:.4f})"
         )
 
-        if spot_price > 0:
-            ratio = result['amount'] / spot_price
-            logger.info(f"Safe/Spot ratio: {ratio:.4f}")
-            assert 0.5 < ratio < 2.0, (
-                f"Safe price should be within 2x of spot. Ratio: {ratio:.4f}"
-            )
-
-        logger.info("Test passed: Safe price first→second returns valid output")
+        logger.info("Test passed: safe price matches reference and tracks spot")
 
     @pytest.mark.happy_path
     def test_get_safe_price_second_to_first_token(
@@ -821,7 +816,7 @@ class TestSafePriceViewFunctions:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Query safe price for second→first token conversion
@@ -841,22 +836,28 @@ class TestSafePriceViewFunctions:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
         test_amount = nominated_amount(1)
         result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.secondToken, test_amount
+            pair_contract, network_providers, pair_contract.secondToken, test_amount
         )
 
         if result is None:
@@ -866,7 +867,7 @@ class TestSafePriceViewFunctions:
             return
 
         logger.info(f"Safe price result: {result['amount']} {result['token_identifier']}")
-        assert result['amount'] > 0, "Safe price output should be non-zero"
+        assert result["amount"] > 0, "Safe price output should be non-zero"
 
         logger.info("Test passed: Safe price second→first returns valid output")
 
@@ -879,7 +880,7 @@ class TestSafePriceViewFunctions:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Query safe price using default round offset
@@ -896,23 +897,29 @@ class TestSafePriceViewFunctions:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
         # updateAndGetSafePrice uses default offset internally
         test_amount = nominated_amount(1)
         result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
+            pair_contract, network_providers, pair_contract.firstToken, test_amount
         )
 
         if result is None:
@@ -921,7 +928,7 @@ class TestSafePriceViewFunctions:
             logger.info("Test passed (indirect): Default offset query backed by observations")
             return
 
-        assert result['amount'] > 0, "Default offset safe price should be non-zero"
+        assert result["amount"] > 0, "Default offset safe price should be non-zero"
         logger.info(f"Default offset safe price: {result['amount']}")
 
         logger.info("Test passed: Default offset safe price returns valid data")
@@ -929,20 +936,21 @@ class TestSafePriceViewFunctions:
     @pytest.mark.happy_path
     def test_get_safe_price_by_round_offset(
         self,
+        dex_context,
         pair_contract: PairContract,
         alice: Account,
         bob: Account,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Query safe price with explicit round offset
 
         GIVEN: Pool with observations spanning multiple rounds
-        WHEN: Query getSafePriceByRoundOffset with known offset
-        THEN: Returns valid price for that time window
+        WHEN: Query getSafePriceByRoundOffset on the pairs_view contract
+        THEN: Returns a valid, non-zero price denominated in the output token
 
         SECURITY: Round offset allows consumers to choose their TWAP window.
         """
@@ -952,63 +960,52 @@ class TestSafePriceViewFunctions:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=8, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=8,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
-        pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+        # Try decreasing offsets so start_round stays within the observation window
+        # (smaller offsets are always valid once observations exist).
+        result = used_offset = None
+        for offset in (40, 30, 20, 10, 5):
+            result = query_safe_price_by_offset(
+                dex_context,
+                network_providers,
+                pair_contract.address,
+                "getSafePriceByRoundOffset",
+                offset,
+                pair_contract.firstToken,
+                nominated_amount(1),
+            )
+            if result is not None:
+                used_offset = offset
+                break
+
+        if result is None:
+            pytest.skip(
+                "getSafePriceByRoundOffset returned empty — is the pairs_view contract loaded?"
+            )
+
+        assert result["amount"] > 0, "Round-offset safe price should be non-zero"
+        assert result["token_identifier"] == pair_contract.secondToken, (
+            "first-token input should price out in the second token"
         )
-
-        from multiversx_sdk.abi import Abi, U64Value
-        import config
-        abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
-
-        if not abi_path.exists():
-            logger.info("ABI not found, verifying observations exist instead")
-            index = _get_safe_price_current_index(pair_contract, network_providers)
-            assert index > 0, "Observations should exist"
-            logger.info("Test passed (indirect)")
-            return
-
-        abi = Abi.load(abi_path)
-        test_amount = nominated_amount(1)
-        payment_payload = abi.encode_custom_type(
-            "EsdtTokenPayment",
-            [pair_contract.firstToken, 0, test_amount]
-        )
-
-        pair_address = Address.new_from_bech32(pair_contract.address)
-        round_offset = 50  # Look back 50 rounds
-
-        result_hex = pair_data_fetcher.get_data(
-            "getSafePriceByRoundOffset",
-            [AddressValue(pair_address), BigUIntValue(round_offset),
-             bytes.fromhex(payment_payload)]
-        )
-
-        if result_hex:
-            esdt_schema = {
-                'token_identifier': 'string',
-                'token_nonce': 'u64',
-                'amount': 'biguint',
-            }
-            result = decode_merged_attributes(result_hex, esdt_schema)
-            assert result['amount'] > 0, "Round offset safe price should be non-zero"
-            logger.info(f"Round offset safe price (offset={round_offset}): {result['amount']}")
-        else:
-            logger.info("Round offset query returned empty")
-
-        logger.info("Test passed: Safe price by round offset")
+        logger.info(f"Round-offset safe price (offset={used_offset}): {result['amount']}")
 
     @pytest.mark.happy_path
     def test_update_and_get_safe_price_legacy_endpoint(
@@ -1019,7 +1016,7 @@ class TestSafePriceViewFunctions:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Legacy updateAndGetSafePrice endpoint returns valid data
@@ -1039,15 +1036,22 @@ class TestSafePriceViewFunctions:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -1055,8 +1059,7 @@ class TestSafePriceViewFunctions:
 
         # Query legacy endpoint
         result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
+            pair_contract, network_providers, pair_contract.firstToken, test_amount
         )
 
         if result is None:
@@ -1066,8 +1069,8 @@ class TestSafePriceViewFunctions:
             logger.info("Test passed (indirect)")
             return
 
-        assert result['amount'] > 0, "Legacy endpoint should return non-zero amount"
-        assert result['token_identifier'] == pair_contract.secondToken, (
+        assert result["amount"] > 0, "Legacy endpoint should return non-zero amount"
+        assert result["token_identifier"] == pair_contract.secondToken, (
             f"Output token should be second token. "
             f"Got: {result['token_identifier']}, Expected: {pair_contract.secondToken}"
         )
@@ -1084,7 +1087,7 @@ class TestSafePriceViewFunctions:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Query LP token valuation via safe price oracle
@@ -1105,15 +1108,22 @@ class TestSafePriceViewFunctions:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -1132,31 +1142,34 @@ class TestSafePriceViewFunctions:
             return
 
         first_token_result, second_token_result = result
-        logger.info(f"LP safe price: {first_token_result['amount']} first + "
-                     f"{second_token_result['amount']} second")
+        logger.info(
+            f"LP safe price: {first_token_result['amount']} first + "
+            f"{second_token_result['amount']} second"
+        )
 
-        assert first_token_result['amount'] > 0, "First token amount should be > 0"
-        assert second_token_result['amount'] > 0, "Second token amount should be > 0"
+        assert first_token_result["amount"] > 0, "First token amount should be > 0"
+        assert second_token_result["amount"] > 0, "Second token amount should be > 0"
 
         logger.info("Test passed: LP tokens safe price returns valid amounts")
 
     @pytest.mark.happy_path
     def test_get_lp_tokens_safe_price_by_round_offset(
         self,
+        dex_context,
         pair_contract: PairContract,
         alice: Account,
         bob: Account,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Query LP token valuation with explicit round offset
 
         GIVEN: Pool with observations spanning multiple rounds
-        WHEN: Query getLpTokensSafePriceByRoundOffset
-        THEN: Returns valid token amounts for the specified time window
+        WHEN: Query getLpTokensSafePriceByRoundOffset on the pairs_view contract
+        THEN: Returns valid amounts of both underlying tokens for that window
 
         SECURITY: Round offset allows customized TWAP window for LP valuation.
         """
@@ -1166,56 +1179,69 @@ class TestSafePriceViewFunctions:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=4, blocks_between=3
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=4,
+            blocks_between=3,
         )
         blockchain_controller.wait_blocks(5)
 
-        # The default offset approach also works for verifying round-based queries
         reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         lp_supply = reserves[2]
         test_lp_amount = lp_supply // 100
 
-        result = _query_lp_safe_price(pair_contract, network_providers, test_lp_amount)
+        result = None
+        for offset in (20, 10, 5, 3):
+            result = _query_lp_safe_price_by_round_offset(
+                dex_context, network_providers, pair_contract.address, offset, test_lp_amount
+            )
+            if result is not None:
+                break
 
         if result is None:
-            index = _get_safe_price_current_index(pair_contract, network_providers)
-            assert index > 0, "Observations should exist"
-            logger.info("Test passed (indirect)")
-            return
+            pytest.skip("getLpTokensSafePriceByRoundOffset returned empty — is pairs_view loaded?")
 
         first_result, second_result = result
-        assert first_result['amount'] > 0, "First token amount should be > 0"
-        assert second_result['amount'] > 0, "Second token amount should be > 0"
+        assert first_result["amount"] > 0, "First token amount should be > 0"
+        assert second_result["amount"] > 0, "Second token amount should be > 0"
+        assert first_result["token_identifier"] == pair_contract.firstToken
+        assert second_result["token_identifier"] == pair_contract.secondToken
 
-        logger.info("Test passed: LP safe price by round offset returns valid data")
+        logger.info(
+            f"LP safe price by round offset: {first_result['amount']} {first_result['token_identifier']}, "
+            f"{second_result['amount']} {second_result['token_identifier']}"
+        )
 
     @pytest.mark.happy_path
     def test_get_price_observation_at_recorded_round(
         self,
+        dex_context,
         pair_contract: PairContract,
         alice: Account,
         bob: Account,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Query price observation at a specific recorded round
 
         GIVEN: Pool with observations from multiple swaps
-        WHEN: Query getPriceObservation for a recent round
-        THEN:
-            - Returns observation data (non-empty)
-            - Observation contains reserve accumulator data
+        WHEN: Query getPriceObservation (on pairs_view) for a recent round
+        THEN: Returns an observation with positive reserve accumulators and weight
 
         SECURITY: Raw observations are the building blocks of TWAP.
                   They must be queryable for verification and debugging.
@@ -1226,63 +1252,61 @@ class TestSafePriceViewFunctions:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(5)
 
-        pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
-        )
-
-        current_block = blockchain_controller.get_current_block()
-        pair_address = Address.new_from_bech32(pair_contract.address)
-
-        # Try a few recent rounds
-        observation_found = False
-        for offset in [5, 10, 15, 20, 25, 30]:
-            search_round = current_block - offset
-            if search_round <= 0:
-                continue
-
-            observation = pair_data_fetcher.get_data(
-                "getPriceObservation",
-                [AddressValue(pair_address), BigUIntValue(search_round)]
-            )
-
-            if observation and len(observation) > 0:
-                has_data = any(
-                    (isinstance(part, str) and len(part) > 0) or
-                    (isinstance(part, int) and part > 0)
-                    for part in observation
-                )
-                if has_data:
-                    logger.info(f"Observation found at round {search_round}: "
-                                f"{len(observation)} data parts")
-                    observation_found = True
-                    break
-
-        # Verify observations exist via index as fallback
+        # Observations must exist after the swaps.
         index = _get_safe_price_current_index(pair_contract, network_providers)
         assert index > 0, "Observations should exist after multiple swaps"
 
-        if observation_found:
-            logger.info("Test passed: Price observation retrieved at specific round")
-        else:
-            logger.info(f"Test passed (indirect): {index} observations exist via index")
+        # Find a recent round with a retrievable observation (smaller search rounds
+        # stay within [oldest, current], so a revert -> None just means try again).
+        current_block = blockchain_controller.get_current_block()
+        observation = found_round = None
+        for offset in (3, 5, 8, 12, 20, 30):
+            search_round = current_block - offset
+            if search_round <= 0:
+                continue
+            observation = _query_price_observation(
+                dex_context, network_providers, pair_contract.address, search_round
+            )
+            if observation is not None:
+                found_round = search_round
+                break
+
+        if observation is None:
+            pytest.skip("getPriceObservation returned empty — is the pairs_view contract loaded?")
+
+        assert observation["weight_accumulated"] > 0, "Observation must have accumulated weight"
+        assert observation["first_token_reserve_accumulated"] > 0, "First reserve accumulator > 0"
+        assert observation["second_token_reserve_accumulated"] > 0, "Second reserve accumulator > 0"
+        assert observation["recording_round"] > 0, "Observation must have a recording round"
+        logger.info(
+            f"Observation @search_round={found_round}: recorded_round="
+            f"{observation['recording_round']} weight={observation['weight_accumulated']}"
+        )
 
 
 # ============================================================================
 # Category 13: TWAP Mathematical Properties (6 tests)
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.pair
@@ -1298,82 +1322,58 @@ class TestTWAPMathematicalProperties:
     @pytest.mark.happy_path
     def test_twap_equals_spot_when_price_stable(
         self,
+        dex_context,
         pair_contract: PairContract,
-        alice: Account,
-        bob: Account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
     ):
         """
-        SCENARIO: TWAP approximately equals spot price when price is stable
+        SCENARIO: TWAP equals spot price when price is stable
 
-        GIVEN: Pool with no significant price changes between observations
-        WHEN: Query TWAP and spot price
-        THEN: TWAP ≈ spot price (< 10% deviation)
+        GIVEN: Small alternating same-shard swaps (price ~stable)
+        WHEN: Query TWAP over the recent observation window
+        THEN: TWAP == reference oracle exactly, and tracks spot (< 5% deviation)
 
-        SECURITY: In stable conditions, TWAP should track spot accurately.
-                  Large deviations in stable conditions indicate oracle malfunction.
+        SECURITY: In stable conditions, TWAP must track spot accurately.
         """
         logger.info("TEST: TWAP equals spot when price stable")
 
         if not test_environment.supports_time_control():
             pytest.skip("Requires chain simulator for block control")
 
-        _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+        swapper = _pick_same_shard_account(
+            dex_context, pair_contract.address, test_environment, network_providers
+        )
+        recorder, captured, fetcher = _build_recorded_observations(
+            pair_contract,
+            swapper,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            directions=["first", "second"] * 4,
         )
 
-        # Small alternating swaps to create observations without moving price much
-        _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=8, blocks_between=5, alternating=True
-        )
-        blockchain_controller.wait_blocks(10)
-
-        test_amount = nominated_amount(1)
-
-        # Get spot price
-        pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
-        )
-        spot_price = pair_data_fetcher.get_data(
-            "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+        amount = nominated_amount(1)
+        twap, _reference, _start, _end = _safe_price_vs_reference(
+            dex_context,
+            network_providers,
+            pair_contract,
+            recorder,
+            captured,
+            input_is_first=True,
+            amount=amount,
         )
 
-        # Get TWAP
-        twap_result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
+        spot = _spot_equivalent(fetcher, pair_contract.firstToken, amount)
+        deviation = abs(twap - spot) / spot
+        logger.info(f"spot={spot} twap={twap} deviation={deviation:.4f}")
+        assert deviation < 0.05, (
+            f"TWAP should be within 5% of spot when price is stable (deviation {deviation:.4f})"
         )
 
-        if twap_result is None:
-            logger.info("ABI not available - verifying stable pool has observations")
-            index = _get_safe_price_current_index(pair_contract, network_providers)
-            assert index > 0, "Stable pool should have observations"
-            logger.info("Test passed (indirect)")
-            return
-
-        twap_price = twap_result['amount']
-        logger.info(f"Spot price: {spot_price}, TWAP: {twap_price}")
-
-        if spot_price > 0:
-            deviation = abs(twap_price - spot_price) / spot_price
-            logger.info(f"TWAP/Spot deviation: {deviation:.4f} ({deviation * 100:.2f}%)")
-
-            # With small alternating swaps, TWAP should be close to spot
-            assert deviation < 0.10, (
-                f"TWAP should be within 10% of spot when price is stable. "
-                f"Deviation: {deviation:.4f}"
-            )
-
-        logger.info("Test passed: TWAP ≈ spot when price stable")
+        logger.info("Test passed: TWAP matches reference and ≈ spot when stable")
 
     @pytest.mark.happy_path
     def test_twap_smooths_single_large_price_move(
@@ -1384,7 +1384,7 @@ class TestTWAPMathematicalProperties:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: TWAP moves less than spot after a single large swap
@@ -1403,33 +1403,38 @@ class TestTWAPMathematicalProperties:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Establish baseline with multiple observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=8, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=8,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
         # Record baseline prices
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
         test_amount = nominated_amount(1)
         spot_before = pair_data_fetcher.get_data(
             "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)],
         )
 
         twap_before_result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
+            pair_contract, network_providers, pair_contract.firstToken, test_amount
         )
 
         # Large swap: 30% of first reserve
@@ -1438,15 +1443,20 @@ class TestTWAPMathematicalProperties:
         ensure_esdt_amounts(bob, {pair_contract.firstToken: large_swap})
 
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, large_swap
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.firstToken,
+            pair_contract.secondToken,
+            large_swap,
         )
         blockchain_controller.wait_blocks(3)
 
         # Record post-swap prices
         spot_after = pair_data_fetcher.get_data(
             "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)],
         )
 
         spot_change_pct = abs(spot_after - spot_before) / spot_before * 100
@@ -1458,17 +1468,15 @@ class TestTWAPMathematicalProperties:
 
         if twap_before_result is not None:
             twap_after_result = _query_safe_price_legacy(
-                pair_contract, network_providers,
-                pair_contract.firstToken, test_amount
+                pair_contract, network_providers, pair_contract.firstToken, test_amount
             )
 
             if twap_after_result is not None:
-                twap_before = twap_before_result['amount']
-                twap_after = twap_after_result['amount']
+                twap_before = twap_before_result["amount"]
+                twap_after = twap_after_result["amount"]
                 twap_change_pct = abs(twap_after - twap_before) / twap_before * 100
 
-                logger.info(f"TWAP: {twap_before} → {twap_after} "
-                            f"(change: {twap_change_pct:.1f}%)")
+                logger.info(f"TWAP: {twap_before} → {twap_after} (change: {twap_change_pct:.1f}%)")
 
                 assert twap_change_pct < spot_change_pct, (
                     f"TWAP change ({twap_change_pct:.1f}%) should be less than "
@@ -1483,88 +1491,75 @@ class TestTWAPMathematicalProperties:
     @pytest.mark.happy_path
     def test_twap_converges_to_new_price_over_time(
         self,
+        dex_context,
         pair_contract: PairContract,
-        alice: Account,
-        bob: Account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
     ):
         """
-        SCENARIO: TWAP gradually converges toward new price level
+        SCENARIO: TWAP gradually converges toward a new price level
 
-        GIVEN: Pool with baseline observations
-        WHEN: Price changes, then many observations at new level
-        THEN: TWAP gradually moves toward new spot price
+        GIVEN: A directional price move followed by observations at the new level
+        WHEN: Compare a recent window (post-move) vs the full window (spans the move)
+        THEN: Both equal the reference oracle, and the recent window tracks current
+              spot at least as closely as the full window (i.e. TWAP converges).
 
-        SECURITY: TWAP must eventually track real price changes,
-                  otherwise it becomes a stale/useless oracle.
+        SECURITY: TWAP must eventually track real price changes, otherwise it
+                  becomes a stale/useless oracle.
         """
         logger.info("TEST: TWAP converges to new price over time")
 
         if not test_environment.supports_time_control():
             pytest.skip("Requires chain simulator for block control")
 
-        _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+        swapper = _pick_same_shard_account(
+            dex_context, pair_contract.address, test_environment, network_providers
+        )
+        # Phase 1: push the price one direction; Phase 2: settle at the new level.
+        recorder, captured, fetcher = _build_recorded_observations(
+            pair_contract,
+            swapper,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            directions=["first"] * 5 + ["first", "second"] * 4,
+            fraction=200,
         )
 
-        # Baseline observations
-        _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=5, blocks_between=5
+        amount = nominated_amount(1)
+        rounds = sorted({rnd for rnd, _ in captured})
+        recent_start = rounds[len(rounds) // 2]
+
+        sp_full, _ref_f, _, _ = _safe_price_vs_reference(
+            dex_context,
+            network_providers,
+            pair_contract,
+            recorder,
+            captured,
+            input_is_first=True,
+            amount=amount,
+        )
+        sp_recent, _ref_r, _, _ = _safe_price_vs_reference(
+            dex_context,
+            network_providers,
+            pair_contract,
+            recorder,
+            captured,
+            input_is_first=True,
+            amount=amount,
+            window=(recent_start, rounds[-1]),
         )
 
-        # Move price with a medium swap
-        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
-        medium_swap = reserves[0] * 15 // 100  # 15% of reserve
-        ensure_esdt_amounts(bob, {pair_contract.firstToken: medium_swap})
-        _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, medium_swap
-        )
-        blockchain_controller.wait_blocks(5)
-
-        # Now create many observations at the new price level
-        _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=10, blocks_between=5, alternating=True
-        )
-        blockchain_controller.wait_blocks(10)
-
-        # After many observations at new price, TWAP should be closer to spot
-        pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
-        )
-        test_amount = nominated_amount(1)
-        spot = pair_data_fetcher.get_data(
-            "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+        spot = _spot_equivalent(fetcher, pair_contract.firstToken, amount)
+        logger.info(f"spot={spot} sp_full={sp_full} sp_recent={sp_recent}")
+        assert abs(sp_recent - spot) <= abs(sp_full - spot), (
+            "recent TWAP window should track current spot at least as closely as the "
+            "window spanning the price move (convergence)"
         )
 
-        twap_result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
-        )
-
-        if twap_result is not None and spot > 0:
-            deviation = abs(twap_result['amount'] - spot) / spot
-            logger.info(f"Post-convergence TWAP/Spot deviation: {deviation:.4f}")
-            # After many observations, deviation should be moderate
-            assert deviation < 0.30, (
-                f"TWAP should converge toward new price. Deviation: {deviation:.4f}"
-            )
-        else:
-            index = _get_safe_price_current_index(pair_contract, network_providers)
-            assert index > 0, "Should have accumulated many observations"
-
-        logger.info("Test passed: TWAP converges to new price")
+        logger.info("Test passed: TWAP converges toward the new price")
 
     @pytest.mark.happy_path
     def test_twap_symmetric_for_both_token_directions(
@@ -1575,7 +1570,7 @@ class TestTWAPMathematicalProperties:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: TWAP is reciprocally consistent in both directions
@@ -1592,27 +1587,32 @@ class TestTWAPMathematicalProperties:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
         test_amount = nominated_amount(1)
 
         result_a_to_b = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
+            pair_contract, network_providers, pair_contract.firstToken, test_amount
         )
         result_b_to_a = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.secondToken, test_amount
+            pair_contract, network_providers, pair_contract.secondToken, test_amount
         )
 
         if result_a_to_b is None or result_b_to_a is None:
@@ -1621,8 +1621,8 @@ class TestTWAPMathematicalProperties:
             logger.info("Test passed (indirect): Observations exist for both directions")
             return
 
-        output_a_to_b = result_a_to_b['amount']
-        output_b_to_a = result_b_to_a['amount']
+        output_a_to_b = result_a_to_b["amount"]
+        output_b_to_a = result_b_to_a["amount"]
 
         logger.info(f"A→B: {test_amount} → {output_a_to_b}")
         logger.info(f"B→A: {test_amount} → {output_b_to_a}")
@@ -1634,119 +1634,76 @@ class TestTWAPMathematicalProperties:
             logger.info(f"Reciprocal product: {product:.6f} (ideal = 1.0)")
 
             # Allow for fee impact and rounding
-            assert 0.5 < product < 2.0, (
-                f"Reciprocal product should be near 1.0. Got: {product:.6f}"
-            )
+            assert 0.5 < product < 2.0, f"Reciprocal product should be near 1.0. Got: {product:.6f}"
 
         logger.info("Test passed: TWAP symmetric for both directions")
 
     @pytest.mark.happy_path
     def test_twap_price_reflects_time_weighted_average(
         self,
+        dex_context,
         pair_contract: PairContract,
-        alice: Account,
-        bob: Account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
     ):
         """
-        SCENARIO: TWAP reflects time-weighted (not volume-weighted) average
+        SCENARIO: TWAP is the time-weighted reserve ratio over the window
 
-        GIVEN: Pool at price P1 for N blocks, then price P2 for M blocks (M >> N)
-        WHEN: Query TWAP
-        THEN: TWAP is closer to P2 than arithmetic mean (time weighting)
+        GIVEN: A directional price drift across several observations
+        WHEN: Query TWAP over the full window
+        THEN: It equals the reference oracle, and lies within [min, max] of the
+              windowed instantaneous reserve ratios (a weighted ratio of positive
+              reserves provably sits within the range of the individual ratios).
 
-        SECURITY: Time weighting ensures manipulation cost scales with duration,
-                  not just volume.
+        SECURITY: Time weighting ensures manipulation cost scales with duration.
         """
         logger.info("TEST: TWAP reflects time-weighted average")
 
         if not test_environment.supports_time_control():
             pytest.skip("Requires chain simulator for block control")
 
-        _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+        swapper = _pick_same_shard_account(
+            dex_context, pair_contract.address, test_environment, network_providers
+        )
+        # Monotonic directional drift so the instantaneous ratios span a real range.
+        recorder, captured, _fetcher = _build_recorded_observations(
+            pair_contract,
+            swapper,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            directions=["first"] * 7,
+            fraction=300,
         )
 
-        # Phase 1: Brief period at baseline price (few observations)
-        _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=2, blocks_between=3
+        amount = nominated_amount(1)
+        twap, _reference, start_round, end_round = _safe_price_vs_reference(
+            dex_context,
+            network_providers,
+            pair_contract,
+            recorder,
+            captured,
+            input_is_first=True,
+            amount=amount,
         )
 
-        # Record spot at P1
-        pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
-        )
-        test_amount = nominated_amount(1)
-        spot_p1 = pair_data_fetcher.get_data(
-            "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
-        )
-
-        # Move price to P2
-        reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
-        price_move_swap = reserves[0] * 20 // 100  # 20% of reserve
-        ensure_esdt_amounts(bob, {pair_contract.firstToken: price_move_swap})
-        _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, price_move_swap
-        )
-        blockchain_controller.wait_blocks(5)
-
-        # Phase 2: Long period at new price (many observations)
-        _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=10, blocks_between=5, alternating=True
-        )
-        blockchain_controller.wait_blocks(10)
-
-        spot_p2 = pair_data_fetcher.get_data(
-            "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+        # Observations contributing to the [start, end] accumulator delta are those
+        # recorded after start_round; their instantaneous ratios bound the TWAP.
+        ratios = [
+            amount * second // first
+            for rnd, (first, second, _lp) in captured
+            if start_round < rnd <= end_round
+        ]
+        assert ratios, "expected contributing observations in the window"
+        lo, hi = min(ratios), max(ratios)
+        logger.info(f"twap={twap} instantaneous_ratio_range=[{lo}, {hi}]")
+        assert lo <= twap <= hi, (
+            f"TWAP {twap} must lie within the instantaneous ratio range [{lo}, {hi}]"
         )
 
-        twap_result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
-        )
-
-        if twap_result is not None and spot_p1 > 0 and spot_p2 > 0:
-            twap = twap_result['amount']
-            arithmetic_mean = (spot_p1 + spot_p2) / 2
-
-            dist_to_p2 = abs(twap - spot_p2)
-            dist_to_mean = abs(twap - arithmetic_mean)
-
-            logger.info(f"P1: {spot_p1}, P2: {spot_p2}, Mean: {arithmetic_mean:.0f}, TWAP: {twap}")
-            logger.info(f"Distance to P2: {dist_to_p2}, Distance to mean: {dist_to_mean}")
-
-            # TWAP should be closer to P2 (more time at P2) than to arithmetic mean
-            # This may not always hold perfectly due to fee effects, but the trend should be clear
-            if dist_to_p2 < dist_to_mean:
-                logger.info("TWAP is closer to P2 than arithmetic mean (time-weighted confirmed)")
-            else:
-                logger.info("TWAP may still be converging - checking it's between P1 and P2")
-                twap_in_range = min(spot_p1, spot_p2) <= twap <= max(spot_p1, spot_p2)
-                if not twap_in_range:
-                    # Allow some tolerance for fee accumulation
-                    lower = min(spot_p1, spot_p2) * 0.8
-                    upper = max(spot_p1, spot_p2) * 1.2
-                    assert lower <= twap <= upper, (
-                        f"TWAP ({twap}) should be between P1 ({spot_p1}) and P2 ({spot_p2})"
-                    )
-        else:
-            index = _get_safe_price_current_index(pair_contract, network_providers)
-            assert index > 0, "Should have observations"
-
-        logger.info("Test passed: TWAP reflects time-weighted average")
+        logger.info("Test passed: TWAP is the time-weighted reserve ratio")
 
     @pytest.mark.happy_path
     def test_safe_price_increases_with_fee_accumulation(
@@ -1757,7 +1714,7 @@ class TestTWAPMathematicalProperties:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Safe price reflects fee-enriched reserves
@@ -1775,28 +1732,41 @@ class TestTWAPMathematicalProperties:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Create initial observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=3, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=3,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
         # Record k before fee accumulation
-        reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        reserves_before = PairAssertions.get_reserves(
+            pair_contract.address, network_providers.proxy
+        )
         k_before = reserves_before[0] * reserves_before[1]
 
         # Many swaps to accumulate fees
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=15, blocks_between=3
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=15,
+            blocks_between=3,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -1810,15 +1780,18 @@ class TestTWAPMathematicalProperties:
         index = _get_safe_price_current_index(pair_contract, network_providers)
         assert index > 0, "Should have many observations"
 
-        logger.info(f"Fee accumulation verified: k increased by "
-                     f"{(k_after - k_before) * 100 // k_before}%, "
-                     f"{index} observations recorded")
+        logger.info(
+            f"Fee accumulation verified: k increased by "
+            f"{(k_after - k_before) * 100 // k_before}%, "
+            f"{index} observations recorded"
+        )
         logger.info("Test passed: Safe price reflects fee accumulation")
 
 
 # ============================================================================
 # Category 14: Safe Price Manipulation Resistance (4 tests)
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.pair
@@ -1840,7 +1813,7 @@ class TestSafePriceManipulationResistance:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Large swap in single block should not significantly move TWAP
@@ -1860,16 +1833,23 @@ class TestSafePriceManipulationResistance:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Build observation history
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=8, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=8,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -1878,16 +1858,20 @@ class TestSafePriceManipulationResistance:
         spot_pre = reserves_pre[0] / reserves_pre[1] if reserves_pre[1] > 0 else 0
 
         twap_pre = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, nominated_amount(1)
+            pair_contract, network_providers, pair_contract.firstToken, nominated_amount(1)
         )
 
         # Attack: 40% reserve swap
         attack_amount = reserves_pre[0] * 40 // 100
         ensure_esdt_amounts(bob, {pair_contract.firstToken: attack_amount})
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, attack_amount
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.firstToken,
+            pair_contract.secondToken,
+            attack_amount,
         )
 
         # Record post-attack state
@@ -1900,12 +1884,13 @@ class TestSafePriceManipulationResistance:
 
         if twap_pre is not None:
             twap_post = _query_safe_price_legacy(
-                pair_contract, network_providers,
-                pair_contract.firstToken, nominated_amount(1)
+                pair_contract, network_providers, pair_contract.firstToken, nominated_amount(1)
             )
 
             if twap_post is not None:
-                twap_change = abs(twap_post['amount'] - twap_pre['amount']) / twap_pre['amount'] * 100
+                twap_change = (
+                    abs(twap_post["amount"] - twap_pre["amount"]) / twap_pre["amount"] * 100
+                )
                 logger.info(f"TWAP change: {twap_change:.1f}% vs spot change: {spot_change:.1f}%")
                 assert twap_change < spot_change, (
                     f"TWAP change ({twap_change:.1f}%) must be less than "
@@ -1929,7 +1914,7 @@ class TestSafePriceManipulationResistance:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Large swap + immediate reverse should leave TWAP unchanged
@@ -1950,16 +1935,23 @@ class TestSafePriceManipulationResistance:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Build observation history
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=8, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=8,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -1967,16 +1959,20 @@ class TestSafePriceManipulationResistance:
         k_pre = reserves_pre[0] * reserves_pre[1]
 
         twap_pre = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, nominated_amount(1)
+            pair_contract, network_providers, pair_contract.firstToken, nominated_amount(1)
         )
 
         # Flash-loan style: large A→B
         flash_amount = reserves_pre[0] * 20 // 100  # 20% of reserve
         ensure_esdt_amounts(bob, {pair_contract.firstToken: flash_amount})
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, flash_amount
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.firstToken,
+            pair_contract.secondToken,
+            flash_amount,
         )
 
         # Immediately reverse: B→A in next block
@@ -1985,8 +1981,13 @@ class TestSafePriceManipulationResistance:
         reverse_amount = reserves_mid[1] * 15 // 100  # Use what we can
         ensure_esdt_amounts(bob, {pair_contract.secondToken: reverse_amount})
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.secondToken, pair_contract.firstToken, reverse_amount
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.secondToken,
+            pair_contract.firstToken,
+            reverse_amount,
         )
         blockchain_controller.wait_blocks(3)
 
@@ -1998,12 +1999,13 @@ class TestSafePriceManipulationResistance:
 
         if twap_pre is not None:
             twap_post = _query_safe_price_legacy(
-                pair_contract, network_providers,
-                pair_contract.firstToken, nominated_amount(1)
+                pair_contract, network_providers, pair_contract.firstToken, nominated_amount(1)
             )
 
             if twap_post is not None:
-                twap_change_pct = abs(twap_post['amount'] - twap_pre['amount']) / twap_pre['amount'] * 100
+                twap_change_pct = (
+                    abs(twap_post["amount"] - twap_pre["amount"]) / twap_pre["amount"] * 100
+                )
                 logger.info(f"TWAP change after flash-loan attack: {twap_change_pct:.2f}%")
                 # TWAP should barely move from a round-trip
                 assert twap_change_pct < 15, (
@@ -2022,7 +2024,7 @@ class TestSafePriceManipulationResistance:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Multiple large same-direction swaps — TWAP lags behind spot
@@ -2041,32 +2043,37 @@ class TestSafePriceManipulationResistance:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Build history
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=8, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=8,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
         test_amount = nominated_amount(1)
         spot_before = pair_data_fetcher.get_data(
             "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)],
         )
 
         twap_before = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
+            pair_contract, network_providers, pair_contract.firstToken, test_amount
         )
 
         # 5 directional swaps (all first→second), 5% each
@@ -2076,14 +2083,19 @@ class TestSafePriceManipulationResistance:
 
         for i in range(5):
             _perform_swap(
-                pair_contract, bob, network_providers, blockchain_controller,
-                pair_contract.firstToken, pair_contract.secondToken, directional_amount
+                pair_contract,
+                bob,
+                network_providers,
+                blockchain_controller,
+                pair_contract.firstToken,
+                pair_contract.secondToken,
+                directional_amount,
             )
             blockchain_controller.wait_blocks(2)
 
         spot_after = pair_data_fetcher.get_data(
             "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)],
         )
 
         spot_change = abs(spot_after - spot_before) / spot_before * 100
@@ -2091,12 +2103,13 @@ class TestSafePriceManipulationResistance:
 
         if twap_before is not None:
             twap_after = _query_safe_price_legacy(
-                pair_contract, network_providers,
-                pair_contract.firstToken, test_amount
+                pair_contract, network_providers, pair_contract.firstToken, test_amount
             )
 
             if twap_after is not None:
-                twap_change = abs(twap_after['amount'] - twap_before['amount']) / twap_before['amount'] * 100
+                twap_change = (
+                    abs(twap_after["amount"] - twap_before["amount"]) / twap_before["amount"] * 100
+                )
                 logger.info(f"TWAP change: {twap_change:.1f}% vs spot: {spot_change:.1f}%")
 
                 assert twap_change < spot_change, (
@@ -2114,7 +2127,7 @@ class TestSafePriceManipulationResistance:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: TWAP eventually tracks gradual price drift
@@ -2134,27 +2147,33 @@ class TestSafePriceManipulationResistance:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Build initial observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=5, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=5,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
         test_amount = nominated_amount(1)
         spot_start = pair_data_fetcher.get_data(
             "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)],
         )
 
         # Gradual drift: 20 small same-direction swaps
@@ -2164,20 +2183,26 @@ class TestSafePriceManipulationResistance:
 
         for i in range(20):
             _perform_swap(
-                pair_contract, bob, network_providers, blockchain_controller,
-                pair_contract.firstToken, pair_contract.secondToken, small_drift
+                pair_contract,
+                bob,
+                network_providers,
+                blockchain_controller,
+                pair_contract.firstToken,
+                pair_contract.secondToken,
+                small_drift,
             )
             blockchain_controller.wait_blocks(3)
 
         spot_end = pair_data_fetcher.get_data(
             "getAmountOut",
-            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)]
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(test_amount)],
         )
 
         spot_direction = "down" if spot_end < spot_start else "up"
         spot_change = abs(spot_end - spot_start) / spot_start * 100
-        logger.info(f"Spot drifted {spot_direction}: {spot_start} → {spot_end} "
-                     f"({spot_change:.1f}%)")
+        logger.info(
+            f"Spot drifted {spot_direction}: {spot_start} → {spot_end} ({spot_change:.1f}%)"
+        )
 
         # Verify observations tracked the drift
         index = _get_safe_price_current_index(pair_contract, network_providers)
@@ -2194,6 +2219,7 @@ class TestSafePriceManipulationResistance:
 # ============================================================================
 # Category 15: Safe Price LP Token Valuation (4 tests)
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.pair
@@ -2215,7 +2241,7 @@ class TestSafePriceLPValuation:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: LP safe price scales linearly with LP amount
@@ -2232,15 +2258,22 @@ class TestSafePriceLPValuation:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -2257,19 +2290,17 @@ class TestSafePriceLPValuation:
             logger.info("Test passed (indirect): Observations exist")
             return
 
-        first_x = result_x[0]['amount']
-        first_2x = result_2x[0]['amount']
-        second_x = result_x[1]['amount']
-        second_2x = result_2x[1]['amount']
+        first_x = result_x[0]["amount"]
+        first_2x = result_2x[0]["amount"]
+        second_x = result_x[1]["amount"]
+        second_2x = result_2x[1]["amount"]
 
         logger.info(f"X:  {first_x} first + {second_x} second")
         logger.info(f"2X: {first_2x} first + {second_2x} second")
 
         if first_x > 0:
             ratio_first = first_2x / first_x
-            assert 1.9 < ratio_first < 2.1, (
-                f"First token should scale ~2x. Got: {ratio_first:.4f}"
-            )
+            assert 1.9 < ratio_first < 2.1, f"First token should scale ~2x. Got: {ratio_first:.4f}"
 
         if second_x > 0:
             ratio_second = second_2x / second_x
@@ -2288,7 +2319,7 @@ class TestSafePriceLPValuation:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: LP safe price returns both token amounts
@@ -2308,15 +2339,22 @@ class TestSafePriceLPValuation:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -2333,11 +2371,13 @@ class TestSafePriceLPValuation:
 
         first_result, second_result = result
 
-        assert first_result['amount'] > 0, "First token amount must be > 0"
-        assert second_result['amount'] > 0, "Second token amount must be > 0"
+        assert first_result["amount"] > 0, "First token amount must be > 0"
+        assert second_result["amount"] > 0, "Second token amount must be > 0"
 
-        logger.info(f"LP valuation: {first_result['amount']} {first_result['token_identifier']} + "
-                     f"{second_result['amount']} {second_result['token_identifier']}")
+        logger.info(
+            f"LP valuation: {first_result['amount']} {first_result['token_identifier']} + "
+            f"{second_result['amount']} {second_result['token_identifier']}"
+        )
 
         logger.info("Test passed: LP safe price covers both tokens")
 
@@ -2350,7 +2390,7 @@ class TestSafePriceLPValuation:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: LP position value via safe price increases as fees accumulate
@@ -2368,29 +2408,42 @@ class TestSafePriceLPValuation:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Initial observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=5, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=5,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
-        reserves_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        reserves_before = PairAssertions.get_reserves(
+            pair_contract.address, network_providers.proxy
+        )
         test_lp_amount = reserves_before[2] // 100
 
         result_before = _query_lp_safe_price(pair_contract, network_providers, test_lp_amount)
 
         # Accumulate fees with many swaps
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=15, blocks_between=3
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=15,
+            blocks_between=3,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -2417,11 +2470,15 @@ class TestSafePriceLPValuation:
         # Also verify safe price observations were recorded during fee accumulation
         result_after = _query_lp_safe_price(pair_contract, network_providers, test_lp_amount)
         if result_after is not None:
-            logger.info(f"Safe LP price after fees: "
-                         f"{result_after[0]['amount']} first + {result_after[1]['amount']} second")
+            logger.info(
+                f"Safe LP price after fees: "
+                f"{result_after[0]['amount']} first + {result_after[1]['amount']} second"
+            )
         else:
-            logger.info(f"k increased by {(k_after - k_before) * 100 // k_before}% — "
-                         "fees accumulated (LP pricing verified via k)")
+            logger.info(
+                f"k increased by {(k_after - k_before) * 100 // k_before}% — "
+                "fees accumulated (LP pricing verified via k)"
+            )
 
         logger.info("Test passed: LP safe price increases with fees")
 
@@ -2434,7 +2491,7 @@ class TestSafePriceLPValuation:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: LP safe price is in same ballpark as spot LP valuation
@@ -2452,16 +2509,24 @@ class TestSafePriceLPValuation:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Small alternating swaps for stable observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=8, blocks_between=5, alternating=True
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=8,
+            blocks_between=5,
+            alternating=True,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -2470,12 +2535,10 @@ class TestSafePriceLPValuation:
 
         # Spot LP valuation
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
         spot_result = pair_data_fetcher.get_data(
-            "getTokensForGivenPosition",
-            [BigUIntValue(test_lp_amount)]
+            "getTokensForGivenPosition", [BigUIntValue(test_lp_amount)]
         )
 
         # Safe LP valuation
@@ -2483,17 +2546,17 @@ class TestSafePriceLPValuation:
 
         if safe_result is not None and spot_result and len(spot_result) >= 2:
             spot_schema = {
-                'token_identifier': 'string',
-                'token_nonce': 'u64',
-                'amount': 'biguint',
+                "token_identifier": "string",
+                "token_nonce": "u64",
+                "amount": "biguint",
             }
             spot_first = decode_merged_attributes(spot_result[0], spot_schema)
             spot_second = decode_merged_attributes(spot_result[1], spot_schema)
 
-            safe_first_amt = safe_result[0]['amount']
-            safe_second_amt = safe_result[1]['amount']
-            spot_first_amt = spot_first['amount']
-            spot_second_amt = spot_second['amount']
+            safe_first_amt = safe_result[0]["amount"]
+            safe_second_amt = safe_result[1]["amount"]
+            spot_first_amt = spot_first["amount"]
+            spot_second_amt = spot_second["amount"]
 
             logger.info(f"Spot LP:  {spot_first_amt} first + {spot_second_amt} second")
             logger.info(f"Safe LP:  {safe_first_amt} first + {safe_second_amt} second")
@@ -2519,6 +2582,7 @@ class TestSafePriceLPValuation:
 # Category 16: Safe Price Edge Cases (6 tests)
 # ============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.pair
 @pytest.mark.chainsim
@@ -2532,10 +2596,7 @@ class TestSafePriceEdgeCases:
 
     @pytest.mark.edge_case
     def test_safe_price_query_before_sufficient_observations(
-        self,
-        pair_contract: PairContract,
-        network_providers,
-        test_environment
+        self, pair_contract: PairContract, network_providers, test_environment
     ):
         """
         SCENARIO: Query safe price when few observations exist
@@ -2560,8 +2621,7 @@ class TestSafePriceEdgeCases:
 
         # Also verify save interval is queryable
         pair_data_fetcher = PairContractDataFetcher(
-            Address.new_from_bech32(pair_contract.address),
-            network_providers.proxy.url
+            Address.new_from_bech32(pair_contract.address), network_providers.proxy.url
         )
         interval = pair_data_fetcher.get_data("getSafePriceRoundSaveInterval")
         assert interval is not None and interval >= 0, (
@@ -2580,7 +2640,7 @@ class TestSafePriceEdgeCases:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Observations with large round gap — tests linear interpolation
@@ -2599,16 +2659,23 @@ class TestSafePriceEdgeCases:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Create initial observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=3, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=3,
+            blocks_between=5,
         )
 
         round_r1 = blockchain_controller.get_current_block()
@@ -2619,9 +2686,13 @@ class TestSafePriceEdgeCases:
 
         # Create observations after gap
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=3, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=3,
+            blocks_between=5,
         )
 
         round_r2 = blockchain_controller.get_current_block()
@@ -2648,7 +2719,7 @@ class TestSafePriceEdgeCases:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Safe price behavior across pool drain and refill
@@ -2669,16 +2740,23 @@ class TestSafePriceEdgeCases:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Create some observations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=4, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=4,
+            blocks_between=5,
         )
 
         index_before_drain = _get_safe_price_current_index(pair_contract, network_providers)
@@ -2690,9 +2768,13 @@ class TestSafePriceEdgeCases:
 
         # Refill / more operations
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=5, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=5,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(10)
 
@@ -2719,7 +2801,7 @@ class TestSafePriceEdgeCases:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Safe price after large swap creates extreme price ratio
@@ -2739,16 +2821,23 @@ class TestSafePriceEdgeCases:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         # Normal observations first
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=4, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=4,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(5)
 
@@ -2758,16 +2847,25 @@ class TestSafePriceEdgeCases:
         ensure_esdt_amounts(bob, {pair_contract.firstToken: extreme_swap})
 
         _perform_swap(
-            pair_contract, bob, network_providers, blockchain_controller,
-            pair_contract.firstToken, pair_contract.secondToken, extreme_swap
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            pair_contract.firstToken,
+            pair_contract.secondToken,
+            extreme_swap,
         )
         blockchain_controller.wait_blocks(5)
 
         # More operations at extreme ratio
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=3, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=3,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(5)
 
@@ -2793,7 +2891,7 @@ class TestSafePriceEdgeCases:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Earlier observations not overwritten by newer operations
@@ -2810,9 +2908,12 @@ class TestSafePriceEdgeCases:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         indices = []
@@ -2820,9 +2921,13 @@ class TestSafePriceEdgeCases:
         # 4 phases of operations
         for phase in range(4):
             _perform_swaps_with_block_advancement(
-                pair_contract, bob, network_providers,
-                blockchain_controller, ensure_esdt_amounts,
-                num_swaps=3, blocks_between=5
+                pair_contract,
+                bob,
+                network_providers,
+                blockchain_controller,
+                ensure_esdt_amounts,
+                num_swaps=3,
+                blocks_between=5,
             )
             blockchain_controller.wait_blocks(5)
 
@@ -2853,7 +2958,7 @@ class TestSafePriceEdgeCases:
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        test_environment
+        test_environment,
     ):
         """
         SCENARIO: Safe price query for current blockchain round
@@ -2873,15 +2978,22 @@ class TestSafePriceEdgeCases:
             pytest.skip("Requires chain simulator for block control")
 
         _ensure_pool_has_liquidity(
-            pair_contract, alice, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            amount=nominated_amount(10000)
+            pair_contract,
+            alice,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            amount=nominated_amount(10000),
         )
 
         _perform_swaps_with_block_advancement(
-            pair_contract, bob, network_providers,
-            blockchain_controller, ensure_esdt_amounts,
-            num_swaps=6, blocks_between=5
+            pair_contract,
+            bob,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+            num_swaps=6,
+            blocks_between=5,
         )
         blockchain_controller.wait_blocks(5)
 
@@ -2892,12 +3004,11 @@ class TestSafePriceEdgeCases:
         # updateAndGetSafePrice internally uses default offset which may span current round
         test_amount = nominated_amount(1)
         result = _query_safe_price_legacy(
-            pair_contract, network_providers,
-            pair_contract.firstToken, test_amount
+            pair_contract, network_providers, pair_contract.firstToken, test_amount
         )
 
         if result is not None:
-            assert result['amount'] > 0, "Current round safe price should be non-zero"
+            assert result["amount"] > 0, "Current round safe price should be non-zero"
             logger.info(f"Safe price at round ~{current_round}: {result['amount']}")
         else:
             # Verify via index that observations exist
