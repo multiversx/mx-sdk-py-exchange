@@ -349,17 +349,19 @@ def _ensure_rewards_available(staking_contract, deployer_account, test_environme
     if not _check_staking_has_code(staking_contract, network_providers.proxy):
         return
 
-    reserve = staking_contract.get_reward_reserve(network_providers.proxy)
+    rewards_capacity = staking_contract.get_reward_capacity(network_providers.proxy)
+    accumulated_rewards = staking_contract.get_accumulated_rewards(network_providers.proxy)
+    remained_rewards = rewards_capacity - accumulated_rewards
 
-    min_reserve = nominated_amount(10_000_000)  # 10M tokens
-    if reserve >= min_reserve:
+    min_reserve = nominated_amount(100_000)  # 100k tokens
+    if remained_rewards >= min_reserve:
         return
 
-    top_up_amount = nominated_amount(50_000_000)  # 50M tokens
+    top_up_amount = nominated_amount(100_000)  # 100k tokens
     farming_token = staking_contract.farming_token
 
     logger.info(
-        f"Reward reserve depleted (reserve={reserve}), "
+        f"Reward reserve depleted (reserve={remained_rewards}), "
         f"topping up staking contract with {top_up_amount} {farming_token}"
     )
 
