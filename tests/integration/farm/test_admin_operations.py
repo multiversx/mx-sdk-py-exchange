@@ -24,30 +24,21 @@ import pytest
 
 import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string
-from utils.utils_tx import NetworkProviders, endpoint_call
+from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
+    _ensure_deployer_has_egld,
     _enter_farm,
     _exit_farm,
-    _claim_rewards,
-    _claim_boosted_rewards,
-    _get_farm_tokens_for_user,
     _get_current_week,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _get_farm_state,
+    _get_farm_tokens_for_user,
+    _get_stake_amount,
 )
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -55,6 +46,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -98,7 +90,7 @@ class TestFarmAdminOperations:
         WHEN: Deployer calls startProduceRewards
         THEN:
             - Transaction succeeds (idempotent if already started)
-            - getLastRewardBlockNonce is set (> 0)
+            - getLastRewardTimestamp is set (> 0)
 
         NOTE: On mainnet state, rewards are typically already started.
         This test verifies the endpoint is callable and the view reflects it.
@@ -119,11 +111,11 @@ class TestFarmAdminOperations:
         else:
             TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
-        # Verify last reward block nonce is set
-        last_block = farm_contract.get_last_reward_block_nonce(network_providers.proxy)
-        logger.info(f"Last reward block nonce: {last_block}")
-        assert last_block > 0, (
-            f"getLastRewardBlockNonce should be > 0 after startProduceRewards, got {last_block}"
+        # Verify last reward timestamp is set
+        last_timestamp = farm_contract.get_last_reward_timestamp(network_providers.proxy)
+        logger.info(f"Last reward timestamp: {last_timestamp}")
+        assert last_timestamp > 0, (
+            f"getLastRewardTimestamp should be > 0 after startProduceRewards, got {last_timestamp}"
         )
 
         logger.info("PASSED: test_start_produce_rewards")
@@ -167,9 +159,13 @@ class TestFarmAdminOperations:
             TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
             logger.info("endProduceRewards succeeded")
 
-            reserve_stopped = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+            reserve_stopped = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_reserve"
+            ]
             blockchain_controller.wait_blocks(5)
-            reserve_after_wait = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+            reserve_after_wait = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_reserve"
+            ]
 
             assert reserve_after_wait == reserve_stopped, (
                 f"Reward reserve should freeze after endProduceRewards:\n"
@@ -181,7 +177,9 @@ class TestFarmAdminOperations:
         finally:
             # Always restart reward production
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_restart = farm_contract.start_produce_rewards(deployer_account, network_providers.proxy)
+            tx_restart = farm_contract.start_produce_rewards(
+                deployer_account, network_providers.proxy
+            )
             blockchain_controller.wait_for_tx(tx_restart)
             TransactionAssertions.assert_transaction_success(tx_restart, network_providers.proxy)
             logger.info("Reward production restarted (cleanup)")
@@ -192,7 +190,7 @@ class TestFarmAdminOperations:
     # Configuration Tests
     # ----------------------------------------------------------------
 
-    def test_set_per_block_reward_amount(
+    def test_set_per_second_reward_amount(
         self,
         farm_contract: FarmContract,
         deployer_account: Account,
@@ -201,17 +199,17 @@ class TestFarmAdminOperations:
         test_environment,
     ):
         """
-        SCENARIO: Change the per-block reward amount
+        SCENARIO: Change the per-second reward amount
 
-        GIVEN: Farm contract with a known per-block reward rate
-        WHEN: Deployer sets a new per-block reward amount
+        GIVEN: Farm contract with a known per-second reward rate
+        WHEN: Deployer sets a new per-second reward amount
         THEN:
             - Transaction succeeds
-            - getPerBlockRewardAmount reflects the new value
+            - getPerSecondRewardAmount reflects the new value
 
-        CLEANUP: Always restore the original per-block reward amount
+        CLEANUP: Always restore the original per-second reward amount
         """
-        logger.info("TEST: Set per-block reward amount")
+        logger.info("TEST: Set per-second reward amount")
 
         if not _check_farm_has_code(farm_contract, network_providers.proxy):
             pytest.skip("Farm contract bytecode not loaded on chain simulator")
@@ -219,11 +217,11 @@ class TestFarmAdminOperations:
         _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
 
         # Read current rate
-        original_rate = farm_contract.get_per_block_reward_amount(network_providers.proxy)
-        logger.info(f"Original per-block reward amount: {original_rate}")
+        original_rate = farm_contract.get_per_second_reward_amount(network_providers.proxy)
+        logger.info(f"Original per-second reward amount: {original_rate}")
 
         # Set a new rate (use a small but distinct value)
-        new_rate = 2
+        new_rate = int(original_rate * 0.9)
         assert new_rate != original_rate, (
             f"New rate must differ from original for a meaningful test. "
             f"Original: {original_rate}, New: {new_rate}"
@@ -231,17 +229,17 @@ class TestFarmAdminOperations:
 
         try:
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_hash = farm_contract.set_rewards_per_block(
+            tx_hash = farm_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, new_rate
             )
             blockchain_controller.wait_for_tx(tx_hash)
             TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
             # Verify the rate changed
-            updated_rate = farm_contract.get_per_block_reward_amount(network_providers.proxy)
-            logger.info(f"Updated per-block reward amount: {updated_rate}")
+            updated_rate = farm_contract.get_per_second_reward_amount(network_providers.proxy)
+            logger.info(f"Updated per-second reward amount: {updated_rate}")
             assert updated_rate == new_rate, (
-                f"Per-block reward amount mismatch after set:\n"
+                f"Per-second reward amount mismatch after set:\n"
                 f"  Expected: {new_rate}\n"
                 f"  Actual: {updated_rate}"
             )
@@ -249,22 +247,22 @@ class TestFarmAdminOperations:
         finally:
             # Restore original rate
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_restore = farm_contract.set_rewards_per_block(
+            tx_restore = farm_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, original_rate
             )
             blockchain_controller.wait_for_tx(tx_restore)
             TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
 
             # Verify restoration
-            restored_rate = farm_contract.get_per_block_reward_amount(network_providers.proxy)
+            restored_rate = farm_contract.get_per_second_reward_amount(network_providers.proxy)
             assert restored_rate == original_rate, (
-                f"Failed to restore per-block reward amount:\n"
+                f"Failed to restore per-second reward amount:\n"
                 f"  Expected: {original_rate}\n"
                 f"  Actual: {restored_rate}"
             )
-            logger.info(f"Per-block reward amount restored to {original_rate} (cleanup)")
+            logger.info(f"Per-second reward amount restored to {original_rate} (cleanup)")
 
-        logger.info("PASSED: test_set_per_block_reward_amount")
+        logger.info("PASSED: test_set_per_second_reward_amount")
 
     def test_set_boosted_yields_percentage(
         self,
@@ -296,7 +294,7 @@ class TestFarmAdminOperations:
         _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
 
         original_percentage = 6000  # 60% - standard mainnet value
-        new_percentage = 5000       # 50%
+        new_percentage = 5000  # 50%
 
         try:
             # Set new percentage
@@ -415,18 +413,19 @@ class TestFarmAdminOperations:
             # Verify farm is now inactive
             state_paused = farm_contract.get_state(network_providers.proxy)
             logger.info(f"Farm state after pause: {state_paused}")
-            assert state_paused == 0, (
-                f"Farm should be inactive (0) after pause, got {state_paused}"
-            )
+            assert state_paused == 0, f"Farm should be inactive (0) after pause, got {state_paused}"
 
             # Attempt enterFarm while paused - should fail
             tx_enter = _enter_farm(
-                farm_contract, alice, farming_token, stake_amount,
-                network_providers, blockchain_controller
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
             )
             TransactionAssertions.assert_transaction_failed(
-                tx_enter, network_providers.proxy,
-                expected_error="Not active"
+                tx_enter, network_providers.proxy, expected_error="Not active"
             )
             logger.info("enterFarm correctly rejected while paused")
 
@@ -441,9 +440,7 @@ class TestFarmAdminOperations:
         # Verify farm is active again after resume
         state_after = farm_contract.get_state(network_providers.proxy)
         logger.info(f"Farm state after resume: {state_after}")
-        assert state_after == 1, (
-            f"Farm should be active (1) after resume, got {state_after}"
-        )
+        assert state_after == 1, f"Farm should be active (1) after resume, got {state_after}"
 
         logger.info("PASSED: test_pause_resume")
 
@@ -485,9 +482,7 @@ class TestFarmAdminOperations:
 
         # Verify farm is still active (pause was rejected)
         state = farm_contract.get_state(network_providers.proxy)
-        assert state == 1, (
-            f"Farm should still be active after rejected pause, got {state}"
-        )
+        assert state == 1, f"Farm should still be active after rejected pause, got {state}"
 
         # Alice tries to end produce rewards
         alice.sync_nonce(network_providers.proxy)
@@ -511,6 +506,7 @@ class TestFarmAdminOperations:
         blockchain_controller,
         ensure_esdt_amounts,
         test_environment,
+        dex_context,
     ):
         """
         SCENARIO: Collect undistributed boosted rewards after a full week passes
@@ -551,8 +547,12 @@ class TestFarmAdminOperations:
         stake_amount = _get_stake_amount(farm_contract, network_providers.proxy)
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
         tx_enter = _enter_farm(
-            farm_contract, alice, farming_token, stake_amount,
-            network_providers, blockchain_controller,
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
         logger.info(f"Alice entered farm with {stake_amount} {farming_token}")
@@ -591,6 +591,14 @@ class TestFarmAdminOperations:
             # Collect undistributed boosted rewards from the completed week
             # Note: signature is (proxy, user) — different from most other methods
             deployer_account.sync_nonce(network_providers.proxy)
+            energy_factory = dex_context.get_contracts(config.SIMPLE_LOCKS_ENERGY)[0]
+            tx_hash = energy_factory.set_multisig_address(
+                deployer_account, network_providers.proxy, deployer_account.address.to_bech32()
+            )
+            blockchain_controller.wait_for_tx(tx_hash)
+            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+            logger.info("set multisig address in energy factory succeeded")
+
             tx_hash = farm_contract.collect_undistributed_boosted_rewards(
                 network_providers.proxy, deployer_account
             )
@@ -609,8 +617,12 @@ class TestFarmAdminOperations:
             farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
             for ft in farm_tokens:
                 _exit_farm(
-                    farm_contract, alice, ft.token.nonce, ft.amount,
-                    network_providers, blockchain_controller,
+                    farm_contract,
+                    alice,
+                    ft.token.nonce,
+                    ft.amount,
+                    network_providers,
+                    blockchain_controller,
                 )
             if farm_tokens:
                 logger.info(f"Exited {len(farm_tokens)} farm position(s) (cleanup)")

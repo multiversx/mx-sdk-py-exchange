@@ -21,23 +21,22 @@ Run:
 import pytest
 
 from contracts.farm_contract import FarmContract
-from utils.utils_chain import Account
-from utils.utils_tx import NetworkProviders
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
+    _claim_rewards_on_behalf,
+    _ensure_deployer_has_egld,
     _enter_farm,
     _enter_farm_on_behalf,
-    _claim_rewards_on_behalf,
-    _whitelist_address,
-    _remove_from_whitelist,
+    _get_farm_state,
     _get_farm_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _get_stake_amount,
+    _remove_from_whitelist,
+    _whitelist_address,
 )
 from utils.logger import get_logger
-
+from utils.utils_chain import Account
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -45,6 +44,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -99,8 +99,13 @@ class TestFarmDelegation:
         # Alice tries to enter farm on behalf of Bob (not whitelisted)
         bob_bech32 = bob.address.to_bech32()
         tx_hash = _enter_farm_on_behalf(
-            farm_contract, alice, farming_token, stake_amount,
-            bob_bech32, network_providers, blockchain_controller
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            bob_bech32,
+            network_providers,
+            blockchain_controller,
         )
 
         TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
@@ -141,8 +146,14 @@ class TestFarmDelegation:
 
         # Ensure Bob has a farm position
         ensure_esdt_amounts(bob, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, bob, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Get Bob's farm token
@@ -159,8 +170,12 @@ class TestFarmDelegation:
         # Alice tries to claim on behalf with Bob's farm token nonce.
         # This will fail either because Alice doesn't have the token or isn't whitelisted.
         tx_hash = _claim_rewards_on_behalf(
-            farm_contract, alice, bob_ft.token.nonce,
-            bob_ft.amount, network_providers, blockchain_controller
+            farm_contract,
+            alice,
+            bob_ft.token.nonce,
+            bob_ft.amount,
+            network_providers,
+            blockchain_controller,
         )
         TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)
 
@@ -207,8 +222,11 @@ class TestFarmDelegation:
         try:
             # Whitelist Alice
             tx_whitelist = _whitelist_address(
-                farm_contract, deployer_account, network_providers.proxy,
-                alice_bech32, blockchain_controller
+                farm_contract,
+                deployer_account,
+                network_providers.proxy,
+                alice_bech32,
+                blockchain_controller,
             )
             TransactionAssertions.assert_transaction_success(tx_whitelist, network_providers.proxy)
             logger.info(f"Whitelisted Alice: {alice_bech32}")
@@ -224,8 +242,11 @@ class TestFarmDelegation:
             # Cleanup: remove Alice from whitelist
             deployer_account.sync_nonce(network_providers.proxy)
             tx_remove = _remove_from_whitelist(
-                farm_contract, deployer_account, network_providers.proxy,
-                alice_bech32, blockchain_controller
+                farm_contract,
+                deployer_account,
+                network_providers.proxy,
+                alice_bech32,
+                blockchain_controller,
             )
             logger.info(f"Cleanup: removed Alice from whitelist (tx: {tx_remove})")
 
@@ -263,16 +284,22 @@ class TestFarmDelegation:
 
         # Step 1: Whitelist Alice
         tx_whitelist = _whitelist_address(
-            farm_contract, deployer_account, network_providers.proxy,
-            alice_bech32, blockchain_controller
+            farm_contract,
+            deployer_account,
+            network_providers.proxy,
+            alice_bech32,
+            blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_whitelist, network_providers.proxy)
         logger.info(f"Whitelisted Alice: {alice_bech32}")
 
         # Step 2: Remove Alice from whitelist
         tx_remove = _remove_from_whitelist(
-            farm_contract, deployer_account, network_providers.proxy,
-            alice_bech32, blockchain_controller
+            farm_contract,
+            deployer_account,
+            network_providers.proxy,
+            alice_bech32,
+            blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_remove, network_providers.proxy)
         logger.info(f"Removed Alice from whitelist: {alice_bech32}")
@@ -282,8 +309,13 @@ class TestFarmDelegation:
         supply_before = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
 
         tx_hash = _enter_farm_on_behalf(
-            farm_contract, alice, farming_token, stake_amount,
-            bob_bech32, network_providers, blockchain_controller
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            bob_bech32,
+            network_providers,
+            blockchain_controller,
         )
 
         TransactionAssertions.assert_transaction_failed(tx_hash, network_providers.proxy)

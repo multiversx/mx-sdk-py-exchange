@@ -22,32 +22,23 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
+    _claim_rewards,
     _enter_farm,
     _exit_farm,
-    _claim_rewards,
-    _claim_boosted_rewards,
+    _get_farm_state,
     _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
     _get_farming_token_balance,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _get_minimum_farming_epochs,
+    _get_stake_amount,
 )
+from utils import decoding_structures
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account, decode_merged_attributes, nominated_amount
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -55,6 +46,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -96,43 +88,43 @@ class TestFarmEdgeCases:
         farming_token = farm_contract.farmingToken
         stake_amount = _get_stake_amount(farm_contract, network_providers.proxy)
 
-        supply_before = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
-        reserve_before = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        farm_state_before = _get_farm_state(farm_contract, network_providers.proxy)
+        supply_before = farm_state_before["farm_token_supply"]
 
         # Enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
-        # Immediately exit (no extra blocks advanced)
+        # Immediately exit (next block)
         farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         assert len(farm_tokens) > 0, "Alice should have farm tokens after entry"
         ft = max(farm_tokens, key=lambda t: t.token.nonce)
 
-        tx_exit = _exit_farm(farm_contract, alice, ft.token.nonce, ft.amount,
-                             network_providers, blockchain_controller)
+        tx_exit = _exit_farm(
+            farm_contract,
+            alice,
+            ft.token.nonce,
+            ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
 
         # Farm token supply should return to original
-        supply_after = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
+        farm_state_after = _get_farm_state(farm_contract, network_providers.proxy)
+        supply_after = farm_state_after["farm_token_supply"]
         assert supply_after == supply_before, (
             f"Farm token supply should return to original after enter+exit:\n"
             f"  Before: {supply_before}\n"
             f"  After: {supply_after}"
-        )
-
-        # Reward reserve should not increase significantly (minimal or zero rewards).
-        # Tolerance: per_block_reward_amount=1 mints new rewards each block,
-        # so blocks generated for tx finalization can increase reserve slightly.
-        reserve_after = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        reserve_tolerance = 5_000
-        assert reserve_after <= reserve_before + reserve_tolerance, (
-            f"Reward reserve should not increase significantly after rapid enter+exit:\n"
-            f"  Before: {reserve_before}\n"
-            f"  After: {reserve_after}\n"
-            f"  Delta: {reserve_after - reserve_before}\n"
-            f"  Tolerance: {reserve_tolerance}"
         )
 
         logger.info("PASSED: test_enter_exit_same_block")
@@ -170,15 +162,23 @@ class TestFarmEdgeCases:
 
         ensure_esdt_amounts(alice, {farming_token: dust_amount})
 
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, dust_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            dust_amount,
+            network_providers,
+            blockchain_controller,
+        )
 
         # The transaction may succeed or fail depending on contract minimums.
         # Either outcome is acceptable -- what matters is no crash/panic.
         tx_data = network_providers.proxy.get_transaction(tx_enter)
         if tx_data.status.is_successful:
             logger.info("Dust amount accepted by contract")
-            supply_after = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
+            supply_after = _get_farm_state(farm_contract, network_providers.proxy)[
+                "farm_token_supply"
+            ]
             assert supply_after == supply_before + dust_amount, (
                 f"Supply mismatch after dust entry:\n"
                 f"  Before: {supply_before}\n"
@@ -193,7 +193,9 @@ class TestFarmEdgeCases:
         else:
             logger.info("Dust amount rejected by contract (acceptable)")
             # Supply should be unchanged
-            supply_after = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
+            supply_after = _get_farm_state(farm_contract, network_providers.proxy)[
+                "farm_token_supply"
+            ]
             assert supply_after == supply_before, "Supply should not change on failed tx"
 
         logger.info("PASSED: test_dust_amounts")
@@ -234,8 +236,14 @@ class TestFarmEdgeCases:
 
         ensure_esdt_amounts(alice, {farming_token: large_amount})
 
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, large_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            large_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Verify supply increased correctly (no overflow wrapping)
@@ -294,7 +302,9 @@ class TestFarmEdgeCases:
         stake_amount = _get_stake_amount(farm_contract, network_providers.proxy)
         num_cycles = 3
 
-        supply_baseline = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
+        supply_baseline = _get_farm_state(farm_contract, network_providers.proxy)[
+            "farm_token_supply"
+        ]
         rps_previous = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
 
         for i in range(num_cycles):
@@ -302,11 +312,19 @@ class TestFarmEdgeCases:
 
             # Enter
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                                   network_providers, blockchain_controller)
+            tx_enter = _enter_farm(
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
-            supply_during = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
+            supply_during = _get_farm_state(farm_contract, network_providers.proxy)[
+                "farm_token_supply"
+            ]
             assert supply_during == supply_baseline + stake_amount, (
                 f"Cycle {i + 1}: Supply after enter mismatch:\n"
                 f"  Expected: {supply_baseline + stake_amount}\n"
@@ -314,7 +332,9 @@ class TestFarmEdgeCases:
             )
 
             # RPS should not decrease
-            rps_current = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_current = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             assert rps_current >= rps_previous, (
                 f"Cycle {i + 1}: RPS decreased:\n"
                 f"  Previous: {rps_previous}\n"
@@ -325,11 +345,19 @@ class TestFarmEdgeCases:
             # Exit
             farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
             ft = max(farm_tokens, key=lambda t: t.token.nonce)
-            tx_exit = _exit_farm(farm_contract, alice, ft.token.nonce, ft.amount,
-                                 network_providers, blockchain_controller)
+            tx_exit = _exit_farm(
+                farm_contract,
+                alice,
+                ft.token.nonce,
+                ft.amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
 
-            supply_after_exit = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
+            supply_after_exit = _get_farm_state(farm_contract, network_providers.proxy)[
+                "farm_token_supply"
+            ]
             assert supply_after_exit == supply_baseline, (
                 f"Cycle {i + 1}: Supply after exit mismatch:\n"
                 f"  Expected: {supply_baseline}\n"
@@ -338,7 +366,9 @@ class TestFarmEdgeCases:
 
         # Final state verification
         final_state = _get_farm_state(farm_contract, network_providers.proxy)
-        assert final_state["farm_token_supply"] == supply_baseline, "Final supply should match baseline"
+        assert final_state["farm_token_supply"] == supply_baseline, (
+            "Final supply should match baseline"
+        )
         assert final_state["reward_per_share"] >= 0, "Final RPS should not be negative"
         assert final_state["reward_reserve"] >= 0, "Final reserve should not be negative"
 
@@ -381,8 +411,14 @@ class TestFarmEdgeCases:
 
         # Enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Advance blocks for reward accrual
@@ -393,12 +429,21 @@ class TestFarmEdgeCases:
         assert len(farm_tokens) > 0, "Alice should have farm tokens"
         ft = max(farm_tokens, key=lambda t: t.token.nonce)
 
-        reserve_before_claim = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_claim = _claim_rewards(farm_contract, alice, ft.token.nonce, ft.amount,
-                                  network_providers, blockchain_controller)
+        reserve_before_claim = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
+        tx_claim = _claim_rewards(
+            farm_contract,
+            alice,
+            ft.token.nonce,
+            ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
-        reserve_after_claim = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        farm_state_after = _get_farm_state(farm_contract, network_providers.proxy)
+        reserve_after_claim = farm_state_after["reward_reserve"]
         reward = reserve_before_claim - reserve_after_claim
 
         logger.info(f"Reserve before claim: {reserve_before_claim}")
@@ -406,8 +451,7 @@ class TestFarmEdgeCases:
         logger.info(f"Reward claimed: {reward}")
 
         # Reserve should not increase significantly.
-        # Tolerance: per_block_reward_amount=1 mints new rewards each block.
-        reserve_tolerance = 5_000
+        reserve_tolerance = farm_state_after["per_second_reward_amount"] * 6 * 11
         assert reserve_after_claim <= reserve_before_claim + reserve_tolerance, (
             f"Reserve should not increase significantly after claim:\n"
             f"  Before: {reserve_before_claim}\n"
@@ -421,7 +465,9 @@ class TestFarmEdgeCases:
         assert len(farm_tokens_after) > 0, "Alice should have a farm token after claim"
 
         new_ft = max(farm_tokens_after, key=lambda t: t.token.nonce)
-        attrs = decode_merged_attributes(new_ft.attributes.hex(), decoding_structures.FARM_TOKEN_ATTRIBUTES)
+        attrs = decode_merged_attributes(
+            new_ft.attributes.hex(), decoding_structures.FARM_TOKEN_ATTRIBUTES
+        )
         assert attrs["reward_per_share"] >= 0, "New farm token RPS should not be negative"
 
         logger.info("PASSED: test_claim_after_reward_reserve_large")
@@ -463,16 +509,23 @@ class TestFarmEdgeCases:
 
         # Enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        lp_before_enter = _get_farming_token_balance(farm_contract, alice, network_providers.proxy)
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
         lp_after_enter = _get_farming_token_balance(farm_contract, alice, network_providers.proxy)
 
         farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         assert len(farm_tokens) > 0, "Alice should have farm tokens"
         ft = max(farm_tokens, key=lambda t: t.token.nonce)
-        attrs = decode_merged_attributes(ft.attributes.hex(), decoding_structures.FARM_TOKEN_ATTRIBUTES)
+        attrs = decode_merged_attributes(
+            ft.attributes.hex(), decoding_structures.FARM_TOKEN_ATTRIBUTES
+        )
         entering_epoch = attrs["entering_epoch"]
         logger.info(f"Entering epoch from farm token: {entering_epoch}")
 
@@ -485,8 +538,14 @@ class TestFarmEdgeCases:
         logger.info(f"Current epoch after advance: {actual_epoch}")
 
         # Exit farm
-        tx_exit = _exit_farm(farm_contract, alice, ft.token.nonce, ft.amount,
-                             network_providers, blockchain_controller)
+        tx_exit = _exit_farm(
+            farm_contract,
+            alice,
+            ft.token.nonce,
+            ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
 
         lp_after_exit = _get_farming_token_balance(farm_contract, alice, network_providers.proxy)

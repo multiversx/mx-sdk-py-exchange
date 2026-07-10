@@ -23,33 +23,21 @@ Run:
 """
 
 import re
+
 import pytest
 
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
     _enter_farm,
-    _exit_farm,
-    _claim_rewards,
-    _claim_boosted_rewards,
     _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _get_stake_amount,
 )
+from utils import decoding_structures
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account, decode_merged_attributes
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -57,6 +45,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -106,9 +95,7 @@ class TestFarmViewFunctions:
         # Query initial supply - should be > 0 from mainnet state
         supply_before = farm_contract.get_farm_token_supply(network_providers.proxy)
         logger.info(f"Initial farm token supply: {supply_before}")
-        assert supply_before > 0, (
-            "Farm token supply should be > 0 with loaded mainnet state"
-        )
+        assert supply_before > 0, "Farm token supply should be > 0 with loaded mainnet state"
 
         # Enter farm with a known amount
         farming_token = farm_contract.farmingToken
@@ -118,8 +105,12 @@ class TestFarmViewFunctions:
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
 
         tx_hash = _enter_farm(
-            farm_contract, alice, farming_token, stake_amount,
-            network_providers, blockchain_controller
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
@@ -168,12 +159,11 @@ class TestFarmViewFunctions:
         )
 
         # Sanity check: reward reserve should be a valid integer, not an error code
-        assert reward_reserve != -1, (
-            "Reward reserve returned -1, indicating a query error"
-        )
+        assert reward_reserve != -1, "Reward reserve returned -1, indicating a query error"
 
-        logger.info(f"Reward reserve is valid: {reward_reserve} "
-                     f"({reward_reserve / 10**18:.4f} tokens)")
+        logger.info(
+            f"Reward reserve is valid: {reward_reserve} ({reward_reserve / 10**18:.4f} tokens)"
+        )
         logger.info("PASSED: test_get_reward_reserve")
 
     def test_get_reward_per_share(
@@ -255,7 +245,7 @@ class TestFarmViewFunctions:
         )
 
         # Validate MultiversX ESDT token format: TICKER-hexhash (6 hex chars)
-        token_pattern = r'^[A-Z0-9]{3,10}-[a-f0-9]{6}$'
+        token_pattern = r"^[A-Z0-9]{3,10}-[a-f0-9]{6}$"
         assert re.match(token_pattern, farming_token_id), (
             f"Farming token ID does not match valid ESDT format (TICKER-hexhash):\n"
             f"  Token: {farming_token_id}\n"
@@ -305,9 +295,7 @@ class TestFarmViewFunctions:
         )
 
         # Verify state is not an error code
-        assert state != -1, (
-            "Farm state returned -1, indicating a query error"
-        )
+        assert state != -1, "Farm state returned -1, indicating a query error"
 
         logger.info(f"Farm is active (state={state})")
         logger.info("PASSED: test_get_state")
@@ -419,8 +407,12 @@ class TestFarmViewFunctions:
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
 
         tx_hash = _enter_farm(
-            farm_contract, alice, farming_token, stake_amount,
-            network_providers, blockchain_controller
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
@@ -487,8 +479,12 @@ class TestFarmViewFunctions:
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
 
         tx_hash = _enter_farm(
-            farm_contract, alice, farming_token, stake_amount,
-            network_providers, blockchain_controller
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
@@ -537,8 +533,10 @@ class TestFarmViewFunctions:
                 f"  Calculated reward: {expected_reward}"
             )
         else:
-            logger.info("RPS unchanged - no rewards generated in 10 blocks "
-                        "(farm may not be actively producing rewards)")
+            logger.info(
+                "RPS unchanged - no rewards generated in 10 blocks "
+                "(farm may not be actively producing rewards)"
+            )
 
         # Verify per-block reward amount is configured
         per_block_reward = farm_contract.get_per_block_reward_amount(network_providers.proxy)
@@ -582,9 +580,7 @@ class TestFarmViewFunctions:
         logger.info(f"Last reward timestamp: {last_timestamp}")
         logger.info(f"Last reward block nonce: {last_block_nonce}")
 
-        assert last_timestamp >= 0, (
-            f"Last reward timestamp should be >= 0, got {last_timestamp}"
-        )
+        assert last_timestamp >= 0, f"Last reward timestamp should be >= 0, got {last_timestamp}"
         assert last_block_nonce >= 0, (
             f"Last reward block nonce should be >= 0, got {last_block_nonce}"
         )
@@ -629,8 +625,14 @@ class TestFarmViewFunctions:
         )
         if position == 0:
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                                   network_providers, blockchain_controller)
+            tx_enter = _enter_farm(
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         current_week = farm_contract.get_current_week(network_providers.proxy)
@@ -689,8 +691,14 @@ class TestFarmViewFunctions:
         )
         if position == 0:
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                                   network_providers, blockchain_controller)
+            tx_enter = _enter_farm(
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         last_active_week = farm_contract.get_last_active_week_for_user(
@@ -701,9 +709,7 @@ class TestFarmViewFunctions:
         logger.info(f"Last active week for Alice: {last_active_week}")
         logger.info(f"Current week: {current_week}")
 
-        assert last_active_week >= 0, (
-            f"Last active week should be >= 0, got {last_active_week}"
-        )
+        assert last_active_week >= 0, f"Last active week should be >= 0, got {last_active_week}"
 
         if last_active_week > 0:
             assert last_active_week <= current_week, (
@@ -745,9 +751,7 @@ class TestFarmViewFunctions:
         )
         logger.info(f"Total locked tokens for week {current_week}: {total_locked}")
 
-        assert total_locked >= 0, (
-            f"Total locked tokens should be >= 0, got {total_locked}"
-        )
+        assert total_locked >= 0, f"Total locked tokens should be >= 0, got {total_locked}"
 
         # Also check a previous week
         if current_week > 1:

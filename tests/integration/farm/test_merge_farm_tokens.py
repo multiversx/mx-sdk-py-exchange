@@ -18,33 +18,20 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, MergePositionFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
     _enter_farm,
-    _exit_farm,
-    _claim_rewards,
-    _claim_boosted_rewards,
+    _get_farm_state,
     _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
+    _get_stake_amount,
     _merge_farm_positions,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
 )
+from utils import decoding_structures
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account, decode_merged_attributes
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -52,6 +39,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -106,14 +94,26 @@ class TestFarmMergeFarmTokens:
 
         # First entry
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx1 = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                          network_providers, blockchain_controller)
+        tx1 = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx1, network_providers.proxy)
 
         # Second entry
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx2 = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                          network_providers, blockchain_controller)
+        tx2 = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx2, network_providers.proxy)
 
         # Get Alice's farm tokens — should have at least 2
@@ -137,8 +137,9 @@ class TestFarmMergeFarmTokens:
         supply_before = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
 
         # Merge
-        tx_merge = _merge_farm_positions(farm_contract, alice, tokens_to_merge,
-                                         network_providers, blockchain_controller)
+        tx_merge = _merge_farm_positions(
+            farm_contract, alice, tokens_to_merge, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_merge, network_providers.proxy)
 
         # Verify: farm token supply is unchanged
@@ -202,8 +203,14 @@ class TestFarmMergeFarmTokens:
 
         # First entry
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx1 = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                          network_providers, blockchain_controller)
+        tx1 = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx1, network_providers.proxy)
 
         # Advance blocks so RPS changes between entries
@@ -211,8 +218,14 @@ class TestFarmMergeFarmTokens:
 
         # Second entry (at potentially different RPS)
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx2 = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                          network_providers, blockchain_controller)
+        tx2 = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx2, network_providers.proxy)
 
         # Get farm tokens
@@ -228,8 +241,9 @@ class TestFarmMergeFarmTokens:
         state_before = _get_farm_state(farm_contract, network_providers.proxy)
 
         # Merge
-        tx_merge = _merge_farm_positions(farm_contract, alice, tokens_to_merge,
-                                         network_providers, blockchain_controller)
+        tx_merge = _merge_farm_positions(
+            farm_contract, alice, tokens_to_merge, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_merge, network_providers.proxy)
 
         # Verify state consistency
@@ -292,8 +306,14 @@ class TestFarmMergeFarmTokens:
 
         # Enter farm once
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Get farm tokens and pick just 1
@@ -304,8 +324,9 @@ class TestFarmMergeFarmTokens:
         supply_before = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
 
         # Merge with just 1 token — deployed contract accepts this as a no-op merge
-        tx_merge = _merge_farm_positions(farm_contract, alice, single_token,
-                                         network_providers, blockchain_controller)
+        tx_merge = _merge_farm_positions(
+            farm_contract, alice, single_token, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_merge, network_providers.proxy)
 
         # Supply unchanged
@@ -317,7 +338,9 @@ class TestFarmMergeFarmTokens:
         )
 
         farm_tokens_after = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
-        assert len(farm_tokens_after) > 0, "Alice should still hold a farm position after single-token merge"
+        assert len(farm_tokens_after) > 0, (
+            "Alice should still hold a farm position after single-token merge"
+        )
 
         logger.info("PASSED: test_merge_single_token_fails")
 
@@ -354,8 +377,14 @@ class TestFarmMergeFarmTokens:
         # Enter farm 3 times
         for i in range(3):
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                             network_providers, blockchain_controller)
+            tx = _enter_farm(
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
             logger.info(f"Entry {i + 1}/3 succeeded")
 
@@ -379,8 +408,9 @@ class TestFarmMergeFarmTokens:
         supply_before = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
 
         # Merge all 3
-        tx_merge = _merge_farm_positions(farm_contract, alice, tokens_to_merge,
-                                         network_providers, blockchain_controller)
+        tx_merge = _merge_farm_positions(
+            farm_contract, alice, tokens_to_merge, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_merge, network_providers.proxy)
 
         # Verify: supply unchanged
