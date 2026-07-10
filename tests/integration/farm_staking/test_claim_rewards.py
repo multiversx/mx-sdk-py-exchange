@@ -16,24 +16,24 @@ Coverage: 8 tests (P0 - critical path)
 
 import pytest
 from multiversx_sdk import Address
-from utils.logger import get_logger
-from utils.utils_chain import nominated_amount, decode_merged_attributes
-from utils.utils_tx import ESDTToken, multi_esdt_endpoint_call
-from utils import decoding_structures
+
 from tests.helpers import TransactionAssertions
 from tests.integration.farm_staking import (
-    _get_staking_state,
     _check_staking_has_code,
+    _claim_rewards,
+    _ensure_rewards_available,
+    _get_farm_tokens_for_user,
     _get_stake_amount,
     _stake_farm,
-    _claim_rewards,
-    _get_farm_tokens_for_user,
 )
+from utils import decoding_structures
+from utils.logger import get_logger
+from utils.utils_chain import decode_merged_attributes, nominated_amount
+from utils.utils_tx import ESDTToken, multi_esdt_endpoint_call
 
 logger = get_logger(__name__)
 
 
-@pytest.mark.usefixtures("seed_staking_rewards")
 class TestClaimRewards:
     """Test suite for claimRewards endpoint"""
 
@@ -41,6 +41,8 @@ class TestClaimRewards:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -50,6 +52,15 @@ class TestClaimRewards:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -79,32 +90,19 @@ class TestClaimRewards:
         # Get farming token balance before claiming
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_before = sum(
-            t.balance for t in all_tokens_before if t.identifier == farming_token
+            t.amount for t in all_tokens_before if t.token.identifier == farming_token
         )
 
         # Claim rewards
         tx_claim = _claim_rewards(
             staking_contract,
             alice,
-            farm_token.token.nonce,
-            farm_token.balance,
+            old_nonce,
+            stake_amount,
             network_providers,
             blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
-
-        # Verify rewards received (farming token balance increased)
-        all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        farming_balance_after = sum(
-            t.balance for t in all_tokens_after if t.identifier == farming_token
-        )
-
-        rewards = farming_balance_after - farming_balance_before
-        assert rewards > 0, (
-            f"Expected rewards > 0:\n"
-            f"  Before: {farming_balance_before}\n"
-            f"  After: {farming_balance_after}"
-        )
 
         # Verify new farm token with updated RPS
         farm_tokens_after = _get_farm_tokens_for_user(
@@ -115,9 +113,20 @@ class TestClaimRewards:
 
         # New token should have different nonce (old burned, new minted)
         assert new_nonce != old_nonce, (
-            f"Expected new farm token nonce:\n"
-            f"  Old: {old_nonce}\n"
-            f"  New: {new_nonce}"
+            f"Expected new farm token nonce:\n  Old: {old_nonce}\n  New: {new_nonce}"
+        )
+
+        # Verify rewards received (farming token balance increased)
+        all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+        farming_balance_after = sum(
+            t.amount for t in all_tokens_after if t.token.identifier == farming_token
+        )
+
+        rewards = farming_balance_after - farming_balance_before
+        assert rewards > 0, (
+            f"Expected rewards > 0:\n"
+            f"  Before: {farming_balance_before}\n"
+            f"  After: {farming_balance_after}"
         )
 
         logger.info(
@@ -130,6 +139,8 @@ class TestClaimRewards:
         staking_contract,
         alice,
         bob,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -139,6 +150,15 @@ class TestClaimRewards:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         base_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -174,13 +194,19 @@ class TestClaimRewards:
 
         # Get balances before claiming
         alice_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        alice_balance_before = sum(t.balance for t in alice_tokens_before if t.identifier == farming_token)
+        alice_balance_before = sum(
+            t.amount for t in alice_tokens_before if t.token.identifier == farming_token
+        )
 
         bob_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(bob.address)
-        bob_balance_before = sum(t.balance for t in bob_tokens_before if t.identifier == farming_token)
+        bob_balance_before = sum(
+            t.amount for t in bob_tokens_before if t.token.identifier == farming_token
+        )
 
         # Both claim
-        alice_farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
+        alice_farm_tokens = _get_farm_tokens_for_user(
+            staking_contract, alice, network_providers.proxy
+        )
         alice_farm_token = max(alice_farm_tokens, key=lambda t: t.token.nonce)
 
         bob_farm_tokens = _get_farm_tokens_for_user(staking_contract, bob, network_providers.proxy)
@@ -190,7 +216,7 @@ class TestClaimRewards:
             staking_contract,
             alice,
             alice_farm_token.token.nonce,
-            alice_farm_token.balance,
+            alice_farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -200,7 +226,7 @@ class TestClaimRewards:
             staking_contract,
             bob,
             bob_farm_token.token.nonce,
-            bob_farm_token.balance,
+            bob_farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -208,11 +234,15 @@ class TestClaimRewards:
 
         # Calculate rewards
         alice_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        alice_balance_after = sum(t.balance for t in alice_tokens_after if t.identifier == farming_token)
+        alice_balance_after = sum(
+            t.amount for t in alice_tokens_after if t.token.identifier == farming_token
+        )
         alice_rewards = alice_balance_after - alice_balance_before
 
         bob_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(bob.address)
-        bob_balance_after = sum(t.balance for t in bob_tokens_after if t.identifier == farming_token)
+        bob_balance_after = sum(
+            t.amount for t in bob_tokens_after if t.token.identifier == farming_token
+        )
         bob_rewards = bob_balance_after - bob_balance_before
 
         # Alice staked 2x, should get ~2x rewards (allowing 20% tolerance for timing)
@@ -239,6 +269,8 @@ class TestClaimRewards:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -248,6 +280,15 @@ class TestClaimRewards:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -271,20 +312,24 @@ class TestClaimRewards:
         farm_token_1 = max(farm_tokens_1, key=lambda t: t.token.nonce)
 
         all_tokens_before_1 = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_before_1 = sum(t.balance for t in all_tokens_before_1 if t.identifier == farming_token)
+        balance_before_1 = sum(
+            t.amount for t in all_tokens_before_1 if t.token.identifier == farming_token
+        )
 
         tx_claim_1 = _claim_rewards(
             staking_contract,
             alice,
             farm_token_1.token.nonce,
-            farm_token_1.balance,
+            farm_token_1.amount,
             network_providers,
             blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim_1, network_providers.proxy)
 
         all_tokens_after_1 = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_after_1 = sum(t.balance for t in all_tokens_after_1 if t.identifier == farming_token)
+        balance_after_1 = sum(
+            t.amount for t in all_tokens_after_1 if t.token.identifier == farming_token
+        )
         rewards_1 = balance_after_1 - balance_before_1
 
         logger.info(f"  First claim: {rewards_1} rewards")
@@ -296,20 +341,24 @@ class TestClaimRewards:
         farm_token_2 = max(farm_tokens_2, key=lambda t: t.token.nonce)
 
         all_tokens_before_2 = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_before_2 = sum(t.balance for t in all_tokens_before_2 if t.identifier == farming_token)
+        balance_before_2 = sum(
+            t.amount for t in all_tokens_before_2 if t.token.identifier == farming_token
+        )
 
         tx_claim_2 = _claim_rewards(
             staking_contract,
             alice,
             farm_token_2.token.nonce,
-            farm_token_2.balance,
+            farm_token_2.amount,
             network_providers,
             blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim_2, network_providers.proxy)
 
         all_tokens_after_2 = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_after_2 = sum(t.balance for t in all_tokens_after_2 if t.identifier == farming_token)
+        balance_after_2 = sum(
+            t.amount for t in all_tokens_after_2 if t.token.identifier == farming_token
+        )
         rewards_2 = balance_after_2 - balance_before_2
 
         logger.info(f"  Second claim: {rewards_2} rewards")
@@ -328,12 +377,16 @@ class TestClaimRewards:
             f"  Ratio: {ratio:.2f} (expected ~1.0)"
         )
 
-        logger.info(f"✓ Consecutive claims: first={rewards_1}, second={rewards_2}, no double-counting")
+        logger.info(
+            f"✓ Consecutive claims: first={rewards_1}, second={rewards_2}, no double-counting"
+        )
 
     def test_claim_rewards_zero_accrued(
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -343,6 +396,15 @@ class TestClaimRewards:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -364,13 +426,13 @@ class TestClaimRewards:
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_before = sum(t.balance for t in all_tokens_before if t.identifier == farming_token)
+        balance_before = sum(t.amount for t in all_tokens_before if t.token.identifier == farming_token)
 
         tx_claim = _claim_rewards(
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -379,7 +441,7 @@ class TestClaimRewards:
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_after = sum(t.balance for t in all_tokens_after if t.identifier == farming_token)
+        balance_after = sum(t.amount for t in all_tokens_after if t.token.identifier == farming_token)
         rewards = balance_after - balance_before
 
         # Rewards should be zero or very small (minimal time passed during tx processing)
@@ -396,6 +458,8 @@ class TestClaimRewards:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -405,6 +469,15 @@ class TestClaimRewards:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -435,7 +508,7 @@ class TestClaimRewards:
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -445,7 +518,9 @@ class TestClaimRewards:
         global_rps_after = staking_contract.get_reward_per_share(network_providers.proxy)
 
         # Get new farm token and check RPS attribute
-        farm_tokens_after = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
+        farm_tokens_after = _get_farm_tokens_for_user(
+            staking_contract, alice, network_providers.proxy
+        )
         new_farm_token = max(farm_tokens_after, key=lambda t: t.token.nonce)
 
         attrs_hex = new_farm_token.attributes.hex()
@@ -469,6 +544,8 @@ class TestClaimRewards:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -478,6 +555,15 @@ class TestClaimRewards:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -507,7 +593,7 @@ class TestClaimRewards:
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -568,6 +654,8 @@ class TestClaimRewards:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -577,6 +665,15 @@ class TestClaimRewards:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -602,7 +699,7 @@ class TestClaimRewards:
 
         # Get balance before claiming
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_before = sum(t.balance for t in all_tokens_before if t.identifier == farming_token)
+        balance_before = sum(t.amount for t in all_tokens_before if t.token.identifier == farming_token)
 
         # Claim
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
@@ -612,7 +709,7 @@ class TestClaimRewards:
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -620,7 +717,7 @@ class TestClaimRewards:
 
         # Calculate actual rewards
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_after = sum(t.balance for t in all_tokens_after if t.identifier == farming_token)
+        balance_after = sum(t.amount for t in all_tokens_after if t.token.identifier == farming_token)
         actual_rewards = balance_after - balance_before
 
         # Calculate APR-bounded maximum
@@ -628,7 +725,9 @@ class TestClaimRewards:
         SECONDS_IN_YEAR = 31_536_000
         MAX_PERCENT = 10_000
 
-        apr_bounded_max = (stake_amount * max_apr * elapsed_seconds) // (MAX_PERCENT * SECONDS_IN_YEAR)
+        apr_bounded_max = (stake_amount * max_apr * elapsed_seconds) // (
+            MAX_PERCENT * SECONDS_IN_YEAR
+        )
 
         # Actual rewards should not significantly exceed APR cap
         tolerance = apr_bounded_max // 10  # 10% tolerance

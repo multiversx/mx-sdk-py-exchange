@@ -23,7 +23,6 @@ from tests.integration.farm_staking import (
 logger = get_logger(__name__)
 
 
-@pytest.mark.usefixtures("seed_staking_rewards")
 class TestCompoundRewards:
     """Test suite for compoundRewards endpoint (unique to staking contracts)"""
 
@@ -54,7 +53,7 @@ class TestCompoundRewards:
 
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
-        old_amount = farm_token.balance
+        old_amount = farm_token.amount
         old_nonce = farm_token.token.nonce
 
         # Wait for rewards
@@ -62,7 +61,7 @@ class TestCompoundRewards:
 
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_before = sum(
-            t.balance for t in all_tokens_before if t.identifier == farming_token
+            t.amount for t in all_tokens_before if t.token.identifier == farming_token
         )
 
         # Get RPS before compound (to estimate rewards)
@@ -75,7 +74,7 @@ class TestCompoundRewards:
 
         # Compound
         tx_compound = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_compound, network_providers.proxy)
@@ -84,10 +83,10 @@ class TestCompoundRewards:
         farm_tokens_after = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         new_token = max(farm_tokens_after, key=lambda t: t.token.nonce)
 
-        assert new_token.balance > old_amount, (
+        assert new_token.amount > old_amount, (
             f"Compounded farm token should be larger:\n"
             f"  Before: {old_amount}\n"
-            f"  After: {new_token.balance}"
+            f"  After: {new_token.amount}"
         )
 
         # New nonce (old burned, new minted)
@@ -96,7 +95,7 @@ class TestCompoundRewards:
         # No separate reward output (rewards are embedded into the new token)
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_after = sum(
-            t.balance for t in all_tokens_after if t.identifier == farming_token
+            t.amount for t in all_tokens_after if t.token.identifier == farming_token
         )
         loose_rewards = farming_balance_after - farming_balance_before
         assert loose_rewards == 0, (
@@ -107,8 +106,8 @@ class TestCompoundRewards:
         )
 
         logger.info(
-            f"✓ Compounded: {old_amount} → {new_token.balance} "
-            f"(+{new_token.balance - old_amount})"
+            f"✓ Compounded: {old_amount} → {new_token.amount} "
+            f"(+{new_token.amount - old_amount})"
         )
 
     def test_compound_updates_compounded_reward_attr(
@@ -148,7 +147,7 @@ class TestCompoundRewards:
         blockchain_controller.wait_blocks(10)
 
         tx_compound = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_compound, network_providers.proxy)
@@ -168,7 +167,7 @@ class TestCompoundRewards:
 
         # compounded_reward = current_farm_amount - original_stake
         # (current_farm_amount = original + compounded)
-        expected_compounded = new_token.balance - stake_amount
+        expected_compounded = new_token.amount - stake_amount
         assert abs(compounded - expected_compounded) <= stake_amount // 100, (
             f"compounded_reward should match (current_amount - original):\n"
             f"  compounded_reward attr: {compounded}\n"
@@ -211,7 +210,7 @@ class TestCompoundRewards:
         blockchain_controller.wait_blocks(10)
 
         tx_compound = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_compound, network_providers.proxy)
@@ -260,7 +259,7 @@ class TestCompoundRewards:
         blockchain_controller.wait_blocks(10)
 
         tx_compound = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_compound, network_providers.proxy)
@@ -303,30 +302,30 @@ class TestCompoundRewards:
         blockchain_controller.wait_blocks(10)
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
-        amount_before_first = farm_token.balance
+        amount_before_first = farm_token.amount
 
         tx_1 = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_1, network_providers.proxy)
 
         farm_tokens_1 = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         token_1 = max(farm_tokens_1, key=lambda t: t.token.nonce)
-        amount_after_first = token_1.balance
+        amount_after_first = token_1.amount
         assert amount_after_first > amount_before_first
 
         # Second compound
         blockchain_controller.wait_blocks(10)
         tx_2 = _compound_rewards(
-            staking_contract, alice, token_1.token.nonce, token_1.balance,
+            staking_contract, alice, token_1.token.nonce, token_1.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_2, network_providers.proxy)
 
         farm_tokens_2 = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         token_2 = max(farm_tokens_2, key=lambda t: t.token.nonce)
-        amount_after_second = token_2.balance
+        amount_after_second = token_2.amount
 
         assert amount_after_second > amount_after_first, (
             f"Second compound should further increase amount:\n"
@@ -369,11 +368,11 @@ class TestCompoundRewards:
 
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
-        original_amount = farm_token.balance
+        original_amount = farm_token.amount
 
         # Compound immediately (no time for rewards to accrue)
         tx_compound = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
 
@@ -385,15 +384,15 @@ class TestCompoundRewards:
 
         # Amount should be same (or very slightly higher due to tx time)
         tolerance = stake_amount // 100
-        assert new_token.balance >= original_amount, (
+        assert new_token.amount >= original_amount, (
             f"Amount should not decrease on zero-reward compound:\n"
             f"  Before: {original_amount}\n"
-            f"  After: {new_token.balance}"
+            f"  After: {new_token.amount}"
         )
-        assert new_token.balance <= original_amount + tolerance, (
+        assert new_token.amount <= original_amount + tolerance, (
             f"Amount increased more than expected for zero-reward compound:\n"
             f"  Before: {original_amount}\n"
-            f"  After: {new_token.balance}"
+            f"  After: {new_token.amount}"
         )
 
-        logger.info(f"✓ Zero-reward compound succeeded: {original_amount} → {new_token.balance}")
+        logger.info(f"✓ Zero-reward compound succeeded: {original_amount} → {new_token.amount}")

@@ -26,6 +26,7 @@ from tests.integration.farm_staking import (
     _get_farm_tokens_for_user,
     _get_unbond_tokens_for_user,
     _ensure_deployer_has_egld,
+    _ensure_rewards_available,
 )
 
 logger = get_logger(__name__)
@@ -54,8 +55,8 @@ class TestEdgeCases:
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
 
         farming_before = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         # Stake
@@ -70,14 +71,14 @@ class TestEdgeCases:
 
         # Immediately unstake (same block or next)
         tx_unstake = _unstake_farm(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_unstake, network_providers.proxy)
 
         farming_after = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         # Should receive back approximately what was staked (minimal/zero rewards)
@@ -96,6 +97,8 @@ class TestEdgeCases:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -105,6 +108,15 @@ class TestEdgeCases:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         dust_amount = nominated_amount(1)  # 1 full token (10^18 wei)
@@ -123,7 +135,7 @@ class TestEdgeCases:
 
         # Claim rewards — may be 0 but should not error
         tx_claim = _claim_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
@@ -134,6 +146,8 @@ class TestEdgeCases:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -143,6 +157,15 @@ class TestEdgeCases:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
 
@@ -174,7 +197,7 @@ class TestEdgeCases:
 
         # Claim — verifies RPS calculation doesn't overflow
         tx_claim = _claim_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
@@ -216,7 +239,7 @@ class TestEdgeCases:
             farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
             tx_unstake = _unstake_farm(
-                staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+                staking_contract, alice, farm_token.token.nonce, farm_token.amount,
                 network_providers, blockchain_controller,
             )
             TransactionAssertions.assert_transaction_success(tx_unstake, network_providers.proxy)
@@ -287,19 +310,19 @@ class TestEdgeCases:
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
         bal_before = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         tx_claim = _claim_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         bal_after = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
         rewards = bal_after - bal_before
 
@@ -310,16 +333,26 @@ class TestEdgeCases:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
-        seed_staking_rewards,
     ):
         """Compound then unstake: total = original + compounded, no loss"""
         logger.info("TEST: Compound then unstake")
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -338,39 +371,39 @@ class TestEdgeCases:
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
         tx_compound = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_compound, network_providers.proxy)
 
         farm_tokens_after_compound = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         compounded_token = max(farm_tokens_after_compound, key=lambda t: t.token.nonce)
-        compounded_amount = compounded_token.balance
+        compounded_amount = compounded_token.amount
 
         assert compounded_amount > stake_amount, "Compounded amount should be > original stake"
 
         # Now unstake the compounded position
         bal_before_unstake = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         tx_unstake = _unstake_farm(
-            staking_contract, alice, compounded_token.token.nonce, compounded_token.balance,
+            staking_contract, alice, compounded_token.token.nonce, compounded_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_unstake, network_providers.proxy)
 
         # Rewards returned immediately (from RPS diff after compound)
         bal_after_unstake = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         # Should receive at least the compounded amount as unbond token
         # (unbond token represents the compounded principal)
         unbond_tokens = _get_unbond_tokens_for_user(staking_contract, alice, network_providers.proxy)
-        unbond_amount = max((t.balance for t in unbond_tokens), default=0)
+        unbond_amount = max((t.amount for t in unbond_tokens), default=0)
 
         assert unbond_amount == compounded_amount, (
             f"Unbond token should match full compounded position:\n"

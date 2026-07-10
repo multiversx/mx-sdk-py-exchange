@@ -22,6 +22,7 @@ from tests.integration.farm_staking import (
     _get_stake_amount,
     _stake_farm,
     _get_farm_tokens_for_user,
+    _ensure_rewards_available,
 )
 
 logger = get_logger(__name__)
@@ -308,7 +309,7 @@ class TestViewFunctions:
 
         # Also verify it matches sum of held farm tokens
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
-        total_held = sum(t.balance for t in farm_tokens)
+        total_held = sum(t.amount for t in farm_tokens)
         # Note: total_held may exceed position if user has unbond tokens; use tolerance
         tolerance = stake_amount
         assert abs(total_held - position_after) <= tolerance, (
@@ -323,6 +324,8 @@ class TestViewFunctions:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -332,6 +335,15 @@ class TestViewFunctions:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -347,7 +359,7 @@ class TestViewFunctions:
 
         # Get farming token balance before actual claim
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_before = sum(t.balance for t in all_tokens_before if t.identifier == farming_token)
+        balance_before = sum(t.amount for t in all_tokens_before if t.token.identifier == farming_token)
 
         # View-only calculation
         from utils.contract_data_fetchers import StakingContractDataFetcher
@@ -360,13 +372,13 @@ class TestViewFunctions:
         # Since decoding its args is complex, we verify the claim gives reasonable rewards
         from tests.integration.farm_staking import _claim_rewards
         tx_claim = _claim_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_after = sum(t.balance for t in all_tokens_after if t.identifier == farming_token)
+        balance_after = sum(t.amount for t in all_tokens_after if t.token.identifier == farming_token)
         actual_rewards = balance_after - balance_before
 
         assert actual_rewards >= 0, f"Rewards must be >= 0, got {actual_rewards}"

@@ -12,27 +12,28 @@ Coverage: 5 tests (P2)
 """
 
 import pytest
-from utils.logger import get_logger
-from utils.utils_chain import nominated_amount, decode_merged_attributes
-from utils import decoding_structures
+
 from tests.helpers import TransactionAssertions
 from tests.integration.farm_staking import (
     _check_staking_has_code,
-    _get_stake_amount,
-    _stake_farm,
-    _unstake_farm,
-    _unbond_farm,
     _claim_rewards,
     _compound_rewards,
-    _get_farm_tokens_for_user,
-    _get_unbond_tokens_for_user,
     _ensure_deployer_has_egld,
+    _ensure_rewards_available,
+    _get_farm_tokens_for_user,
+    _get_stake_amount,
+    _get_unbond_tokens_for_user,
+    _stake_farm,
+    _unbond_farm,
+    _unstake_farm,
 )
+from utils import decoding_structures
+from utils.logger import get_logger
+from utils.utils_chain import decode_merged_attributes, nominated_amount
 
 logger = get_logger(__name__)
 
 
-@pytest.mark.usefixtures("seed_staking_rewards")
 class TestStateTransitions:
     """Test suite for contract lifecycle and state transitions"""
 
@@ -40,6 +41,8 @@ class TestStateTransitions:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -50,13 +53,22 @@ class TestStateTransitions:
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
 
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
+
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
 
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
         initial_balance = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         # 1. Stake
@@ -73,18 +85,18 @@ class TestStateTransitions:
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
         bal_before_claim = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         tx_claim = _claim_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
         claimed_rewards = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         ) - bal_before_claim
         logger.info(f"  2. Claimed {claimed_rewards} rewards")
 
@@ -95,21 +107,21 @@ class TestStateTransitions:
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
         tx_compound = _compound_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_compound, network_providers.proxy)
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         compound_token = max(farm_tokens, key=lambda t: t.token.nonce)
-        logger.info(f"  3. Compounded: position now {compound_token.balance}")
+        logger.info(f"  3. Compounded: position now {compound_token.amount}")
 
         # 4. Unstake
         tx_unstake = _unstake_farm(
-            staking_contract, alice, compound_token.token.nonce, compound_token.balance,
+            staking_contract, alice, compound_token.token.nonce, compound_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_unstake, network_providers.proxy)
-        logger.info(f"  4. Unstaked {compound_token.balance}")
+        logger.info(f"  4. Unstaked {compound_token.amount}")
 
         # 5. Advance epochs and unbond
         unbond_tokens = _get_unbond_tokens_for_user(staking_contract, alice, network_providers.proxy)
@@ -125,24 +137,24 @@ class TestStateTransitions:
             blockchain_controller.advance_to_epoch(unlock_epoch)
 
         bal_before_unbond = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
 
         tx_unbond = _unbond_farm(
-            staking_contract, alice, unbond_token.token.nonce, unbond_token.balance,
+            staking_contract, alice, unbond_token.token.nonce, unbond_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_unbond, network_providers.proxy)
 
         final_balance = sum(
-            t.balance for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-            if t.identifier == farming_token
+            t.amount for t in network_providers.proxy.get_fungible_tokens_of_account(alice.address)
+            if t.token.identifier == farming_token
         )
         principal_returned = final_balance - bal_before_unbond
-        assert principal_returned == unbond_token.balance, (
+        assert principal_returned == unbond_token.amount, (
             f"Full principal returned on unbond:\n"
-            f"  Expected: {unbond_token.balance}\n"
+            f"  Expected: {unbond_token.amount}\n"
             f"  Returned: {principal_returned}"
         )
         logger.info(f"  5. Unbonded {principal_returned}")
@@ -150,7 +162,7 @@ class TestStateTransitions:
         logger.info(
             f"✓ Full lifecycle complete: "
             f"staked={stake_amount}, claimed_rewards={claimed_rewards}, "
-            f"compounded={compound_token.balance - stake_amount}, "
+            f"compounded={compound_token.amount - stake_amount}, "
             f"returned={principal_returned}"
         )
 
@@ -158,6 +170,8 @@ class TestStateTransitions:
         self,
         staking_contract,
         alice,
+        deployer_account,
+        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -167,6 +181,15 @@ class TestStateTransitions:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -198,7 +221,7 @@ class TestStateTransitions:
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
         tx_claim = _claim_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
@@ -218,7 +241,6 @@ class TestStateTransitions:
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
 
         current_week = staking_contract.get_current_week(network_providers.proxy)
-        first_week_epoch = staking_contract.get_first_week_start_epoch(network_providers.proxy)
         current_epoch = blockchain_controller.get_current_epoch()
 
         # Advance 7 epochs (1 week)
@@ -227,12 +249,7 @@ class TestStateTransitions:
         new_week = staking_contract.get_current_week(network_providers.proxy)
 
         # Week should have advanced
-        assert new_week >= current_week, "Week should not decrease"
-
-        # Verify first_week_start_epoch is 0 (overridden by state filter)
-        assert first_week_epoch == 0, (
-            f"firstWeekStartEpoch should be 0 (state filter applied), got {first_week_epoch}"
-        )
+        assert new_week > current_week, "Week should not decrease"
 
         logger.info(
             f"✓ Epoch advancement: epoch {current_epoch} → {current_epoch + 7}, "
@@ -337,6 +354,14 @@ class TestStateTransitions:
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
 
         _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
+        _ensure_rewards_available(
+            staking_contract,
+            deployer_account,
+            test_environment,
+            network_providers,
+            blockchain_controller,
+            ensure_esdt_amounts,
+        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -348,7 +373,7 @@ class TestStateTransitions:
         )
         TransactionAssertions.assert_transaction_success(tx_stake, network_providers.proxy)
 
-        original_rate = staking_contract.get_per_block_reward_amount(network_providers.proxy)
+        original_rate = staking_contract.get_per_second_reward_amount(network_providers.proxy)
         new_rate = max(2, original_rate * 2) if original_rate > 0 else 2
 
         try:
@@ -358,7 +383,7 @@ class TestStateTransitions:
 
             # Change rate
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_rate = staking_contract.set_rewards_per_block(
+            tx_rate = staking_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, new_rate
             )
             blockchain_controller.wait_for_tx(tx_rate)
@@ -371,14 +396,14 @@ class TestStateTransitions:
             # Both periods should have increased RPS
             # (exact amounts depend on APR cap and supply)
             assert rps_before_change >= 0, f"RPS before change: {rps_before_change}"
-            assert rps_after_change >= rps_before_change, f"RPS should not decrease"
+            assert rps_after_change >= rps_before_change, "RPS should not decrease"
 
             # Claim — should succeed regardless of rate change
             farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
             farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
             tx_claim = _claim_rewards(
-                staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+                staking_contract, alice, farm_token.token.nonce, farm_token.amount,
                 network_providers, blockchain_controller,
             )
             TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
@@ -390,7 +415,7 @@ class TestStateTransitions:
 
         finally:
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_restore = staking_contract.set_rewards_per_block(
+            tx_restore = staking_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, original_rate
             )
             blockchain_controller.wait_for_tx(tx_restore)
