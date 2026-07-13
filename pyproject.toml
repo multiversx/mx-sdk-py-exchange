@@ -1,0 +1,55 @@
+[tool.ruff]
+# Match Black's default; 100 is also a popular modern choice — pick one and commit to it.
+line-length = 100
+indent-width = 4
+# Set this to YOUR project's minimum Python version. Drives version-specific rules/fixes.
+target-version = "py312"
+
+# Directories Ruff should never touch (these are sensible defaults).
+extend-exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes (unused imports/vars, undefined names)
+    "I",    # isort (import sorting — replaces your old isort)
+    "N",    # pep8-naming
+    "UP",   # pyupgrade (modernize syntax for your target-version)
+    "B",    # flake8-bugbear (likely-bug patterns)
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RET",  # flake8-return
+    "PTH",  # prefer pathlib over os.path
+    "TID",  # tidy imports
+    "TC",   # type-checking import hygiene (TYPE_CHECKING blocks)
+    "ICN",  # import naming conventions (np, pd, etc.)
+    "FURB", # refurb — more idiomatic patterns
+    "RUF",  # Ruff-specific rules
+]
+ignore = [
+    "E501",   # line length — the formatter handles this; linting it is just noise
+    "ISC001", # single-line implicit string concat — conflicts with the formatter
+]
+
+# Let Ruff auto-remove unused imports, sort imports, etc. on `ruff check --fix`.
+fixable = ["ALL"]
+unfixable = ["F401"] # but DON'T silently delete unused imports — make them visible first
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]      # re-exporting in package __init__ is intentional
+"tests/**/*.py" = ["N802"]    # allow non-PEP8 test method names (e.g. test_FooBar)
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"          # only matters if you later enable the "D" docstring rules
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true   # format code blocks inside your docstrings too
+line-ending = "auto"
