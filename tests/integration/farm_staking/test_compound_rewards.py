@@ -9,7 +9,7 @@ Coverage: 6 tests (P1)
 
 import pytest
 from utils.logger import get_logger
-from utils.utils_chain import nominated_amount, decode_merged_attributes
+from utils.utils_chain import decode_merged_attributes
 from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm_staking import (

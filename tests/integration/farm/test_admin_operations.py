@@ -24,7 +24,6 @@ import pytest
 
 import config
 from contracts.farm_contract import FarmContract
-from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
     _check_farm_has_code,

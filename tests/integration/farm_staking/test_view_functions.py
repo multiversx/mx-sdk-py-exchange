@@ -15,7 +15,6 @@ Coverage: 13 tests (P1)
 
 import pytest
 from utils.logger import get_logger
-from utils.utils_chain import nominated_amount
 from tests.helpers import TransactionAssertions
 from tests.integration.farm_staking import (
     _check_staking_has_code,

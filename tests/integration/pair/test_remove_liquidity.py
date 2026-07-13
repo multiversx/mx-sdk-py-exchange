@@ -12,14 +12,12 @@ Usage:
     pytest --env=devnet tests/integration/pair/test_remove_liquidity.py -m "not slow"
 """
 
-from multiversx_sdk import Address, find_events_by_identifier, Token
+from multiversx_sdk import Address, Token
 import pytest
 
-import config
-from contracts.builtin_contracts import ESDTContract
-from contracts.pair_contract import PairContract, AddLiquidityEvent, RemoveLiquidityEvent, SwapFixedInputEvent, PairContractVersion
+from contracts.pair_contract import PairContract, AddLiquidityEvent, RemoveLiquidityEvent, SwapFixedInputEvent
 from utils.contract_data_fetchers import PairContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string
+from utils.utils_chain import nominated_amount, Account
 from utils.utils_tx import multi_esdt_transfer, ESDTToken
 from tests.helpers import PairAssertions, TransactionAssertions
 from utils.logger import get_logger

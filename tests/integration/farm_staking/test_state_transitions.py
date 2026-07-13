@@ -29,7 +29,7 @@ from tests.integration.farm_staking import (
 )
 from utils import decoding_structures
 from utils.logger import get_logger
-from utils.utils_chain import decode_merged_attributes, nominated_amount
+from utils.utils_chain import decode_merged_attributes
 
 logger = get_logger(__name__)
 
