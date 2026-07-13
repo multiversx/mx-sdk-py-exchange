@@ -5,11 +5,11 @@ import time
 import config
 from argparse import ArgumentParser
 from multiversx_sdk import Address, SmartContractController
-from multiversx_sdk.abi import AddressValue, U64Value, TokenIdentifierValue, BigUIntValue, Abi
+from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue, Abi
 from typing import List, Any
 from context import Context
 from utils.contract_data_fetchers import PairContractDataFetcher
-from utils.utils_chain import decode_merged_attributes, string_to_hex, dec_to_padded_hex
+from utils.utils_chain import decode_merged_attributes
 from pathlib import Path
 from contracts.pair_contract import PairContract
 
