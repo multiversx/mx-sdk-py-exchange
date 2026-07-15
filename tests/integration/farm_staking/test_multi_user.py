@@ -17,12 +17,12 @@ from tests.integration.farm_staking import (
     _claim_rewards,
     _unstake_farm,
     _get_farm_tokens_for_user,
-    _ensure_rewards_available,
 )
 
 logger = get_logger(__name__)
 
 
+@pytest.mark.usefixtures("seed_staking_rewards")
 class TestMultiUser:
     """Test suite for multi-user reward distribution scenarios"""
 
@@ -35,8 +35,6 @@ class TestMultiUser:
         staking_contract,
         alice,
         bob,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -46,15 +44,6 @@ class TestMultiUser:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -104,8 +93,6 @@ class TestMultiUser:
         staking_contract,
         alice,
         bob,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -115,15 +102,6 @@ class TestMultiUser:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -173,8 +151,6 @@ class TestMultiUser:
         staking_contract,
         alice,
         bob,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -184,15 +160,6 @@ class TestMultiUser:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
@@ -239,8 +206,6 @@ class TestMultiUser:
         staking_contract,
         alice,
         bob,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -250,15 +215,6 @@ class TestMultiUser:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)

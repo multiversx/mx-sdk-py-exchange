@@ -21,7 +21,6 @@ from tests.integration.farm_staking import (
     _get_stake_amount,
     _stake_farm,
     _get_farm_tokens_for_user,
-    _ensure_rewards_available,
 )
 
 logger = get_logger(__name__)
@@ -319,12 +318,11 @@ class TestViewFunctions:
 
         logger.info(f"✓ getUserTotalFarmPosition: {position_before} → {position_after}")
 
+    @pytest.mark.usefixtures("seed_staking_rewards")
     def test_calculate_rewards_for_position(
         self,
         staking_contract,
         alice,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -334,15 +332,6 @@ class TestViewFunctions:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)

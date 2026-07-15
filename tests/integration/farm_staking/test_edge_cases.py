@@ -26,12 +26,12 @@ from tests.integration.farm_staking import (
     _get_farm_tokens_for_user,
     _get_unbond_tokens_for_user,
     _ensure_deployer_has_egld,
-    _ensure_rewards_available,
 )
 
 logger = get_logger(__name__)
 
 
+@pytest.mark.usefixtures("seed_staking_rewards")
 class TestEdgeCases:
     """Test suite for edge cases and boundary conditions"""
 
@@ -97,8 +97,6 @@ class TestEdgeCases:
         self,
         staking_contract,
         alice,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -108,15 +106,6 @@ class TestEdgeCases:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
         dust_amount = nominated_amount(1)  # 1 full token (10^18 wei)
@@ -146,8 +135,6 @@ class TestEdgeCases:
         self,
         staking_contract,
         alice,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -157,15 +144,6 @@ class TestEdgeCases:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
 
@@ -333,8 +311,6 @@ class TestEdgeCases:
         self,
         staking_contract,
         alice,
-        deployer_account,
-        test_environment,
         network_providers,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -344,15 +320,6 @@ class TestEdgeCases:
 
         if not _check_staking_has_code(staking_contract, network_providers.proxy):
             pytest.skip("Staking contract bytecode not loaded on chain simulator")
-
-        _ensure_rewards_available(
-            staking_contract,
-            deployer_account,
-            test_environment,
-            network_providers,
-            blockchain_controller,
-            ensure_esdt_amounts,
-        )
 
         farming_token = staking_contract.farming_token
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
