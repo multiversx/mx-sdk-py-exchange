@@ -31,7 +31,6 @@ from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import nominated_amount, Account
 from tests.helpers import PairAssertions, TransactionAssertions
 from utils.logger import get_logger
-from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
 
 
 logger = get_logger(__name__)

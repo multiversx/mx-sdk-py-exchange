@@ -32,11 +32,8 @@ from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
 
 import config
 from contracts.pair_contract import PairContract, PairContractVersion, SwapFixedInputEvent, AddLiquidityEvent
-from contracts.farm_contract import FarmContract
-from contracts.staking_contract import StakingContract
 from utils.contract_data_fetchers import PairContractDataFetcher, FarmContractDataFetcher
-from utils.utils_chain import Account, nominated_amount
-from utils.utils_tx import NetworkProviders
+from utils.utils_chain import Account
 from utils.logger import get_logger
 from tests.helpers import PairAssertions, TransactionAssertions
 

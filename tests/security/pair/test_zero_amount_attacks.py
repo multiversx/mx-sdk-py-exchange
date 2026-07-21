@@ -21,7 +21,6 @@ Run:
 """
 
 import pytest
-from multiversx_sdk import Address
 
 from contracts.pair_contract import PairContract, SwapFixedInputEvent, AddLiquidityEvent, RemoveLiquidityEvent
 from utils.utils_chain import nominated_amount, Account

@@ -18,7 +18,6 @@ from utils.utils_chain import nominated_amount, decode_merged_attributes
 from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm_staking import (
-    _get_staking_state,
     _check_staking_has_code,
     _get_stake_amount,
     _stake_farm,
@@ -30,7 +29,6 @@ from tests.integration.farm_staking import (
 logger = get_logger(__name__)
 
 
-@pytest.mark.usefixtures("seed_staking_rewards")
 class TestUnstakeFarm:
     """Test suite for unstakeFarm endpoint"""
 
@@ -67,7 +65,7 @@ class TestUnstakeFarm:
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
         farm_nonce = farm_token.token.nonce
-        farm_amount = farm_token.balance
+        farm_amount = farm_token.amount
 
         # Wait some time for rewards to accumulate
         blockchain_controller.wait_blocks(5)
@@ -75,7 +73,7 @@ class TestUnstakeFarm:
         # Get farming token balance before unstaking
         all_tokens = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_before = sum(
-            t.balance for t in all_tokens if t.identifier == farming_token
+            t.amount for t in all_tokens if t.token.identifier == farming_token
         )
 
         blockchain_controller.wait_blocks(5)
@@ -94,7 +92,7 @@ class TestUnstakeFarm:
         # Verify rewards received (farming token balance should increase)
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_after = sum(
-            t.balance for t in all_tokens_after if t.identifier == farming_token
+            t.amount for t in all_tokens_after if t.token.identifier == farming_token
         )
 
         assert farming_balance_after > farming_balance_before, (
@@ -153,7 +151,7 @@ class TestUnstakeFarm:
         )
         farm_token = max(farm_tokens_before, key=lambda t: t.token.nonce)
         farm_nonce = farm_token.token.nonce
-        farm_amount = farm_token.balance
+        farm_amount = farm_token.amount
 
         # Unstake half
         unstake_amount = farm_amount // 2
@@ -188,10 +186,10 @@ class TestUnstakeFarm:
         new_unbond_tokens = [t for t in unbond_tokens if t.token.nonce not in previous_unbond_nonces]
         assert new_unbond_tokens, "Expected a new unbond token after partial unstake"
         unbond_token = max(new_unbond_tokens, key=lambda t: t.token.nonce)
-        assert abs(unbond_token.balance - unstake_amount) <= tolerance, (
+        assert abs(unbond_token.amount - unstake_amount) <= tolerance, (
             f"Unbond token amount incorrect after partial unstake:\n"
             f"  Expected: {unstake_amount}\n"
-            f"  Actual: {unbond_token.balance}\n"
+            f"  Actual: {unbond_token.amount}\n"
             f"  Tolerance: {tolerance}"
         )
 
@@ -237,7 +235,7 @@ class TestUnstakeFarm:
         # Get farming token balance before unstaking
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_before = sum(
-            t.balance for t in all_tokens_before if t.identifier == farming_token
+            t.amount for t in all_tokens_before if t.token.identifier == farming_token
         )
 
         # Unstake
@@ -245,7 +243,7 @@ class TestUnstakeFarm:
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -254,7 +252,7 @@ class TestUnstakeFarm:
         # Get farming token balance after unstaking
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_after = sum(
-            t.balance for t in all_tokens_after if t.identifier == farming_token
+            t.amount for t in all_tokens_after if t.token.identifier == farming_token
         )
 
         # Verify reward token == farming token (same-token staking)
@@ -310,7 +308,7 @@ class TestUnstakeFarm:
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -384,7 +382,7 @@ class TestUnstakeFarm:
         # Get farming balance before unstaking
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_before = sum(
-            t.balance for t in all_tokens_before if t.identifier == farming_token
+            t.amount for t in all_tokens_before if t.token.identifier == farming_token
         )
 
         # Unstake
@@ -392,7 +390,7 @@ class TestUnstakeFarm:
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -401,7 +399,7 @@ class TestUnstakeFarm:
         # Calculate actual rewards received
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
         farming_balance_after = sum(
-            t.balance for t in all_tokens_after if t.identifier == farming_token
+            t.amount for t in all_tokens_after if t.token.identifier == farming_token
         )
         actual_rewards = farming_balance_after - farming_balance_before
 
@@ -576,7 +574,7 @@ class TestUnstakeFarm:
                 staking_contract,
                 alice,
                 farm_token.token.nonce,
-                farm_token.balance,
+                farm_token.amount,
                 network_providers,
                 blockchain_controller,
             )
@@ -648,7 +646,7 @@ class TestUnstakeFarm:
             staking_contract,
             alice,
             farm_token.token.nonce,
-            farm_token.balance,
+            farm_token.amount,
             network_providers,
             blockchain_controller,
         )
@@ -705,7 +703,7 @@ class TestUnstakeFarm:
         # Get farm token and unstake
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
-        unstake_amount = farm_token.balance
+        unstake_amount = farm_token.amount
 
         tx_unstake = _unstake_farm(
             staking_contract,

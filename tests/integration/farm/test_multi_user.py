@@ -21,32 +21,20 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
+    _claim_rewards,
     _enter_farm,
     _exit_farm,
-    _claim_rewards,
-    _claim_boosted_rewards,
+    _get_farm_state,
     _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _get_stake_amount,
 )
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -54,6 +42,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -99,13 +88,25 @@ class TestFarmMultiUser:
 
         # Both enter farm with equal amounts
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_a = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_a = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_a, network_providers.proxy)
 
         ensure_esdt_amounts(bob, {farming_token: stake_amount})
-        tx_b = _enter_farm(farm_contract, bob, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_b = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_b, network_providers.proxy)
 
         # Advance blocks for reward accrual
@@ -116,11 +117,21 @@ class TestFarmMultiUser:
         assert len(alice_farm_tokens) > 0, "Alice should have farm tokens"
         alice_ft = max(alice_farm_tokens, key=lambda t: t.token.nonce)
 
-        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_ca = _claim_rewards(farm_contract, alice, alice_ft.token.nonce,
-                               alice_ft.amount, network_providers, blockchain_controller)
+        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
+        tx_ca = _claim_rewards(
+            farm_contract,
+            alice,
+            alice_ft.token.nonce,
+            alice_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_ca, network_providers.proxy)
-        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         alice_reward = reserve_before_alice - reserve_after_alice
 
         # Bob claims
@@ -128,11 +139,21 @@ class TestFarmMultiUser:
         assert len(bob_farm_tokens) > 0, "Bob should have farm tokens"
         bob_ft = max(bob_farm_tokens, key=lambda t: t.token.nonce)
 
-        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_cb = _claim_rewards(farm_contract, bob, bob_ft.token.nonce,
-                               bob_ft.amount, network_providers, blockchain_controller)
+        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
+        tx_cb = _claim_rewards(
+            farm_contract,
+            bob,
+            bob_ft.token.nonce,
+            bob_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
-        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         bob_reward = reserve_before_bob - reserve_after_bob
 
         logger.info(f"Alice reward: {alice_reward}, Bob reward: {bob_reward}")
@@ -140,7 +161,7 @@ class TestFarmMultiUser:
         # Equal stakes should yield approximately equal rewards
         # Allow 20% tolerance due to block timing and existing farm state
         if alice_reward > 0 and bob_reward > 0:
-            ratio = alice_reward / bob_reward if bob_reward != 0 else float('inf')
+            ratio = alice_reward / bob_reward if bob_reward != 0 else float("inf")
             assert 0.8 <= ratio <= 1.2, (
                 f"Equal stakes should yield approximately equal rewards:\n"
                 f"  Alice reward: {alice_reward}\n"
@@ -184,8 +205,14 @@ class TestFarmMultiUser:
 
         # Alice enters first
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_a = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_a = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_a, network_providers.proxy)
 
         # Advance blocks while only Alice is in the farm
@@ -193,8 +220,14 @@ class TestFarmMultiUser:
 
         # Bob enters later
         ensure_esdt_amounts(bob, {farming_token: stake_amount})
-        tx_b = _enter_farm(farm_contract, bob, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_b = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_b, network_providers.proxy)
 
         # Advance more blocks (both in farm now)
@@ -204,22 +237,42 @@ class TestFarmMultiUser:
         alice_farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         alice_ft = max(alice_farm_tokens, key=lambda t: t.token.nonce)
 
-        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_ca = _claim_rewards(farm_contract, alice, alice_ft.token.nonce,
-                               alice_ft.amount, network_providers, blockchain_controller)
+        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
+        tx_ca = _claim_rewards(
+            farm_contract,
+            alice,
+            alice_ft.token.nonce,
+            alice_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_ca, network_providers.proxy)
-        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         alice_reward = reserve_before_alice - reserve_after_alice
 
         # Bob claims
         bob_farm_tokens = _get_farm_tokens_for_user(farm_contract, bob, network_providers.proxy)
         bob_ft = max(bob_farm_tokens, key=lambda t: t.token.nonce)
 
-        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_cb = _claim_rewards(farm_contract, bob, bob_ft.token.nonce,
-                               bob_ft.amount, network_providers, blockchain_controller)
+        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
+        tx_cb = _claim_rewards(
+            farm_contract,
+            bob,
+            bob_ft.token.nonce,
+            bob_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
-        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         bob_reward = reserve_before_bob - reserve_after_bob
 
         logger.info(f"Alice reward (entered first): {alice_reward}")
@@ -269,13 +322,25 @@ class TestFarmMultiUser:
 
         # Both enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_a = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_a = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_a, network_providers.proxy)
 
         ensure_esdt_amounts(bob, {farming_token: stake_amount})
-        tx_b = _enter_farm(farm_contract, bob, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_b = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_b, network_providers.proxy)
 
         # Advance some blocks
@@ -284,13 +349,21 @@ class TestFarmMultiUser:
         # Alice exits early
         alice_farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         alice_ft = max(alice_farm_tokens, key=lambda t: t.token.nonce)
-        tx_exit = _exit_farm(farm_contract, alice, alice_ft.token.nonce, alice_ft.amount,
-                             network_providers, blockchain_controller)
+        tx_exit = _exit_farm(
+            farm_contract,
+            alice,
+            alice_ft.token.nonce,
+            alice_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
         logger.info("Alice exited farm")
 
         # Record reserve after Alice's exit
-        reserve_after_alice_exit = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_alice_exit = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
 
         # Advance more blocks (only Bob is in the farm now)
         blockchain_controller.wait_blocks(10)
@@ -299,11 +372,18 @@ class TestFarmMultiUser:
         bob_farm_tokens = _get_farm_tokens_for_user(farm_contract, bob, network_providers.proxy)
         bob_ft = max(bob_farm_tokens, key=lambda t: t.token.nonce)
 
-        tx_cb = _claim_rewards(farm_contract, bob, bob_ft.token.nonce,
-                               bob_ft.amount, network_providers, blockchain_controller)
+        tx_cb = _claim_rewards(
+            farm_contract,
+            bob,
+            bob_ft.token.nonce,
+            bob_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
 
-        reserve_after_bob_claim = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        farm_state_after_bob_claim = _get_farm_state(farm_contract, network_providers.proxy)
+        reserve_after_bob_claim = farm_state_after_bob_claim["reward_reserve"]
         bob_reward = reserve_after_alice_exit - reserve_after_bob_claim
 
         logger.info(f"Reserve after Alice exit: {reserve_after_alice_exit}")
@@ -313,7 +393,7 @@ class TestFarmMultiUser:
         # Bob should have earned rewards while he was the sole participant.
         # Reserve should not increase significantly (rewards flow out, not in).
         # Tolerance: per_block_reward_amount=1 mints new rewards each block.
-        reserve_tolerance = 5_000
+        reserve_tolerance = farm_state_after_bob_claim["per_second_reward_amount"] * 6 * 11
         assert reserve_after_bob_claim <= reserve_after_alice_exit + reserve_tolerance, (
             f"Reserve should not increase significantly after Bob claims:\n"
             f"  After Alice exit: {reserve_after_alice_exit}\n"
@@ -360,13 +440,25 @@ class TestFarmMultiUser:
 
         # Both enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_a = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_a = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_a, network_providers.proxy)
 
         ensure_esdt_amounts(bob, {farming_token: stake_amount})
-        tx_b = _enter_farm(farm_contract, bob, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_b = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_b, network_providers.proxy)
 
         # Advance blocks for reward accrual
@@ -376,22 +468,42 @@ class TestFarmMultiUser:
         alice_farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         alice_ft = max(alice_farm_tokens, key=lambda t: t.token.nonce)
 
-        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_ca = _claim_rewards(farm_contract, alice, alice_ft.token.nonce,
-                               alice_ft.amount, network_providers, blockchain_controller)
+        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
+        tx_ca = _claim_rewards(
+            farm_contract,
+            alice,
+            alice_ft.token.nonce,
+            alice_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_ca, network_providers.proxy)
-        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         alice_reward = reserve_before_alice - reserve_after_alice
 
         # Bob claims
         bob_farm_tokens = _get_farm_tokens_for_user(farm_contract, bob, network_providers.proxy)
         bob_ft = max(bob_farm_tokens, key=lambda t: t.token.nonce)
 
-        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_cb = _claim_rewards(farm_contract, bob, bob_ft.token.nonce,
-                               bob_ft.amount, network_providers, blockchain_controller)
+        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
+        tx_cb = _claim_rewards(
+            farm_contract,
+            bob,
+            bob_ft.token.nonce,
+            bob_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
-        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         bob_reward = reserve_before_bob - reserve_after_bob
 
         total_rewards_paid = alice_reward + bob_reward
@@ -454,12 +566,20 @@ class TestFarmMultiUser:
 
         # Alice enters farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_a = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_a = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_a, network_providers.proxy)
 
         # Measure RPS growth rate with Alice alone
-        rps_before_solo = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+        rps_before_solo = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_per_share"
+        ]
         supply_solo = _get_farm_state(farm_contract, network_providers.proxy)["farm_token_supply"]
         blockchain_controller.wait_blocks(10)
         rps_after_solo = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
@@ -468,8 +588,14 @@ class TestFarmMultiUser:
 
         # Bob enters farm (increases total supply => dilutes per-share growth)
         ensure_esdt_amounts(bob, {farming_token: stake_amount})
-        tx_b = _enter_farm(farm_contract, bob, farming_token, stake_amount,
-                           network_providers, blockchain_controller)
+        tx_b = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_b, network_providers.proxy)
 
         # Measure RPS growth rate with both Alice and Bob

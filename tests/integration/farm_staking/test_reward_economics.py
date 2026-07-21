@@ -114,7 +114,7 @@ class TestRewardEconomics:
         # Get balances before claiming
         def get_farming_balance(user):
             tokens = network_providers.proxy.get_fungible_tokens_of_account(user.address)
-            return sum(t.balance for t in tokens if t.identifier == farming_token)
+            return sum(t.amount for t in tokens if t.token.identifier == farming_token)
 
         alice_before = get_farming_balance(alice)
         bob_before = get_farming_balance(bob)
@@ -123,10 +123,10 @@ class TestRewardEconomics:
         alice_ft = max(_get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy), key=lambda t: t.token.nonce)
         bob_ft = max(_get_farm_tokens_for_user(staking_contract, bob, network_providers.proxy), key=lambda t: t.token.nonce)
 
-        tx_ca = _claim_rewards(staking_contract, alice, alice_ft.token.nonce, alice_ft.balance, network_providers, blockchain_controller)
+        tx_ca = _claim_rewards(staking_contract, alice, alice_ft.token.nonce, alice_ft.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_ca, network_providers.proxy)
 
-        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.balance, network_providers, blockchain_controller)
+        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
 
         alice_rewards = get_farming_balance(alice) - alice_before
@@ -203,13 +203,13 @@ class TestRewardEconomics:
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
         all_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        bal_before = sum(t.balance for t in all_before if t.identifier == farming_token)
+        bal_before = sum(t.amount for t in all_before if t.token.identifier == farming_token)
 
-        tx_claim = _claim_rewards(staking_contract, alice, farm_token.token.nonce, farm_token.balance, network_providers, blockchain_controller)
+        tx_claim = _claim_rewards(staking_contract, alice, farm_token.token.nonce, farm_token.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         all_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        bal_after = sum(t.balance for t in all_after if t.identifier == farming_token)
+        bal_after = sum(t.amount for t in all_after if t.token.identifier == farming_token)
         actual_rewards = bal_after - bal_before
 
         # APR-bounded max for alice's stake (her share of rewards)
@@ -298,7 +298,7 @@ class TestRewardEconomics:
 
         # Get all non-farming tokens before
         all_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        non_farming_before = {t.identifier: t.balance for t in all_before if t.identifier != farming_token}
+        non_farming_before = {t.token.identifier: t.amount for t in all_before if t.token.identifier != farming_token}
 
         stake_amount = _get_stake_amount(staking_contract, network_providers.proxy)
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
@@ -311,24 +311,24 @@ class TestRewardEconomics:
         farm_token = max(farm_tokens, key=lambda t: t.token.nonce)
 
         farming_before = sum(
-            t.balance for t in all_before if t.identifier == farming_token
+            t.amount for t in all_before if t.token.identifier == farming_token
         )
 
-        tx_claim = _claim_rewards(staking_contract, alice, farm_token.token.nonce, farm_token.balance, network_providers, blockchain_controller)
+        tx_claim = _claim_rewards(staking_contract, alice, farm_token.token.nonce, farm_token.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         all_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
 
         # Check no new non-farming tokens appeared
         for tok in all_after:
-            if tok.identifier != farming_token and tok.identifier not in non_farming_before:
+            if tok.token.identifier != farming_token and tok.token.identifier not in non_farming_before:
                 assert False, (
-                    f"New unexpected token appeared after claim: {tok.identifier}\n"
+                    f"New unexpected token appeared after claim: {tok.token.identifier}\n"
                     f"Rewards should be in {farming_token} only"
                 )
 
         # Check farming token increased
-        farming_after = sum(t.balance for t in all_after if t.identifier == farming_token)
+        farming_after = sum(t.amount for t in all_after if t.token.identifier == farming_token)
         assert farming_after > farming_before - stake_amount, (
             f"Farming token balance should reflect claimed rewards"
         )

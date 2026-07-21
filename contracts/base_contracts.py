@@ -265,6 +265,15 @@ class BaseFarmContract(DEXContractInterface, ABC):
             return self._get_storage_int(proxy, 'per_block_reward_amount', 'perBlockRewardAmount')
         return int(raw_results)
     
+    def get_per_second_reward_amount(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPerSecondRewardAmount')
+        if raw_results is None or raw_results == 0:
+            return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'per_second_reward_amount', 'perSecondRewardAmount')
+        return int(raw_results)
+    
     def get_reward_per_share(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getRewardPerShare')

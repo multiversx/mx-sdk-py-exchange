@@ -157,33 +157,33 @@ class TestAdminOperations:
         _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
 
         original_rate = _require_supported_view(
-            staking_contract.get_per_block_reward_amount(network_providers.proxy),
-            "getPerBlockRewardAmount",
+            staking_contract.get_per_second_reward_amount(network_providers.proxy),
+            "getPerSecondRewardAmount",
         )
         new_rate = max(2, original_rate // 2) if original_rate > 4 else 2
 
         try:
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_hash = staking_contract.set_rewards_per_block(
+            tx_hash = staking_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, new_rate
             )
             blockchain_controller.wait_for_tx(tx_hash)
             TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
             updated_rate = _require_supported_view(
-                staking_contract.get_per_block_reward_amount(network_providers.proxy),
-                "getPerBlockRewardAmount",
+                staking_contract.get_per_second_reward_amount(network_providers.proxy),
+                "getPerSecondRewardAmount",
             )
             assert updated_rate == new_rate, (
                 f"Per-second rate mismatch:\n"
                 f"  Expected: {new_rate}\n"
                 f"  Actual: {updated_rate}"
             )
-            logger.info(f"✓ setPerBlockRewardAmount: {original_rate} → {new_rate}")
+            logger.info(f"✓ setPerSecondRewardAmount: {original_rate} → {new_rate}")
 
         finally:
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_restore = staking_contract.set_rewards_per_block(
+            tx_restore = staking_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, original_rate
             )
             blockchain_controller.wait_for_tx(tx_restore)
@@ -343,8 +343,7 @@ class TestAdminOperations:
         # Fund deployer with farming tokens for topup
         ensure_esdt_amounts(deployer_account, {farming_token: topup_amount})
 
-        capacity_before = staking_contract.get_reward_capacity(network_providers.proxy)
-        capacity_before = _require_supported_view(capacity_before, "getRewardCapacity")
+        capacity_before = _require_supported_view(staking_contract.get_reward_capacity(network_providers.proxy), "getRewardCapacity")
         accumulated_before = staking_contract.get_accumulated_rewards(network_providers.proxy)
         remaining_before = max(0, capacity_before - accumulated_before)
         try:
@@ -366,19 +365,14 @@ class TestAdminOperations:
             )
             logger.info(f"✓ topUpRewards: capacity {capacity_before} → {capacity_after}")
         finally:
-            # withdrawRewards calls generate_aggregated_rewards internally before checking
-            # amount <= remaining_uncollected. This means accumulated_rewards is updated by
-            # (blocks_since_last_update * per_block_reward) at execution time, not at read time.
-            # Re-read everything fresh and subtract headroom for the blocks that wait_for_tx
-            # will generate (chain sim generates ~5 blocks for tx finalization).
-            per_block_reward = staking_contract.get_per_block_reward_amount(network_providers.proxy)
+            tx_hash = staking_contract.end_produce_rewards(deployer_account, network_providers.proxy)
+            blockchain_controller.wait_for_tx(tx_hash)
+            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+
             current_capacity = staking_contract.get_reward_capacity(network_providers.proxy)
             current_accumulated = staking_contract.get_accumulated_rewards(network_providers.proxy)
             remaining_now = max(0, current_capacity - current_accumulated)
-            excess_remaining = max(0, remaining_now - remaining_before)
-            # Subtract headroom for reward accumulation during tx finalization
-            safe_withdraw = max(0, excess_remaining - per_block_reward * 10)
-            if safe_withdraw > 0:
+            if remaining_now > 0:
                 deployer_account.sync_nonce(network_providers.proxy)
                 tx_restore = endpoint_call(
                     network_providers.proxy,
@@ -386,10 +380,15 @@ class TestAdminOperations:
                     deployer_account,
                     Address(staking_contract.address),
                     "withdrawRewards",
-                    [safe_withdraw],
+                    [remaining_now],
                 )
                 blockchain_controller.wait_for_tx(tx_restore)
                 TransactionAssertions.assert_transaction_success(tx_restore, network_providers.proxy)
+            
+            tx_hash = staking_contract.start_produce_rewards(deployer_account, network_providers.proxy)
+            blockchain_controller.wait_for_tx(tx_hash)
+            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+
 
     def test_withdraw_rewards(
         self,
@@ -604,6 +603,7 @@ class TestAdminOperations:
 
         logger.info("✓ pause/resume: operations correctly blocked when paused")
 
+    @pytest.mark.usefixtures("seed_staking_rewards")
     def test_claim_rewards_while_paused_fails(
         self,
         staking_contract,

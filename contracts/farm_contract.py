@@ -1,19 +1,37 @@
-import config
-from contracts.contract_identities import FarmContractVersion, DEXContractInterface
-from contracts.base_contracts import (BaseFarmContract, BaseBoostedContract, 
-                                      BaseSCWhitelistContract, BasePermissionsHubContract)
-from utils import decoding_structures
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.logger import get_logger
-from utils.utils_tx import NetworkProviders, ESDTToken, \
-    multi_esdt_endpoint_call, deploy, upgrade_call, endpoint_call
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
+from typing import Any, Dict
+
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue
+
+import config
+from contracts.base_contracts import (
+    BaseBoostedContract,
+    BaseFarmContract,
+    BasePermissionsHubContract,
+    BaseSCWhitelistContract,
+)
+from contracts.contract_identities import FarmContractVersion
+from events.farm_events import (
+    ClaimRewardsFarmEvent,
+    CompoundRewardsFarmEvent,
+    EnterFarmEvent,
+    ExitFarmEvent,
+    MergePositionFarmEvent,
+    MigratePositionFarmEvent,
+)
+from utils.contract_data_fetchers import FarmContractDataFetcher
+from utils.logger import get_logger
+from utils.utils_chain import Account, hex_to_string
+from utils.utils_chain import WrapperAddress as Address
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
-from events.farm_events import (EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent,
-                                CompoundRewardsFarmEvent, MergePositionFarmEvent, MigratePositionFarmEvent)
-from typing import Dict, Any
+from utils.utils_tx import (
+    ESDTToken,
+    NetworkProviders,
+    deploy,
+    endpoint_call,
+    multi_esdt_endpoint_call,
+    upgrade_call,
+)
 
 logger = get_logger(__name__)
 
@@ -77,7 +95,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         enterFarmFn = "enterFarm"
         logger.info(f"Calling {enterFarmFn} endpoint...")
 
-        gas_limit = 50000000
+        gas_limit = 100000000
 
         tokens = [ESDTToken(event.farming_tk, event.farming_tk_nonce, event.farming_tk_amount)]
         if event.farm_tk_amount > 0:
@@ -110,7 +128,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
                                         Address(self.address), enterFarmFn, sc_args)
 
     def exitFarm(self, network_provider: NetworkProviders, user: Account, event: ExitFarmEvent) -> str:
-        function_purpose = f"exit farm"
+        function_purpose = "exit farm"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
@@ -124,7 +142,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
                                         Address(self.address), "exitFarm", sc_args)
 
     def claimRewards(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsFarmEvent) -> str:
-        function_purpose = f"claimRewards"
+        function_purpose = "claimRewards"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
@@ -147,7 +165,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         return endpoint_call(network_provider.proxy, gas_limit, user, Address(self.address), claim_fn, sc_args)
     
     def claim_rewards_on_behalf(self, network_provider: NetworkProviders, user: Account, event: ClaimRewardsFarmEvent) -> str:
-        function_purpose = f"claimRewardsOnBehalf"
+        function_purpose = "claimRewardsOnBehalf"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
@@ -169,7 +187,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         return endpoint_call(proxy, gas_limit, user, Address(self.address), claim_fn, [])
 
     def compoundRewards(self, network_provider: NetworkProviders, user: Account, event: CompoundRewardsFarmEvent) -> str:
-        function_purpose = f"compoundRewards"
+        function_purpose = "compoundRewards"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
@@ -182,7 +200,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
                                         Address(self.address), "compoundRewards", sc_args)
 
     def migratePosition(self, network_provider: NetworkProviders, user: Account, event: MigratePositionFarmEvent) -> str:
-        function_purpose = f"migratePosition"
+        function_purpose = "migratePosition"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
@@ -196,7 +214,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
                                         Address(self.address), "migratePosition", sc_args)
     
     def mergePositions(self, network_provider: NetworkProviders, user:Account, event_list: list[MergePositionFarmEvent]) -> str:
-        function_purpose = f"mergeFarmTokens"
+        function_purpose = "mergeFarmTokens"
         logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
@@ -346,6 +364,17 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         ]
         logger.debug(f"Arguments: {sc_args}")
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPerBlockRewardAmount", sc_args)
+
+    def set_rewards_per_second(self, deployer: Account, proxy: ProxyNetworkProvider, rewards_amount: int):
+        function_purpose = "Set rewards per second in farm"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            rewards_amount
+        ]
+        logger.debug(f"Arguments: {sc_args}")
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPerSecondRewardAmount", sc_args)
 
     def set_penalty_percent(self, deployer: Account, proxy: ProxyNetworkProvider, percent: int):
         function_purpose = "Set penalty percent in farm"
