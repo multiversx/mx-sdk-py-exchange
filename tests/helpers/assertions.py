@@ -18,16 +18,14 @@ Usage:
     )
 """
 
-import base64
+import time
 from typing import Tuple, Optional
 from multiversx_sdk import ProxyNetworkProvider, Address
 
 from utils.contract_data_fetchers import (
     PairContractDataFetcher,
-    FarmContractDataFetcher,
-    RouterContractDataFetcher
 )
-from utils.utils_chain import WrapperAddress, get_current_tokens_for_address
+from utils.utils_chain import get_current_tokens_for_address
 from utils.logger import get_logger
 
 
@@ -494,6 +492,26 @@ class TransactionAssertions:
             return f"Error during extraction: {str(e)}"
 
     @staticmethod
+    @staticmethod
+    def _get_transaction_with_retry(proxy: ProxyNetworkProvider, tx_hash: str, retries: int = 5):
+        """Fetch a transaction, retrying on TimeoutError with exponential backoff.
+
+        wait_for_tx already confirmed the tx is on-chain via the chain sim endpoint.
+        This only retries the status fetch, which can time out when the chain sim
+        is under load responding to concurrent futures in the SDK.
+        """
+        delay = 0.5
+        for attempt in range(retries):
+            try:
+                return proxy.get_transaction(tx_hash)
+            except TimeoutError:
+                if attempt == retries - 1:
+                    raise
+                logger.debug(f"get_transaction timed out for {tx_hash}, retry {attempt + 1}/{retries}")
+                time.sleep(delay)
+                delay *= 2
+
+    @staticmethod
     def assert_transaction_success(tx_hash: str, proxy: ProxyNetworkProvider):
         """
         Verify transaction succeeded.
@@ -505,7 +523,7 @@ class TransactionAssertions:
         Raises:
             AssertionError: If transaction failed or pending
         """
-        tx = proxy.get_transaction(tx_hash)
+        tx = TransactionAssertions._get_transaction_with_retry(proxy, tx_hash)
 
         if not tx.status.is_successful:
             # Extract error message from signalError event if available
@@ -540,7 +558,7 @@ class TransactionAssertions:
         Raises:
             AssertionError: If transaction succeeded or error doesn't match
         """
-        tx = proxy.get_transaction(tx_hash)
+        tx = TransactionAssertions._get_transaction_with_retry(proxy, tx_hash)
 
         assert not tx.status.is_successful, (
             f"Transaction should have failed but succeeded: {tx_hash}\n"

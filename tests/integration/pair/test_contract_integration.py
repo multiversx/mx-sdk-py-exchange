@@ -10,7 +10,6 @@ Run:
     pytest --env=chainsim tests/integration/pair/test_contract_integration.py
 """
 
-import config
 from multiversx_sdk import Address, Token
 import pytest
 
@@ -159,10 +158,16 @@ class TestContractIntegration:
 
         ensure_esdt_amounts(alice, {start_token: swap_amount})
 
+        # Query expected output for step 1 before executing
+        pair1_data_fetcher = PairContractDataFetcher(
+            Address.new_from_bech32(pair1.address), network_providers.proxy.url
+        )
+        expected_intermediate = pair1_data_fetcher.get_data(
+            "getAmountOut",
+            [TokenIdentifierValue(start_token), BigUIntValue(swap_amount)]
+        )
+
         # Step 1: Swap start_token -> common_token through pair1
-        token_start_balance_before = network_providers.proxy.get_token_of_account(
-            alice.address, Token(start_token, 0)
-        ).amount
         common_balance_before = network_providers.proxy.get_token_of_account(
             alice.address, Token(common_token, 0)
         ).amount
@@ -179,12 +184,14 @@ class TestContractIntegration:
         TransactionAssertions.assert_transaction_success(tx_swap1, network_providers.proxy)
         logger.info("Step 1: First leg swap succeeded")
 
-        # Check intermediate result
+        # Verify intermediate amount matches getAmountOut exactly
         common_balance_after_1 = network_providers.proxy.get_token_of_account(
             alice.address, Token(common_token, 0)
         ).amount
         intermediate_amount = common_balance_after_1 - common_balance_before
-        assert intermediate_amount > 0, f"Should have received {common_token} from first swap"
+        assert intermediate_amount == expected_intermediate, (
+            f"Intermediate amount should be exactly {expected_intermediate}, got {intermediate_amount}"
+        )
         logger.info(f"Intermediate amount received: {intermediate_amount} {common_token}")
 
         # Cap intermediate amount to 0.1% of pair2's common_token reserve
@@ -195,6 +202,15 @@ class TestContractIntegration:
         if intermediate_amount > max_swap_for_pair2 and max_swap_for_pair2 > 0:
             logger.info(f"Capping intermediate amount: {intermediate_amount} -> {max_swap_for_pair2}")
             intermediate_amount = max_swap_for_pair2
+
+        # Query expected output for step 2 (using possibly-capped intermediate amount)
+        pair2_data_fetcher = PairContractDataFetcher(
+            Address.new_from_bech32(pair2.address), network_providers.proxy.url
+        )
+        expected_final_output = pair2_data_fetcher.get_data(
+            "getAmountOut",
+            [TokenIdentifierValue(common_token), BigUIntValue(intermediate_amount)]
+        )
 
         # Step 2: Swap common_token -> end_token through pair2
         end_balance_before = network_providers.proxy.get_token_of_account(
@@ -213,12 +229,14 @@ class TestContractIntegration:
         TransactionAssertions.assert_transaction_success(tx_swap2, network_providers.proxy)
         logger.info("Step 2: Second leg swap succeeded")
 
-        # Verify final output
+        # Verify final output matches getAmountOut exactly
         end_balance_after = network_providers.proxy.get_token_of_account(
             alice.address, Token(end_token, 0)
         ).amount
         final_output = end_balance_after - end_balance_before
-        assert final_output > 0, f"Should have received {end_token} from multi-hop swap"
+        assert final_output == expected_final_output, (
+            f"Final output should be exactly {expected_final_output}, got {final_output}"
+        )
         logger.info(f"Final output: {final_output} {end_token}")
 
         # Verify k invariants in both pools
@@ -279,7 +297,10 @@ class TestContractIntegration:
         if reserves_primary[0] == 0 or reserves_trusted[0] == 0:
             pytest.skip("One or both pairs have no reserves")
 
-        # Add trusted swap pair
+        # Add trusted swap pair — treat "already registered" as a valid idempotent outcome.
+        # The storage-key inspection approach is unreliable (proxy API may truncate keys for
+        # large contracts loaded from mainnet state), so we just attempt the add and accept
+        # both a success status and a "already" / "trusted" SC error.
         deployer_account.sync_nonce(network_providers.proxy)
         tx_hash = primary_pair.add_trusted_swap_pair(
             deployer_account,
@@ -287,8 +308,16 @@ class TestContractIntegration:
             [trusted_pair.address, trusted_pair.firstToken, trusted_pair.secondToken]
         )
         blockchain_controller.wait_for_tx(tx_hash)
-        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
-        logger.info("Trusted swap pair added successfully")
+        tx_data = network_providers.proxy.get_transaction(tx_hash)
+        if tx_data.status.is_successful:
+            logger.info("Trusted swap pair added successfully")
+        else:
+            error_msg = TransactionAssertions._extract_error_from_tx(tx_data)
+            if "already" in error_msg.lower() or "trusted" in error_msg.lower():
+                logger.info(f"Trusted swap pair already registered (idempotent): {error_msg}")
+            else:
+                # Unexpected failure — re-raise via the standard helper
+                TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
         # Verify both pairs still functional after the change
         # Check primary pair is still responsive
@@ -501,12 +530,27 @@ class TestContractIntegration:
         k_1 = reserves_1[0] * reserves_1[1]
         assert k_1 >= k_initial, f"k decreased after add liquidity: {k_initial} -> {k_1}"
         alice_lp_after_add = network_providers.proxy.get_token_of_account(alice.address, lp_token).amount
-        assert alice_lp_after_add > alice_lp_before, "Alice should have received LP tokens"
-        logger.info(f"Step 1 (Add liquidity): k={k_1}, LP gained={alice_lp_after_add - alice_lp_before}")
+        alice_lp_gained = alice_lp_after_add - alice_lp_before
+        expected_alice_lp = min(
+            add_amount * reserves[2] // reserves[0],
+            equivalent * reserves[2] // reserves[1]
+        )
+        assert alice_lp_gained == expected_alice_lp, (
+            f"Alice LP minted should be exactly {expected_alice_lp}, got {alice_lp_gained}"
+        )
+        logger.info(f"Step 1 (Add liquidity): k={k_1}, LP gained={alice_lp_gained}")
 
         # Step 2: Swap A -> B
         swap_amount = reserves_1[0] // 1000  # 0.1% of reserve
         ensure_esdt_amounts(bob, {pair_contract.firstToken: swap_amount})
+
+        expected_out_2 = pair_data_fetcher.get_data(
+            "getAmountOut",
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(swap_amount)]
+        )
+        bob_second_before_2 = network_providers.proxy.get_token_of_account(
+            bob.address, Token(pair_contract.secondToken, 0)
+        ).amount
 
         swap1_event = SwapFixedInputEvent(
             tokenA=pair_contract.firstToken,
@@ -519,6 +563,12 @@ class TestContractIntegration:
         blockchain_controller.wait_for_tx(tx2)
         TransactionAssertions.assert_transaction_success(tx2, network_providers.proxy)
 
+        bob_second_after_2 = network_providers.proxy.get_token_of_account(
+            bob.address, Token(pair_contract.secondToken, 0)
+        ).amount
+        assert bob_second_after_2 - bob_second_before_2 == expected_out_2, (
+            f"Step 2 output should be {expected_out_2}, got {bob_second_after_2 - bob_second_before_2}"
+        )
         reserves_2 = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         k_2 = reserves_2[0] * reserves_2[1]
         assert k_2 >= k_1, f"k decreased after swap A->B: {k_1} -> {k_2}"
@@ -527,6 +577,14 @@ class TestContractIntegration:
         # Step 3: Swap B -> A
         swap_amount_b = reserves_2[1] // 1000
         ensure_esdt_amounts(bob, {pair_contract.secondToken: swap_amount_b})
+
+        expected_out_3 = pair_data_fetcher.get_data(
+            "getAmountOut",
+            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(swap_amount_b)]
+        )
+        bob_first_before_3 = network_providers.proxy.get_token_of_account(
+            bob.address, Token(pair_contract.firstToken, 0)
+        ).amount
 
         swap2_event = SwapFixedInputEvent(
             tokenA=pair_contract.secondToken,
@@ -539,6 +597,12 @@ class TestContractIntegration:
         blockchain_controller.wait_for_tx(tx3)
         TransactionAssertions.assert_transaction_success(tx3, network_providers.proxy)
 
+        bob_first_after_3 = network_providers.proxy.get_token_of_account(
+            bob.address, Token(pair_contract.firstToken, 0)
+        ).amount
+        assert bob_first_after_3 - bob_first_before_3 == expected_out_3, (
+            f"Step 3 output should be {expected_out_3}, got {bob_first_after_3 - bob_first_before_3}"
+        )
         reserves_3 = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         k_3 = reserves_3[0] * reserves_3[1]
         assert k_3 >= k_2, f"k decreased after swap B->A: {k_2} -> {k_3}"
@@ -607,6 +671,14 @@ class TestContractIntegration:
         final_swap = reserves_5[0] // 2000
         ensure_esdt_amounts(bob, {pair_contract.firstToken: final_swap})
 
+        expected_final_out = pair_data_fetcher.get_data(
+            "getAmountOut",
+            [TokenIdentifierValue(pair_contract.firstToken), BigUIntValue(final_swap)]
+        )
+        bob_second_before_6 = network_providers.proxy.get_token_of_account(
+            bob.address, Token(pair_contract.secondToken, 0)
+        ).amount
+
         final_event = SwapFixedInputEvent(
             tokenA=pair_contract.firstToken,
             amountA=final_swap,
@@ -618,6 +690,12 @@ class TestContractIntegration:
         blockchain_controller.wait_for_tx(tx6)
         TransactionAssertions.assert_transaction_success(tx6, network_providers.proxy)
 
+        bob_second_after_6 = network_providers.proxy.get_token_of_account(
+            bob.address, Token(pair_contract.secondToken, 0)
+        ).amount
+        assert bob_second_after_6 - bob_second_before_6 == expected_final_out, (
+            f"Step 6 output should be {expected_final_out}, got {bob_second_after_6 - bob_second_before_6}"
+        )
         reserves_final = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
         assert reserves_final[0] > 0, "First reserve should be positive"
         assert reserves_final[1] > 0, "Second reserve should be positive"

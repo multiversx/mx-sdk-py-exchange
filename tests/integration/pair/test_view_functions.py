@@ -824,16 +824,12 @@ class TestPairViewFunctions:
 
         # Edge case 3: Output exceeding reserve - should fail or return error
         excessive_output = reserves[1] * 2
-        try:
-            amount_in_excessive = pair_data_fetcher.get_data(
-                "getAmountIn",
-                [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(excessive_output)]
-            )
-            # If it returns a value, it should be -1 (error) or an astronomically large number
-            logger.info(f"getAmountIn for 2x reserve output: {amount_in_excessive}")
-            if amount_in_excessive > 0:
-                logger.info("Contract returned a value for excessive output (may be an error indicator)")
-        except Exception as e:
-            logger.info(f"getAmountIn correctly errored for excessive output: {e}")
+        amount_in_excessive = pair_data_fetcher.get_data(
+            "getAmountIn",
+            [TokenIdentifierValue(pair_contract.secondToken), BigUIntValue(excessive_output)]
+        )
+        # Contract may return -1 (error) or a valid number for excessive output
+        logger.info(f"getAmountIn for 2x reserve output: {amount_in_excessive}")
+        # Either -1 (error indicator from data fetcher) or astronomically large number is acceptable
 
         logger.info("Test passed: getAmountIn handles edge cases appropriately")

@@ -16,7 +16,7 @@ from multiversx_sdk import Address, Token
 import pytest
 
 from contracts.pair_contract import (
-    PairContract, SwapFixedInputEvent, AddLiquidityEvent, RemoveLiquidityEvent
+    PairContract, SwapFixedInputEvent, AddLiquidityEvent
 )
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import nominated_amount, Account
@@ -152,9 +152,9 @@ class TestMultiUser:
             balance_after = network_providers.proxy.get_token_of_account(user.address, token_out_sdk).amount
             actual_output = balance_after - balance_before
 
-            assert actual_output >= min_output, (
-                f"{name}'s swap output below minimum.\n"
-                f"Expected >= {min_output}, Got: {actual_output}"
+            assert actual_output == expected_output, (
+                f"{name}'s swap output does not match getAmountOut query result.\n"
+                f"Expected: {expected_output}, Got: {actual_output}"
             )
 
             # k must increase

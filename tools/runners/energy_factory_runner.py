@@ -17,7 +17,7 @@ from tools.runners.common_runner import ExportedAccount, ExportedToken, add_gene
 
 from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx, _prep_legacy_args
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
-from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, string_to_hex, dec_to_padded_hex, hex_to_base64
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, dec_to_padded_hex, hex_to_base64
 from utils.decoding_structures import XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES
 
 

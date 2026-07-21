@@ -446,9 +446,10 @@ class TestPairEconomicInvariants:
             network_providers.proxy.url
         )
 
-        # Track LP supply BEFORE this test's add operations
+        # Track LP supply and reserves BEFORE this test's add operations
         lp_token = Token(pair_contract.lpToken, 0)
-        supply_before = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)[2]
+        reserves_before_bob = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        supply_before = reserves_before_bob[2]
         bob_lp_before = network_providers.proxy.get_token_of_account(bob.address, lp_token).amount
         charlie_lp_before = network_providers.proxy.get_token_of_account(charlie.address, lp_token).amount
 
@@ -475,6 +476,8 @@ class TestPairEconomicInvariants:
         tx_bob = pair_contract.add_liquidity(network_providers, bob, bob_event)
         blockchain_controller.wait_for_tx(tx_bob)
         TransactionAssertions.assert_transaction_success(tx_bob, network_providers.proxy)
+
+        reserves_after_bob = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
 
         # Charlie adds liquidity
         charlie_amount = nominated_amount(200)
@@ -506,9 +509,22 @@ class TestPairEconomicInvariants:
 
         logger.info(f"LP minted in this test: Bob={bob_lp_delta}, Charlie={charlie_lp_delta}")
 
-        # Each user should have received non-zero LP from this test
-        assert bob_lp_delta > 0, "Bob should have received LP tokens"
-        assert charlie_lp_delta > 0, "Charlie should have received LP tokens"
+        # Each user should have received exactly the expected LP amount
+        expected_bob_lp = min(
+            bob_amount * reserves_before_bob[2] // reserves_before_bob[0],
+            bob_equivalent * reserves_before_bob[2] // reserves_before_bob[1]
+        )
+        assert bob_lp_delta == expected_bob_lp, (
+            f"Bob LP minted should be exactly {expected_bob_lp}, got {bob_lp_delta}"
+        )
+
+        expected_charlie_lp = min(
+            charlie_amount * reserves_after_bob[2] // reserves_after_bob[0],
+            charlie_equivalent * reserves_after_bob[2] // reserves_after_bob[1]
+        )
+        assert charlie_lp_delta == expected_charlie_lp, (
+            f"Charlie LP minted should be exactly {expected_charlie_lp}, got {charlie_lp_delta}"
+        )
 
         # Query total supply after adds
         reserves = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
@@ -518,13 +534,12 @@ class TestPairEconomicInvariants:
         logger.info(f"LP supply increase: {supply_delta}")
         logger.info(f"Sum of LP minted to users: {bob_lp_delta + charlie_lp_delta}")
 
-        # The LP minted to Bob + Charlie should equal the supply increase
+        # The LP minted to Bob + Charlie should exactly equal the supply increase
         sum_user_lp_delta = bob_lp_delta + charlie_lp_delta
-        assert sum_user_lp_delta <= supply_delta, (
-            f"Sum of user LP deltas exceeds supply increase!\n"
+        assert sum_user_lp_delta == supply_delta, (
+            f"Sum of user LP deltas should exactly equal supply increase!\n"
             f"Bob: {bob_lp_delta} + Charlie: {charlie_lp_delta} = {sum_user_lp_delta}\n"
-            f"Supply increase: {supply_delta}\n"
-            f"CRITICAL: LP tokens minted without proper accounting"
+            f"Supply increase: {supply_delta}"
         )
 
         # The difference (if any) should be negligible (rounding)

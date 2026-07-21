@@ -48,7 +48,7 @@ class DataFetcher:
         result = None
         try:
             result = self._query_contract(view_name, attrs)
-            return [int(elem.hex(), base=16) for elem in result.return_data_parts]
+            return [int(elem.hex(), base=16) if elem else 0 for elem in result.return_data_parts]
         except Exception as ex:
             logger.exception(f"Exception encountered on view name {view_name}: {ex}")
             if result:
@@ -167,6 +167,7 @@ class FarmContractDataFetcher(DataFetcher):
             "getFarmingTokenReserve": self._get_int_view,
             "getLastRewardBlockNonce": self._get_int_view,
             "getPerBlockRewardAmount": self._get_int_view,
+            "getPerSecondRewardAmount": self._get_int_view,
             "getRewardPerShare": self._get_int_view,
             "getRewardReserve": self._get_int_view,
             "getUndistributedFees": self._get_int_view,
@@ -175,10 +176,11 @@ class FarmContractDataFetcher(DataFetcher):
             "getFarmTokenId": self._get_hex_view,
             "getFarmingTokenId": self._get_hex_view,
             "getRewardTokenId": self._get_hex_view,
+            "getLockingScAddress": self._get_hex_view,
             "getState": self._get_int_view,
             "getPairContractManagedAddress": self._get_hex_view,
             "getUserTotalFarmPosition": self._get_int_view,
-            "getCurrentWeek": self._get_int_view,            
+            "getCurrentWeek": self._get_int_view,
             "getFirstWeekStartEpoch": self._get_int_view,
             "getLastGlobalUpdateWeek": self._get_int_view,
             "getUserEnergyForWeek": self._get_hex_view,
@@ -188,6 +190,7 @@ class FarmContractDataFetcher(DataFetcher):
             "getTotalLockedTokensForWeek": self._get_int_view,
             "getTotalEnergyForWeek": self._get_int_view,
             "getTotalRewardsForWeek": self._get_int_view,
+            "getBoostedYieldsRewardsPercentage": self._get_int_view,
             "getRemainingBoostedRewardsToDistribute": self._get_int_view,
             "getUndistributedBoostedRewards": self._get_int_view,
             "getPermissions": self._get_int_view,

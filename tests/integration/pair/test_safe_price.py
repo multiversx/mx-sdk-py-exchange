@@ -21,8 +21,7 @@ Run:
 """
 
 import math
-import time
-from multiversx_sdk import Address, Token
+from multiversx_sdk import Address
 import pytest
 
 from contracts.pair_contract import (
@@ -96,15 +95,7 @@ def _perform_swap(
     account.sync_nonce(network_providers.proxy)
     tx = pair_contract.swap_fixed_input(network_providers, account, event)
     blockchain_controller.wait_for_tx(tx)
-    for attempt in range(3):
-        try:
-            TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
-            break
-        except TimeoutError:
-            if attempt == 2:
-                raise
-            time.sleep(2)
-            blockchain_controller.wait_for_tx(tx)
+    TransactionAssertions.assert_transaction_success(tx, network_providers.proxy)
     return tx
 
 
@@ -175,35 +166,32 @@ def _query_safe_price_legacy(pair_contract, network_providers, token_id, amount)
         network_providers.proxy.url
     )
 
-    try:
-        from multiversx_sdk.abi import Abi
-        import config
-        abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
+    from multiversx_sdk.abi import Abi
+    import config
+    abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
 
-        if not abi_path.exists():
-            logger.info(f"ABI file not found at {abi_path}")
-            return None
+    if not abi_path.exists():
+        logger.info(f"ABI file not found at {abi_path}")
+        return None
 
-        abi = Abi.load(abi_path)
-        view_payload = abi.encode_custom_type(
-            "EsdtTokenPayment",
-            [token_id, 0, amount]
-        )
+    abi = Abi.load(abi_path)
+    view_payload = abi.encode_custom_type(
+        "EsdtTokenPayment",
+        [token_id, 0, amount]
+    )
 
-        safe_price_hex = pair_data_fetcher.get_data(
-            "updateAndGetSafePrice",
-            [bytes.fromhex(view_payload)]
-        )
+    safe_price_hex = pair_data_fetcher.get_data(
+        "updateAndGetSafePrice",
+        [bytes.fromhex(view_payload)]
+    )
 
-        if safe_price_hex:
-            esdt_token_payment_schema = {
-                'token_identifier': 'string',
-                'token_nonce': 'u64',
-                'amount': 'biguint',
-            }
-            return decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
-    except Exception as e:
-        logger.info(f"Safe price legacy query issue: {e}")
+    if safe_price_hex:
+        esdt_token_payment_schema = {
+            'token_identifier': 'string',
+            'token_nonce': 'u64',
+            'amount': 'biguint',
+        }
+        return decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
 
     return None
 
@@ -216,37 +204,34 @@ def _query_safe_price_view(pair_contract, network_providers, pair_address_value,
         network_providers.proxy.url
     )
 
-    try:
-        from multiversx_sdk.abi import Abi, U64Value
-        import config
-        abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
+    from multiversx_sdk.abi import Abi
+    import config
+    abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
 
-        if not abi_path.exists():
-            logger.info(f"ABI file not found at {abi_path}")
-            return None
+    if not abi_path.exists():
+        logger.info(f"ABI file not found at {abi_path}")
+        return None
 
-        abi = Abi.load(abi_path)
-        payment_payload = abi.encode_custom_type(
-            "EsdtTokenPayment",
-            [token_id, 0, amount]
-        )
+    abi = Abi.load(abi_path)
+    payment_payload = abi.encode_custom_type(
+        "EsdtTokenPayment",
+        [token_id, 0, amount]
+    )
 
-        pair_address = Address.new_from_bech32(pair_contract.address)
-        safe_price_hex = pair_data_fetcher.get_data(
-            "getSafePrice",
-            [AddressValue(pair_address), BigUIntValue(start_round),
-             BigUIntValue(end_round), bytes.fromhex(payment_payload)]
-        )
+    pair_address = Address.new_from_bech32(pair_contract.address)
+    safe_price_hex = pair_data_fetcher.get_data(
+        "getSafePrice",
+        [AddressValue(pair_address), BigUIntValue(start_round),
+         BigUIntValue(end_round), bytes.fromhex(payment_payload)]
+    )
 
-        if safe_price_hex:
-            esdt_token_payment_schema = {
-                'token_identifier': 'string',
-                'token_nonce': 'u64',
-                'amount': 'biguint',
-            }
-            return decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
-    except Exception as e:
-        logger.info(f"Safe price view query issue: {e}")
+    if safe_price_hex:
+        esdt_token_payment_schema = {
+            'token_identifier': 'string',
+            'token_nonce': 'u64',
+            'amount': 'biguint',
+        }
+        return decode_merged_attributes(safe_price_hex, esdt_token_payment_schema)
 
     return None
 
@@ -258,24 +243,21 @@ def _query_lp_safe_price(pair_contract, network_providers, lp_amount):
         network_providers.proxy.url
     )
 
-    try:
-        pair_address = Address.new_from_bech32(pair_contract.address)
-        result = pair_data_fetcher.get_data(
-            "updateAndGetTokensForGivenPositionWithSafePrice",
-            [BigUIntValue(lp_amount)]
-        )
+    pair_address = Address.new_from_bech32(pair_contract.address)
+    result = pair_data_fetcher.get_data(
+        "updateAndGetTokensForGivenPositionWithSafePrice",
+        [BigUIntValue(lp_amount)]
+    )
 
-        if result and len(result) >= 2:
-            esdt_schema = {
-                'token_identifier': 'string',
-                'token_nonce': 'u64',
-                'amount': 'biguint',
-            }
-            first = decode_merged_attributes(result[0], esdt_schema)
-            second = decode_merged_attributes(result[1], esdt_schema)
-            return first, second
-    except Exception as e:
-        logger.info(f"LP safe price query issue: {e}")
+    if result and len(result) >= 2:
+        esdt_schema = {
+            'token_identifier': 'string',
+            'token_nonce': 'u64',
+            'amount': 'biguint',
+        }
+        first = decode_merged_attributes(result[0], esdt_schema)
+        second = decode_merged_attributes(result[1], esdt_schema)
+        return first, second
 
     return None
 
@@ -986,50 +968,44 @@ class TestSafePriceViewFunctions:
             network_providers.proxy.url
         )
 
-        try:
-            from multiversx_sdk.abi import Abi, U64Value
-            import config
-            abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
+        from multiversx_sdk.abi import Abi
+        import config
+        abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
 
-            if not abi_path.exists():
-                logger.info("ABI not found, verifying observations exist instead")
-                index = _get_safe_price_current_index(pair_contract, network_providers)
-                assert index > 0, "Observations should exist"
-                logger.info("Test passed (indirect)")
-                return
-
-            abi = Abi.load(abi_path)
-            test_amount = nominated_amount(1)
-            payment_payload = abi.encode_custom_type(
-                "EsdtTokenPayment",
-                [pair_contract.firstToken, 0, test_amount]
-            )
-
-            pair_address = Address.new_from_bech32(pair_contract.address)
-            round_offset = 50  # Look back 50 rounds
-
-            result_hex = pair_data_fetcher.get_data(
-                "getSafePriceByRoundOffset",
-                [AddressValue(pair_address), BigUIntValue(round_offset),
-                 bytes.fromhex(payment_payload)]
-            )
-
-            if result_hex:
-                esdt_schema = {
-                    'token_identifier': 'string',
-                    'token_nonce': 'u64',
-                    'amount': 'biguint',
-                }
-                result = decode_merged_attributes(result_hex, esdt_schema)
-                assert result['amount'] > 0, "Round offset safe price should be non-zero"
-                logger.info(f"Round offset safe price (offset={round_offset}): {result['amount']}")
-            else:
-                logger.info("Round offset query returned empty")
-
-        except Exception as e:
-            logger.info(f"Round offset query: {e}")
+        if not abi_path.exists():
+            logger.info("ABI not found, verifying observations exist instead")
             index = _get_safe_price_current_index(pair_contract, network_providers)
             assert index > 0, "Observations should exist"
+            logger.info("Test passed (indirect)")
+            return
+
+        abi = Abi.load(abi_path)
+        test_amount = nominated_amount(1)
+        payment_payload = abi.encode_custom_type(
+            "EsdtTokenPayment",
+            [pair_contract.firstToken, 0, test_amount]
+        )
+
+        pair_address = Address.new_from_bech32(pair_contract.address)
+        round_offset = 50  # Look back 50 rounds
+
+        result_hex = pair_data_fetcher.get_data(
+            "getSafePriceByRoundOffset",
+            [AddressValue(pair_address), BigUIntValue(round_offset),
+             bytes.fromhex(payment_payload)]
+        )
+
+        if result_hex:
+            esdt_schema = {
+                'token_identifier': 'string',
+                'token_nonce': 'u64',
+                'amount': 'biguint',
+            }
+            result = decode_merged_attributes(result_hex, esdt_schema)
+            assert result['amount'] > 0, "Round offset safe price should be non-zero"
+            logger.info(f"Round offset safe price (offset={round_offset}): {result['amount']}")
+        else:
+            logger.info("Round offset query returned empty")
 
         logger.info("Test passed: Safe price by round offset")
 
@@ -1276,26 +1252,22 @@ class TestSafePriceViewFunctions:
             if search_round <= 0:
                 continue
 
-            try:
-                observation = pair_data_fetcher.get_data(
-                    "getPriceObservation",
-                    [AddressValue(pair_address), BigUIntValue(search_round)]
-                )
+            observation = pair_data_fetcher.get_data(
+                "getPriceObservation",
+                [AddressValue(pair_address), BigUIntValue(search_round)]
+            )
 
-                if observation and len(observation) > 0:
-                    has_data = any(
-                        (isinstance(part, str) and len(part) > 0) or
-                        (isinstance(part, int) and part > 0)
-                        for part in observation
-                    )
-                    if has_data:
-                        logger.info(f"Observation found at round {search_round}: "
-                                    f"{len(observation)} data parts")
-                        observation_found = True
-                        break
-            except Exception as e:
-                logger.info(f"Observation query for round {search_round}: {e}")
-                continue
+            if observation and len(observation) > 0:
+                has_data = any(
+                    (isinstance(part, str) and len(part) > 0) or
+                    (isinstance(part, int) and part > 0)
+                    for part in observation
+                )
+                if has_data:
+                    logger.info(f"Observation found at round {search_round}: "
+                                f"{len(observation)} data parts")
+                    observation_found = True
+                    break
 
         # Verify observations exist via index as fallback
         index = _get_safe_price_current_index(pair_contract, network_providers)
@@ -2509,35 +2481,32 @@ class TestSafePriceLPValuation:
         safe_result = _query_lp_safe_price(pair_contract, network_providers, test_lp_amount)
 
         if safe_result is not None and spot_result and len(spot_result) >= 2:
-            try:
-                spot_schema = {
-                    'token_identifier': 'string',
-                    'token_nonce': 'u64',
-                    'amount': 'biguint',
-                }
-                spot_first = decode_merged_attributes(spot_result[0], spot_schema)
-                spot_second = decode_merged_attributes(spot_result[1], spot_schema)
+            spot_schema = {
+                'token_identifier': 'string',
+                'token_nonce': 'u64',
+                'amount': 'biguint',
+            }
+            spot_first = decode_merged_attributes(spot_result[0], spot_schema)
+            spot_second = decode_merged_attributes(spot_result[1], spot_schema)
 
-                safe_first_amt = safe_result[0]['amount']
-                safe_second_amt = safe_result[1]['amount']
-                spot_first_amt = spot_first['amount']
-                spot_second_amt = spot_second['amount']
+            safe_first_amt = safe_result[0]['amount']
+            safe_second_amt = safe_result[1]['amount']
+            spot_first_amt = spot_first['amount']
+            spot_second_amt = spot_second['amount']
 
-                logger.info(f"Spot LP:  {spot_first_amt} first + {spot_second_amt} second")
-                logger.info(f"Safe LP:  {safe_first_amt} first + {safe_second_amt} second")
+            logger.info(f"Spot LP:  {spot_first_amt} first + {spot_second_amt} second")
+            logger.info(f"Safe LP:  {safe_first_amt} first + {safe_second_amt} second")
 
-                if spot_first_amt > 0:
-                    ratio_first = safe_first_amt / spot_first_amt
-                    assert 0.5 < ratio_first < 2.0, (
-                        f"Safe/Spot first token ratio out of range: {ratio_first:.4f}"
-                    )
-                if spot_second_amt > 0:
-                    ratio_second = safe_second_amt / spot_second_amt
-                    assert 0.5 < ratio_second < 2.0, (
-                        f"Safe/Spot second token ratio out of range: {ratio_second:.4f}"
-                    )
-            except Exception as e:
-                logger.info(f"Spot decoding issue: {e}")
+            if spot_first_amt > 0:
+                ratio_first = safe_first_amt / spot_first_amt
+                assert 0.5 < ratio_first < 2.0, (
+                    f"Safe/Spot first token ratio out of range: {ratio_first:.4f}"
+                )
+            if spot_second_amt > 0:
+                ratio_second = safe_second_amt / spot_second_amt
+                assert 0.5 < ratio_second < 2.0, (
+                    f"Safe/Spot second token ratio out of range: {ratio_second:.4f}"
+                )
         else:
             index = _get_safe_price_current_index(pair_contract, network_providers)
             assert index > 0, "Observations should exist"

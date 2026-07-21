@@ -1,11 +1,9 @@
-import csv
 import sys
 from argparse import ArgumentParser
 from typing import Any, Dict, List
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from matplotlib.backend_bases import PickEvent
 from pathlib import Path
 
 

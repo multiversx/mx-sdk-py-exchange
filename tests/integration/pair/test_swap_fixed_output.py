@@ -31,7 +31,6 @@ from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import nominated_amount, Account
 from tests.helpers import PairAssertions, TransactionAssertions
 from utils.logger import get_logger
-from multiversx_sdk.abi import TokenIdentifierValue, BigUIntValue
 
 
 logger = get_logger(__name__)
@@ -219,42 +218,26 @@ class TestSwapFixedOutput:
         )
         logger.info(f"Alice received exactly {actual_output / 10**18:.4f} secondToken")
 
-        # 6. ASSERT: Input deducted <= max_input
+        # 6. ASSERT: Input deducted is exactly the estimated input (contract refunds excess)
         alice_first_after = network_providers.proxy.get_token_of_account(alice.address, token_first).amount
         actual_input_spent = alice_first_before - alice_first_after
 
-        assert actual_input_spent <= max_input, (
-            f"Input spent should not exceed max.\n"
-            f"Max: {max_input}, Spent: {actual_input_spent}"
+        assert actual_input_spent == estimated_input, (
+            f"Input spent does not match estimated input.\n"
+            f"Estimated: {estimated_input}, Spent: {actual_input_spent}"
         )
-        assert actual_input_spent > 0, "Some input should have been spent"
+        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} (estimated {estimated_input / 10**18:.4f})")
 
-        # 6b. ASSERT: Refund is correct (max_input - actual_spent returned)
-        refund = max_input - actual_input_spent
-        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f}, refund: {refund / 10**18:.4f} (max was {max_input / 10**18:.4f})")
-        assert refund >= 0, "Refund must be non-negative"
-        if max_input > actual_input_spent:
-            assert refund > 0, (
-                f"Contract should refund excess input.\n"
-                f"Max: {max_input}, Spent: {actual_input_spent}, Refund: {refund}"
-            )
-
-        # 7. ASSERT: Reserves consistent
+        # 7. ASSERT: Reserves changed by exact amounts
         reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
-        assert reserves_after[0] > reserves_before[0], "First reserve should increase"
-        assert reserves_after[1] < reserves_before[1], "Second reserve should decrease"
-
-        # 8. ASSERT: Reserve increase <= actual input spent
-        # Note: reserve increase may be less than input spent because the special
-        # fee is deducted from input and sent to the fee collector externally
-        reserve_increase = reserves_after[0] - reserves_before[0]
-        assert reserve_increase <= actual_input_spent, (
-            f"Reserve increase should not exceed actual input spent.\n"
-            f"Reserve increase: {reserve_increase}, Input spent: {actual_input_spent}"
+        assert reserves_before[1] - reserves_after[1] == desired_output, (
+            f"Second reserve should decrease by exactly {desired_output} (output token removed).\n"
+            f"Before: {reserves_before[1]}, After: {reserves_after[1]}, Delta: {reserves_before[1] - reserves_after[1]}"
         )
-        assert reserve_increase > 0, "Reserve should increase from input"
+        # Note: reserve increase for input < actual_input_spent because special fee goes to fee collector
+        assert reserves_after[0] > reserves_before[0], "First reserve should increase from input"
 
-        # 9. ASSERT: Constant product holds
+        # 8. ASSERT: Constant product holds
         PairAssertions.assert_constant_product_holds(
             pair_contract.address, k_before, network_providers.proxy
         )
@@ -335,14 +318,21 @@ class TestSwapFixedOutput:
             f"Requested: {desired_output}, Received: {actual_output}"
         )
 
-        # 6. ASSERT: Input deducted <= max_input
+        # 6. ASSERT: Input deducted is exactly the estimated input (contract refunds excess)
         alice_second_after = network_providers.proxy.get_token_of_account(alice.address, token_second).amount
         actual_input_spent = alice_second_before - alice_second_after
 
-        assert actual_input_spent <= max_input, (
-            f"Input spent exceeds max.\nMax: {max_input}, Spent: {actual_input_spent}"
+        assert actual_input_spent == estimated_input, (
+            f"Input spent does not match estimated input.\n"
+            f"Estimated: {estimated_input}, Spent: {actual_input_spent}"
         )
-        assert actual_input_spent > 0, "Some input should have been spent"
+
+        # 6b. ASSERT: Output reserve delta is exactly desired_output
+        reserves_after = PairAssertions.get_reserves(pair_contract.address, network_providers.proxy)
+        assert reserves_before[0] - reserves_after[0] == desired_output, (
+            f"First reserve should decrease by exactly {desired_output}.\n"
+            f"Before: {reserves_before[0]}, After: {reserves_after[0]}, Delta: {reserves_before[0] - reserves_after[0]}"
+        )
 
         # 7. ASSERT: Constant product holds
         PairAssertions.assert_constant_product_holds(
@@ -414,19 +404,15 @@ class TestSwapFixedOutput:
         # 4. ASSERT: Transaction success
         TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
-        # 5. ASSERT: Input within tight max
+        # 5. ASSERT: Input spent is exactly the estimated input (contract refunds excess)
         alice_first_after = network_providers.proxy.get_token_of_account(alice.address, token_first).amount
         actual_input_spent = alice_first_before - alice_first_after
 
-        assert actual_input_spent <= tight_max_input, (
-            f"Input spent should be within tight max.\n"
-            f"Max: {tight_max_input}, Spent: {actual_input_spent}"
+        assert actual_input_spent == estimated_input, (
+            f"Input spent does not match estimated input.\n"
+            f"Estimated: {estimated_input}, Spent: {actual_input_spent}"
         )
-        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} <= max {tight_max_input / 10**18:.4f}")
-
-        # Verify input is close to estimated (within 10% tolerance)
-        input_variance = abs(actual_input_spent - estimated_input) / estimated_input if estimated_input > 0 else 0
-        logger.info(f"Input variance from estimate: {input_variance:.2%}")
+        logger.info(f"Input spent: {actual_input_spent / 10**18:.4f} == estimated {estimated_input / 10**18:.4f}")
 
         logger.info("Test passed: Tight max input swap successful")
 

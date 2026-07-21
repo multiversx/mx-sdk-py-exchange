@@ -5,7 +5,7 @@ from hashlib import blake2b
 from multiprocessing.dummy import Pool
 from os import path
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, List, Optional, Set, Tuple, cast
 
 from multiversx_sdk import (Address, AddressComputer, Message, MessageComputer,
                             ProxyNetworkProvider, Transaction,
