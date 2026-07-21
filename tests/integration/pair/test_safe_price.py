@@ -63,6 +63,8 @@ from utils.utils_chain import Account, decode_merged_attributes, nominated_amoun
 
 logger = get_logger(__name__)
 
+pytestmark = pytest.mark.usefixtures("safe_price_view_contract")
+
 # ============================================================================
 # Helpers
 # ============================================================================

@@ -56,6 +56,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+
+import config
 from multiversx_sdk import Address, AddressComputer
 
 from contracts.pair_contract import PairContract, SwapFixedInputEvent
@@ -66,11 +68,14 @@ from tests.integration.pair.reference_oracle import (
     SafePriceView,
 )
 from tests.integration.pair.safe_price_helpers import (
+    deployed_safe_price_uses_milliseconds,
+    get_transaction_execution_round,
     load_safe_price_abi,
     pick_same_shard_account,
     query_safe_price_by_offset,
     reserves,
     spot_equivalent,
+    timestamp_offset_for_round_window,
 )
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.logger import get_logger
@@ -78,8 +83,11 @@ from utils.utils_chain import decode_merged_attributes
 
 logger = get_logger(__name__)
 
+pytestmark = pytest.mark.usefixtures("safe_price_view_contract")
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ESDT_PAYMENT_SCHEMA = {"token_identifier": "string", "token_nonce": "u64", "amount": "biguint"}
+LEGACY_ROUND_DURATION_MS = 6_000
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +197,24 @@ class _Simulation:
         self.in_decimals = _token_decimals(self.proxy, self.first)
         self.out_decimals = _token_decimals(self.proxy, self.second)
         self.ref_amount = 10**self.in_decimals
+        pair_uses_milliseconds = deployed_safe_price_uses_milliseconds(
+            self.proxy, pair_contract.address
+        )
+        self.round_duration_ms = (
+            self.proxy.get_network_config().round_duration
+            if pair_uses_milliseconds
+            else LEGACY_ROUND_DURATION_MS
+        )
+        view_contract = dex_context.get_contracts(config.PAIRS_VIEW)[0]
+        uses_milliseconds = deployed_safe_price_uses_milliseconds(
+            self.proxy, view_contract.address
+        )
+        self.timestamp_offsets = {
+            window: timestamp_offset_for_round_window(
+                window, self.round_duration_ms, uses_milliseconds
+            )
+            for window in self.cfg.windows
+        }
 
         # offline reference oracle, replays every swap from an empty buffer
         self.recorder = SafePriceRecorder()
@@ -203,7 +229,7 @@ class _Simulation:
         header = ["block", "updateAndGetSafePrice", "spot_price"]
         for w in self.cfg.windows:
             header.append(f"getSafePriceByRoundOffset({w})")
-            header.append(f"getSafePriceByTimestampOffset({w * 6})")
+            header.append(f"getSafePriceByTimestampOffset({self.timestamp_offsets[w]})")
         for w in self.cfg.windows:
             header.append(f"{w}_rounds_avg_offline")
         return header
@@ -220,7 +246,7 @@ class _Simulation:
         tx = self.pair.swap_fixed_input(self.network_providers, self.swapper, event)
         self.bc.wait_for_tx(tx)
         TransactionAssertions.assert_transaction_success(tx, self.proxy)
-        rnd = self.proxy.get_transaction(tx).round
+        rnd = get_transaction_execution_round(self.proxy, tx)
         self.recorder.update_safe_price(res_before[0], res_before[1], res_before[2], rnd)
         if self.first_recorded_round is None:
             self.first_recorded_round = rnd
@@ -267,14 +293,14 @@ class _Simulation:
                 self.network_providers,
                 self.pair.address,
                 "getSafePriceByTimestampOffset",
-                w * 6,
+                self.timestamp_offsets[w],
                 self.first,
                 self.ref_amount,
             )
             row[f"getSafePriceByRoundOffset({w})"] = _norm(
                 onchain_round["amount"] if onchain_round else None, self.out_decimals
             )
-            row[f"getSafePriceByTimestampOffset({w * 6})"] = _norm(
+            row[f"getSafePriceByTimestampOffset({self.timestamp_offsets[w]})"] = _norm(
                 onchain_ts["amount"] if onchain_ts else None, self.out_decimals
             )
         for w in self.cfg.windows:

@@ -259,6 +259,52 @@ def get_all_sc_states_in_folder(state_folder: Path) -> list[Any]:
     return all_sc_states
 
 
+def _environment_flag(environment: dict[str, str], name: str) -> bool:
+    return environment.get(name, "").lower() in {"1", "true", "yes"}
+
+
+def build_chain_simulator_entrypoint_args(
+    block: int,
+    round_number: int,
+    epoch: int,
+    environment=None,
+) -> list[str]:
+    """Build startup arguments while keeping Supernova chronology explicitly opt-in."""
+    environment = os.environ if environment is None else environment
+    supernova_enabled = _environment_flag(environment, "MX_RUN_SUPERNOVA_TESTS")
+    supernova_options = (
+        "MX_CHAIN_SIM_SUPERNOVA_ROUNDS_PER_EPOCH",
+        "MX_CHAIN_SIM_SUPERNOVA_ROUND_DURATION",
+        "MX_CHAIN_SIM_NODE_OVERRIDE_FILE",
+    )
+    if (epoch != 0 or any(environment.get(name) for name in supernova_options)) and not supernova_enabled:
+        raise ValueError(
+            "Nonzero epoch and Supernova simulator options require MX_RUN_SUPERNOVA_TESTS=1"
+        )
+
+    rounds_per_epoch = int(environment.get("MX_CHAIN_SIM_ROUNDS_PER_EPOCH", BLOCKS_PER_EPOCH))
+    arguments = [
+        "./start-with-services.sh",
+        "-log-level *:INFO",
+        f"--rounds-per-epoch={rounds_per_epoch}",
+        f"--initial-round={round_number}",
+        f"--initial-nonce={block}",
+    ]
+    if supernova_enabled and epoch != 0:
+        arguments.append(f"--initial-epoch={epoch}")
+
+    option_names = (
+        ("MX_CHAIN_SIM_SUPERNOVA_ROUNDS_PER_EPOCH", "--supernova-rounds-per-epoch"),
+        ("MX_CHAIN_SIM_ROUND_DURATION", "--round-duration"),
+        ("MX_CHAIN_SIM_SUPERNOVA_ROUND_DURATION", "--supernova-round-duration"),
+    )
+    for environment_name, argument_name in option_names:
+        value = environment.get(environment_name)
+        if value:
+            arguments.append(f"{argument_name}={value}")
+    return arguments
+
+
 class ChainSimulator:
     def __init__(self, docker_path: Path = None):
         self.docker_path = docker_path
@@ -276,15 +322,37 @@ class ChainSimulator:
             )
 
     def start(self, block: int = 0, round: int = 0, epoch: int = 0):
+        compose_path = self.docker_path / "docker-compose.yaml"
+        original_compose = compose_path.read_text(encoding="utf-8")
         p = subprocess.Popen(["docker", "compose", "down"], cwd=self.docker_path)
         p.wait()
         p.terminate()
 
-        # alter docker-compose.yml to start with the correct block, round and epoch & add other necessary mods
-        self._update_docker_compose(block, round, epoch)
-        self.process = subprocess.Popen(["docker", "compose", "up", "-d"], cwd=self.docker_path)
-        time.sleep(30)
-        return self.process
+        try:
+            self._update_docker_compose(block, round, epoch)
+            self.process = subprocess.Popen(
+                ["docker", "compose", "up", "-d"], cwd=self.docker_path
+            )
+            return_code = self.process.wait()
+            if return_code != 0:
+                raise RuntimeError(f"docker compose up failed with exit code {return_code}")
+        finally:
+            compose_path.write_text(original_compose, encoding="utf-8")
+
+        timeout_seconds = int(os.environ.get("MX_CHAIN_SIM_START_TIMEOUT_SECONDS", "240"))
+        deadline = time.monotonic() + timeout_seconds
+        last_error = None
+        while time.monotonic() < deadline:
+            try:
+                ProxyNetworkProvider(self.proxy_url).get_network_status()
+                return self.process
+            except Exception as error:
+                last_error = error
+                time.sleep(5)
+
+        raise TimeoutError(
+            f"Chain simulator did not answer within {timeout_seconds}s after docker start"
+        ) from last_error
 
     def stop(self):
         if self.process:
@@ -541,8 +609,18 @@ class ChainSimulator:
         url = f"{self.proxy_url}/simulator/generate-blocks-until-transaction-processed/{tx_hash}"
         if max_num_blocks != 20:  # 20 is the server default
             url += f"?maxNumBlocks={max_num_blocks}"
-        response = requests.post(url)
-        return response.json()
+        response = None
+        for attempt in range(3):
+            response = requests.post(url)
+            if response.status_code == 200:
+                return response.json()
+            if attempt < 2:
+                time.sleep(0.25)
+
+        raise RuntimeError(
+            f"Could not finalize transaction {tx_hash}: "
+            f"HTTP {response.status_code}: {response.text}"
+        )
 
     def advance_epochs(self, number_of_epochs: int):
         blocks_to_advance = self.blocks_per_epoch * number_of_epochs
@@ -584,12 +662,31 @@ class ChainSimulator:
         # Locate the chain-simulator service
         chain_simulator = docker_compose["services"].get("chain-simulator", {})
 
-        # Update the entrypoint — supernova image doesn't have the old config
-        # file paths; skip sed commands and non-zero initial epoch/round/nonce
-        # (non-zero values break cross-shard transactions permanently).
-        chain_simulator["entrypoint"] = (
-            f'/bin/bash -c "./start-with-services.sh -log-level *:INFO --rounds-per-epoch={BLOCKS_PER_EPOCH} --initial-round={round} --initial-nonce={block} --initial-epoch={epoch}"'
+        entrypoint_args = build_chain_simulator_entrypoint_args(
+            block, round, epoch, os.environ
         )
+
+        override_file = os.environ.get("MX_CHAIN_SIM_NODE_OVERRIDE_FILE")
+        if override_file:
+            override_path = Path(override_file)
+            if not override_path.is_absolute():
+                override_path = (self.docker_path / override_path).resolve()
+            if not override_path.is_file():
+                raise FileNotFoundError(
+                    f"Chain-simulator node override not found: {override_path}"
+                )
+
+            volumes = chain_simulator.setdefault("volumes", [])
+            volumes[:] = [
+                volume for volume in volumes
+                if "/multiversx/config/nodeOverride.toml" not in str(volume)
+            ]
+            override_volume = f"{override_path}:/multiversx/config/nodeOverride.toml:ro"
+            volumes.append(override_volume)
+
+            entrypoint_args.append("--node-override-config=config/nodeOverride.toml")
+
+        chain_simulator["entrypoint"] = f'/bin/bash -c "{" ".join(entrypoint_args)}"'
 
         # Save the modified docker-compose.yaml file
         with open(self.docker_path / "docker-compose.yaml", "w") as file:

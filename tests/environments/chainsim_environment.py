@@ -45,6 +45,8 @@ class ChainsimEnvironment(TestEnvironment):
         initial_epoch: int = 0,
         proxy_url: str = "http://localhost:8085",
         api_url: str = "http://localhost:3001",
+        filter_safe_price: bool = True,
+        reuse_existing_state: bool = False,
     ):
         """
         Initialize chain simulator environment.
@@ -69,12 +71,13 @@ class ChainsimEnvironment(TestEnvironment):
         self.initial_epoch = initial_epoch
         self.proxy_url = proxy_url
         self.api_url = api_url
+        self.filter_safe_price = filter_safe_price
         self.chain_sim: ChainSimulator | None = None
         self.loaded_accounts: list[str] = []
         self._proxy: ProxyNetworkProvider | None = None
         self._network_providers: NetworkProviders | None = None
         self._externally_started: bool = False
-        self._state_loaded: bool = False
+        self._state_loaded: bool = reuse_existing_state
 
         logger.info(f"Initialized ChainsimEnvironment with docker_path={docker_path}")
         if state_path:
@@ -101,6 +104,10 @@ class ChainsimEnvironment(TestEnvironment):
         if self.chain_sim.is_running():
             logger.info("Chain simulator already running, connecting to existing instance")
             self._externally_started = True
+        elif self._state_loaded:
+            raise RuntimeError(
+                "--reuse-chain-sim-state requires an already-running chain simulator"
+            )
         else:
             logger.info("Starting chain simulator...")
             self.chain_sim.start(
@@ -132,7 +139,7 @@ class ChainsimEnvironment(TestEnvironment):
         if self.state_path and self.state_path.exists():
             logger.info(f"Loading state from {self.state_path}")
             self.loaded_accounts = self.chain_sim.init_state_from_folder(
-                self.state_path, filter_safe_price=False
+                self.state_path, filter_safe_price=self.filter_safe_price
             )
             self._state_loaded = True
             logger.info(f"Loaded state for {len(self.loaded_accounts)} accounts")
@@ -196,9 +203,10 @@ class ChainsimEnvironment(TestEnvironment):
         Check if environment has pre-deployed contracts.
 
         Returns:
-            bool: True if state_path was provided and state was loaded, False for clean slate
+            bool: True when state was loaded by this environment or the caller
+            explicitly connected to an already-loaded simulator.
         """
-        return self.state_path is not None and self._state_loaded
+        return self._state_loaded
 
     def advance_blocks(self, count: int) -> None:
         """

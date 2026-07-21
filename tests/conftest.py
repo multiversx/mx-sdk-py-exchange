@@ -34,7 +34,7 @@ from tools.chain_simulator_connector import get_shard_chronology_in_folder
 from utils.utils_chain import Account, WrapperAddress as Address, nominated_amount
 from utils.utils_tx import NetworkProviders
 from utils.logger import get_logger
-from multiversx_sdk import ProxyNetworkProvider
+from multiversx_sdk import Address as SdkAddress, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)
@@ -70,6 +70,24 @@ def pytest_addoption(parser):
         action="store_true",
         default=False,
         help="Skip contract deployment and use existing deployed contracts"
+    )
+    parser.addoption(
+        "--skip-farm-staking-state",
+        action="store_true",
+        default=os.environ.get("MX_SKIP_FARM_STAKING_STATE", "") in {"1", "true", "yes"},
+        help=(
+            "When loading chain-simulator mainnet state, skip the extra live mainnet "
+            "farm/staking state hydration. Useful for pair-only tests."
+        ),
+    )
+    parser.addoption(
+        "--reuse-chain-sim-state",
+        action="store_true",
+        default=False,
+        help=(
+            "Connect to an externally started chain simulator without reloading the "
+            "saved state folder. The existing simulator must already contain test state."
+        ),
     )
 
 
@@ -121,7 +139,13 @@ def test_environment(test_env_name, request) -> TestEnvironment:
     # Create appropriate environment
     if test_env_name == "chainsim":
         docker_path = Path(request.config.getoption("--docker-path"))
-        state_path = config.DEFAULT_WORKSPACE / "states" if (config.DEFAULT_WORKSPACE / "states").exists() else None
+        reuse_chain_sim_state = request.config.getoption("--reuse-chain-sim-state")
+        state_path = (
+            config.DEFAULT_WORKSPACE / "states"
+            if not reuse_chain_sim_state
+            and (config.DEFAULT_WORKSPACE / "states").exists()
+            else None
+        )
 
         if not docker_path.exists():
             logger.warning(f"Chain simulator docker path does not exist: {docker_path}")
@@ -129,13 +153,31 @@ def test_environment(test_env_name, request) -> TestEnvironment:
 
         if state_path:
             chronology = get_shard_chronology_in_folder(state_path)
-            # chronology = None
-            if chronology:
-                env = ChainsimEnvironment(docker_path, state_path, chronology["block"], chronology["round"], chronology["epoch"])
+            run_supernova = os.environ.get("MX_RUN_SUPERNOVA_TESTS", "").lower() in {
+                "1",
+                "true",
+                "yes",
+            }
+            ignore_chronology = os.environ.get(
+                "MX_CHAIN_SIM_IGNORE_STATE_CHRONOLOGY", ""
+            ).lower() in {"1", "true", "yes"}
+            if chronology and run_supernova and not ignore_chronology:
+                env = ChainsimEnvironment(
+                    docker_path,
+                    state_path,
+                    chronology["block"],
+                    chronology["round"],
+                    chronology["epoch"],
+                    filter_safe_price=False,
+                )
             else:
-                env = ChainsimEnvironment(docker_path, state_path)
+                env = ChainsimEnvironment(
+                    docker_path, state_path, filter_safe_price=True
+                )
         else:
-            env = ChainsimEnvironment(docker_path)
+            env = ChainsimEnvironment(
+                docker_path, reuse_existing_state=reuse_chain_sim_state
+            )
 
     elif test_env_name == "devnet":
         env = DevnetEnvironment(config.DEFAULT_PROXY, config.DEFAULT_API)
@@ -290,6 +332,70 @@ def blockchain_controller(test_environment):
     return BlockchainController(test_environment)
 
 
+@pytest.fixture
+def safe_price_view_contract(
+    dex_context,
+    deployer_account,
+    test_environment,
+    network_providers,
+    blockchain_controller,
+):
+    """Ensure Safe Price tests use real local view bytecode, not a code-less SF address."""
+    configured_views = dex_context.get_contracts(config.PAIRS_VIEW)
+    configured_wasm = os.environ.get("MX_SAFE_PRICE_VIEW_WASM")
+    if configured_views and configured_views[0].address and not configured_wasm:
+        configured_address = SdkAddress.new_from_bech32(configured_views[0].address)
+        if network_providers.proxy.get_account(configured_address).contract_code:
+            return configured_views[0]
+
+        if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
+            loaded = test_environment.chain_sim.ensure_contract_state_from_mainnet(
+                configured_views[0].address,
+                filter_first_week_epoch=False,
+            )
+            if loaded and network_providers.proxy.get_account(configured_address).contract_code:
+                return configured_views[0]
+
+        pytest.fail(
+            f"Configured pairs_view {configured_views[0].address} has no contract code"
+        )
+
+    if not isinstance(test_environment, ChainsimEnvironment) or not test_environment.chain_sim:
+        pytest.fail("Configured pairs_view address has no contract code")
+
+    wasm_candidates = []
+    if configured_wasm:
+        wasm_candidates.append(Path(configured_wasm).expanduser())
+    wasm_candidates.append(
+        Path(config.DEFAULT_WORKSPACE).parent
+        / "mx-exchange-sc"
+        / "dex"
+        / "pair"
+        / "output"
+        / "safe-price-view.wasm"
+    )
+    wasm_path = next((candidate for candidate in wasm_candidates if candidate.exists()), None)
+    assert wasm_path is not None, f"safe-price-view WASM not found in {wasm_candidates}"
+
+    test_environment.chain_sim.fund_users_w_egld(
+        [deployer_account.address.to_bech32()], nominated_amount(20)
+    )
+    test_environment.chain_sim.advance_nonce_for_deploys(
+        deployer_account.address.to_bech32()
+    )
+
+    from tests.integration.pair.safe_price_helpers import deploy_safe_price_view
+
+    deploy_safe_price_view(
+        dex_context,
+        deployer_account,
+        network_providers,
+        blockchain_controller,
+        wasm_path,
+    )
+    return dex_context.get_contracts(config.PAIRS_VIEW)[0]
+
+
 # ============================================================================
 # DEX INFRASTRUCTURE FIXTURES (Session Scope)
 # ============================================================================
@@ -385,8 +491,11 @@ def dex_context(test_environment, network_proxy, request) -> Context:
     # Ensure pair template has bytecode (needed for Router.createPair on chain simulator)
     if test_environment.supports_time_control() and test_environment.has_pre_existing_state():
         _ensure_pair_template_loaded(context, test_environment)
-        _ensure_farm_state_loaded(context, test_environment)
-        _ensure_staking_state_loaded(context, test_environment)
+        if request.config.getoption("--skip-farm-staking-state"):
+            logger.info("Skipping farm/staking live state hydration for this run")
+        else:
+            _ensure_farm_state_loaded(context, test_environment)
+            _ensure_staking_state_loaded(context, test_environment)
 
     return context
 

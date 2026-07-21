@@ -1,0 +1,8 @@
+OverridableConfigTomlValues = [
+   { File = "enableEpochs.toml", Path = "EnableEpochs.SupernovaEnableEpoch", Value = 2169 },
+   { File = "config.toml", Path = "ProofsPoolConfig.CleanupNonceDelta", Value = 1000000000 },
+   { File = "enableRounds.toml", Path = "RoundActivations", Value = {
+      DisableAsyncCallV1 = { Round = "0", Options = [] },
+      SupernovaEnableRound = { Round = "31246352", Options = [] }
+   } }
+]

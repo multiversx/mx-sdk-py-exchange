@@ -13,10 +13,12 @@ import pytest
 from multiversx_sdk import Address, AddressComputer
 
 from tests.integration.pair.reference_oracle import SafePriceError
+import config
 from tests.integration.pair.safe_price_helpers import (
     DEFAULT_INPUT_AMOUNT,
     TOLERANCE_PPM,
     build_recorded_observations,
+    deployed_safe_price_uses_milliseconds,
     encode_payment,
     load_safe_price_abi,
     pick_same_shard_account,
@@ -24,14 +26,18 @@ from tests.integration.pair.safe_price_helpers import (
     reserves,
     run_raw_view_query,
     safe_price_vs_reference,
+    timestamp_offset_for_round_window,
     u64_top,
 )
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+pytestmark = pytest.mark.usefixtures("safe_price_view_contract")
+
 # Alternating 0.1% swaps keep the pool stable while building 6 observations.
 STABLE_DIRECTIONS = ["first", "second"] * 3
+LEGACY_ROUND_DURATION_MS = 6_000
 
 
 @pytest.mark.integration
@@ -99,7 +105,7 @@ class TestSafePriceReferenceCrossCheck:
                 f"onchain={onchain} reference={reference} diff={onchain - reference}"
             )
 
-    def test_round_offset_equals_timestamp_offset(
+    def test_legacy_round_offset_equals_timestamp_offset(
         self,
         dex_context,
         pair_contract,
@@ -109,9 +115,12 @@ class TestSafePriceReferenceCrossCheck:
         ensure_esdt_amounts,
     ):
         """
-        getSafePriceByTimestampOffset(k*6) == getSafePriceByRoundOffset(k)
-        (the contract converts ts->rounds via // SECONDS_PER_ROUND), and both equal the
-        reference oracle (this also exercises the end>last-observation simulate branch).
+        getSafePriceByTimestampOffset(k*legacy_round_duration_ms)
+        == getSafePriceByRoundOffset(k)
+        for legacy round-weighted observations, and both equal the reference oracle.
+
+        Timestamp-native observations intentionally do not satisfy this equivalence;
+        their weighting is validated by the Supernova upgrade suites.
         """
         from tests.integration.pair.reference_oracle import SafePriceView
 
@@ -129,6 +138,16 @@ class TestSafePriceReferenceCrossCheck:
             Address.new_from_bech32(pair_contract.address)
         )
         cur_round = network_providers.proxy.get_network_status(pair_shard).current_round
+        if deployed_safe_price_uses_milliseconds(
+            network_providers.proxy, pair_contract.address
+        ):
+            pytest.skip(
+                "round/timestamp equivalence applies only to legacy round-weighted pairs"
+            )
+        view_contract = dex_context.get_contracts(config.PAIRS_VIEW)[0]
+        uses_milliseconds = deployed_safe_price_uses_milliseconds(
+            network_providers.proxy, view_contract.address
+        )
         cur = reserves(pair_fetcher)
 
         full = cur_round - start_round
@@ -151,12 +170,19 @@ class TestSafePriceReferenceCrossCheck:
                     network_providers,
                     pair_contract.address,
                     "getSafePriceByTimestampOffset",
-                    round_offset * 6,
+                    timestamp_offset_for_round_window(
+                        round_offset, LEGACY_ROUND_DURATION_MS, uses_milliseconds
+                    ),
                     token_id,
                     DEFAULT_INPUT_AMOUNT,
                 )
-                if by_round is None or by_ts is None:
-                    pytest.skip("offset views returned empty — is pairs_view loaded?")
+                assert by_round is not None, (
+                    "getSafePriceByRoundOffset must be available on the configured pair view"
+                )
+                if by_ts is None:
+                    pytest.skip(
+                        "getSafePriceByTimestampOffset requires the Supernova pair/view upgrade"
+                    )
 
                 logger.info(
                     f"offset={round_offset} input_is_first={input_is_first} "

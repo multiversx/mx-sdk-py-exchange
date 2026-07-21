@@ -29,7 +29,7 @@ from multiversx_sdk import Address, AddressComputer, SmartContractController
 from multiversx_sdk.abi import Abi, BigUIntValue, TokenIdentifierValue
 
 import config
-from contracts.pair_contract import SwapFixedInputEvent
+from contracts.pair_contract import PairContract, PairContractVersion, SwapFixedInputEvent
 from tests.helpers import TransactionAssertions
 from tests.integration.pair.reference_oracle import SafePriceRecorder, SafePriceView
 from utils.contract_data_fetchers import PairContractDataFetcher
@@ -118,6 +118,34 @@ def pairs_view_fetcher(dex_context, network_providers):
     if not addr:
         return None
     return PairContractDataFetcher(Address.new_from_bech32(addr), network_providers.proxy.url)
+
+
+def deploy_safe_price_view(
+    dex_context,
+    deployer_account,
+    network_providers,
+    blockchain_controller,
+    wasm_path: Path,
+) -> str:
+    """Deploy the external safe-price view and update the in-memory DEX context."""
+    assert wasm_path.exists(), f"safe-price-view WASM not found at {wasm_path}"
+
+    view_contract = PairContract("", "", PairContractVersion.V1)
+    deployer_account.sync_nonce(network_providers.proxy)
+    tx_hash, view_address = view_contract.view_contract_deploy(
+        deployer_account,
+        network_providers.proxy,
+        str(wasm_path),
+        [config.ZERO_CONTRACT_ADDRESS],
+    )
+    assert tx_hash, "safe-price-view deploy did not produce a transaction hash"
+    blockchain_controller.wait_for_tx(tx_hash)
+    TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+    assert view_address, "safe-price-view deploy did not return an address"
+
+    view_contract.address = view_address
+    dex_context.deploy_structure.contracts[config.PAIRS_VIEW].deployed_contracts = [view_contract]
+    return view_address
 
 
 def _pair_bytes(pair_address) -> bytes:
@@ -234,6 +262,79 @@ def pick_same_shard_account(dex_context, pair_address, test_environment, network
     return account
 
 
+def timestamp_offset_for_round_window(
+    window: int,
+    round_duration_ms: int,
+    uses_milliseconds: bool,
+) -> int:
+    """Convert a round window to the units expected by the deployed view contract."""
+    if window <= 0 or round_duration_ms <= 0:
+        raise ValueError("window and round_duration_ms must be greater than zero")
+    duration = window * round_duration_ms
+    return duration if uses_milliseconds else max(duration // 1_000, 1)
+
+
+def network_status_timestamp_milliseconds(status) -> int:
+    """Return the exact status timestamp when the gateway exposes millisecond precision."""
+    raw = getattr(status, "raw", {}) or {}
+    timestamp_ms = int(raw.get("erd_block_timestamp_ms", 0))
+    return timestamp_ms if timestamp_ms > 0 else int(status.block_timestamp) * 1_000
+
+
+def block_timestamp_milliseconds(block) -> int:
+    """Return the exact block timestamp when the gateway exposes millisecond precision."""
+    raw = getattr(block, "raw", {}) or {}
+    timestamp_ms = int(raw.get("timestampMs", 0))
+    return timestamp_ms if timestamp_ms > 0 else int(block.timestamp) * 1_000
+
+
+def deployed_safe_price_uses_milliseconds(proxy, contract_address: str) -> bool:
+    """Inspect the deployed view bytecode instead of assuming a local artifact version."""
+    import base64
+
+    code = proxy.get_account(Address.new_from_bech32(contract_address)).contract_code
+    if isinstance(code, str):
+        try:
+            code_bytes = base64.b64decode(code, validate=True)
+        except ValueError:
+            try:
+                code_bytes = bytes.fromhex(code)
+            except ValueError:
+                code_bytes = code.encode()
+    else:
+        code_bytes = bytes(code or b"")
+    return b"getBlockTimestampMs" in code_bytes
+
+
+def get_transaction_execution_round(
+    proxy,
+    tx_hash: str,
+    attempts: int = 5,
+    delay_seconds: float = 1,
+) -> int:
+    """Return the finalized transaction block round, retrying transient gateway timeouts."""
+    import time
+
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            transaction = proxy.get_transaction(tx_hash)
+            execution_round = int(
+                getattr(transaction, "round", 0)
+                or getattr(transaction, "raw", {}).get("round", 0)
+            )
+            if execution_round <= 0:
+                raise RuntimeError(f"Transaction {tx_hash} has no execution round")
+            return execution_round
+        except TimeoutError as error:
+            last_error = error
+            if attempt + 1 < attempts:
+                time.sleep(delay_seconds)
+    raise TimeoutError(
+        f"Could not fetch execution round for transaction {tx_hash} after {attempts} attempts"
+    ) from last_error
+
+
 def build_recorded_observations(
     pair_contract,
     account,
@@ -281,7 +382,7 @@ def build_recorded_observations(
         tx = pair_contract.swap_fixed_input(network_providers, account, event)
         blockchain_controller.wait_for_tx(tx)
         TransactionAssertions.assert_transaction_success(tx, proxy)
-        round = proxy.get_transaction(tx).round
+        round = get_transaction_execution_round(proxy, tx)
         recorder.update_safe_price(
             reserves_before[0], reserves_before[1], reserves_before[2], round
         )

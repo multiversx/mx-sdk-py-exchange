@@ -137,7 +137,11 @@ class RouterContractDataFetcher(DataFetcher):
         super().__init__(contract_address, proxy_url)
         self.view_handler_map = {
             "getAllPairsManagedAddresses": self._get_hex_list_view,
-            "getPairTemplateAddress": self._get_hex_view
+            "getPairTemplateAddress": self._get_hex_view,
+            "getSafePriceRoundSaveInterval": self._get_int_view,
+            "getDefaultSafePriceRoundsOffset": self._get_int_view,
+            "getSafePriceTimestampSaveInterval": self._get_int_view,
+            "getDefaultSafePriceTimestampOffset": self._get_int_view,
         }
 
 

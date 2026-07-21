@@ -347,6 +347,34 @@ class RouterContract(DEXContractInterface):
             offset
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setDefaultSafePriceRoundsOffset", sc_args)
+
+    def set_safe_price_timestamp_save_interval(self, deployer: Account, proxy: ProxyNetworkProvider, interval: int):
+        """ Expected as args:
+            type[int]: interval in milliseconds
+        """
+        function_purpose = f"Set safe price timestamp save interval"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = [
+            interval
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setSafePriceTimestampSaveInterval", sc_args)
+
+    def set_default_safe_price_timestamp_offset(self, deployer: Account, proxy: ProxyNetworkProvider, offset: int):
+        """
+        Sets the default safe price timestamp offset for timestamp-based safe price views.
+        Expected as args:
+            type[int]: offset in milliseconds
+        """
+        function_purpose = f"Set default safe price timestamp offset"
+        logger.info(function_purpose)
+
+        gas_limit = 10000000
+        sc_args = [
+            offset
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setDefaultSafePriceTimestampOffset", sc_args)
     
     def get_pair_template_address(self, proxy: ProxyNetworkProvider):
         router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
@@ -361,6 +389,16 @@ class RouterContract(DEXContractInterface):
     def get_default_safe_price_rounds_offset(self, proxy: ProxyNetworkProvider):
         router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
         offset = router_data_fetcher.get_data("getDefaultSafePriceRoundsOffset")
+        return int(offset)
+
+    def get_safe_price_timestamp_save_interval(self, proxy: ProxyNetworkProvider):
+        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
+        interval = router_data_fetcher.get_data("getSafePriceTimestampSaveInterval")
+        return int(interval)
+
+    def get_default_safe_price_timestamp_offset(self, proxy: ProxyNetworkProvider):
+        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
+        offset = router_data_fetcher.get_data("getDefaultSafePriceTimestampOffset")
         return int(offset)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
