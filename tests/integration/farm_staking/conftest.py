@@ -6,7 +6,7 @@ Farm-staking-package pytest fixtures.
 import pytest
 
 from tests.helpers import TransactionAssertions
-from tests.integration.farm_staking import _ensure_deployer_has_egld
+from tests.integration.farm_staking import _check_staking_has_code, _ensure_deployer_has_egld
 from tests.integration.shared_fixtures import alice, bob
 from utils.logger import get_logger
 from utils.utils_chain import WrapperAddress as Address
@@ -72,6 +72,9 @@ def seed_staking_rewards(
     blockchain_controller,
     ensure_esdt_amounts,
 ):
+    if not _check_staking_has_code(staking_contract, network_providers.proxy):
+        pytest.skip("Staking contract bytecode not loaded on chain simulator")
+
     remained_rewards = _remaining_uncollected_rewards(staking_contract, network_providers.proxy)
     minimum_remaining = nominated_amount(100_000)
     topup_amount = nominated_amount(100_000)
