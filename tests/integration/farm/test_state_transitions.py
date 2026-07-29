@@ -24,32 +24,24 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher, SimpleLockEnergyContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
+    _claim_rewards,
+    _ensure_deployer_has_egld,
     _enter_farm,
     _exit_farm,
-    _claim_rewards,
-    _claim_boosted_rewards,
+    _get_farm_state,
     _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
     _get_locked_token_id,
     _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _get_stake_amount,
 )
+from utils import decoding_structures
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account, decode_merged_attributes
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -57,6 +49,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -114,21 +107,31 @@ class TestFarmStateTransitions:
         position_before = farm_contract.get_user_total_farm_position(
             alice.address.to_bech32(), network_providers.proxy
         )
-        logger.info(f"STATE 0 (before entry): supply={supply_before}, reserve={reserve_before}, "
-                     f"rps={rps_before}, position={position_before}")
+        logger.info(
+            f"STATE 0 (before entry): supply={supply_before}, reserve={reserve_before}, "
+            f"rps={rps_before}, position={position_before}"
+        )
 
         # ---- TRANSITION 1: Enter farm ----
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         state_1 = _get_farm_state(farm_contract, network_providers.proxy)
         position_after_enter = farm_contract.get_user_total_farm_position(
             alice.address.to_bech32(), network_providers.proxy
         )
-        logger.info(f"STATE 1 (after entry): supply={state_1['farm_token_supply']}, "
-                     f"position={position_after_enter}")
+        logger.info(
+            f"STATE 1 (after entry): supply={state_1['farm_token_supply']}, "
+            f"position={position_after_enter}"
+        )
 
         # Verify entry effects
         assert state_1["farm_token_supply"] == supply_before + stake_amount, (
@@ -157,10 +160,18 @@ class TestFarmStateTransitions:
 
         # ---- TRANSITION 2: Claim rewards ----
         ft_before_claim = max(farm_tokens, key=lambda t: t.token.nonce)
-        reserve_before_claim = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_before_claim = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
 
-        tx_claim = _claim_rewards(farm_contract, alice, ft_before_claim.token.nonce,
-                                  ft_before_claim.amount, network_providers, blockchain_controller)
+        tx_claim = _claim_rewards(
+            farm_contract,
+            alice,
+            ft_before_claim.token.nonce,
+            ft_before_claim.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         state_2 = _get_farm_state(farm_contract, network_providers.proxy)
@@ -187,13 +198,19 @@ class TestFarmStateTransitions:
             f"  Locked before claim: {locked_before_claim}\n"
             f"  Locked after claim: {locked_after_claim}"
         )
-        logger.info(f"Locked rewards from claim: {locked_delta} (may be 0 if reward rate is negligible)")
+        logger.info(
+            f"Locked rewards from claim: {locked_delta} (may be 0 if reward rate is negligible)"
+        )
 
         # Alice should have a new farm token with updated RPS
-        farm_tokens_after_claim = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
+        farm_tokens_after_claim = _get_farm_tokens_for_user(
+            farm_contract, alice, network_providers.proxy
+        )
         assert len(farm_tokens_after_claim) > 0, "Alice should have farm tokens after claim"
         new_ft = max(farm_tokens_after_claim, key=lambda t: t.token.nonce)
-        attrs = decode_merged_attributes(new_ft.attributes.hex(), decoding_structures.FARM_TOKEN_ATTRIBUTES)
+        attrs = decode_merged_attributes(
+            new_ft.attributes.hex(), decoding_structures.FARM_TOKEN_ATTRIBUTES
+        )
         assert attrs["reward_per_share"] >= rps_before, (
             f"New farm token RPS should be >= pre-entry RPS:\n"
             f"  Entry RPS: {rps_before}\n"
@@ -204,19 +221,29 @@ class TestFarmStateTransitions:
         blockchain_controller.wait_blocks(5)
 
         # ---- TRANSITION 3: Exit farm ----
-        farm_tokens_for_exit = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
+        farm_tokens_for_exit = _get_farm_tokens_for_user(
+            farm_contract, alice, network_providers.proxy
+        )
         ft_exit = max(farm_tokens_for_exit, key=lambda t: t.token.nonce)
 
-        tx_exit = _exit_farm(farm_contract, alice, ft_exit.token.nonce, ft_exit.amount,
-                             network_providers, blockchain_controller)
+        tx_exit = _exit_farm(
+            farm_contract,
+            alice,
+            ft_exit.token.nonce,
+            ft_exit.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
 
         state_3 = _get_farm_state(farm_contract, network_providers.proxy)
         position_after_exit = farm_contract.get_user_total_farm_position(
             alice.address.to_bech32(), network_providers.proxy
         )
-        logger.info(f"STATE 3 (after exit): supply={state_3['farm_token_supply']}, "
-                     f"position={position_after_exit}")
+        logger.info(
+            f"STATE 3 (after exit): supply={state_3['farm_token_supply']}, "
+            f"position={position_after_exit}"
+        )
 
         # Supply should return to original
         assert state_3["farm_token_supply"] == supply_before, (
@@ -279,8 +306,14 @@ class TestFarmStateTransitions:
 
         # Enter farm and record current week
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         week_at_entry = farm_contract.get_current_week(network_providers.proxy)
@@ -308,8 +341,14 @@ class TestFarmStateTransitions:
         farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         ft = max(farm_tokens, key=lambda t: t.token.nonce)
 
-        tx_claim = _claim_rewards(farm_contract, alice, ft.token.nonce, ft.amount,
-                                  network_providers, blockchain_controller)
+        tx_claim = _claim_rewards(
+            farm_contract,
+            alice,
+            ft.token.nonce,
+            ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
         logger.info("Claim succeeded across week boundary")
 
@@ -324,8 +363,10 @@ class TestFarmStateTransitions:
             network_providers.proxy, week_after_advance
         )
 
-        logger.info(f"Week {week_after_advance}: supply={supply_for_week}, "
-                     f"accumulated={accumulated}, total_rewards={total_rewards}")
+        logger.info(
+            f"Week {week_after_advance}: supply={supply_for_week}, "
+            f"accumulated={accumulated}, total_rewards={total_rewards}"
+        )
 
         # Farm supply for the new week should reflect Alice's position
         assert supply_for_week > 0, (
@@ -388,8 +429,10 @@ class TestFarmStateTransitions:
             expected_week = (current_epoch - first_week_epoch) // 7 + 1
             next_week_start = farm_contract.get_next_week_start_epoch(network_providers.proxy)
 
-            logger.info(f"Step {i + 1}: epoch={current_epoch}, week={current_week}, "
-                         f"expected={expected_week}, next_week_start={next_week_start}")
+            logger.info(
+                f"Step {i + 1}: epoch={current_epoch}, week={current_week}, "
+                f"expected={expected_week}, next_week_start={next_week_start}"
+            )
 
             # Week formula must hold
             assert current_week == expected_week, (
@@ -413,9 +456,10 @@ class TestFarmStateTransitions:
             )
 
             # firstWeekStartEpoch must not change
-            assert farm_contract.get_first_week_start_epoch(network_providers.proxy) == first_week_epoch, (
-                f"firstWeekStartEpoch should remain constant"
-            )
+            assert (
+                farm_contract.get_first_week_start_epoch(network_providers.proxy)
+                == first_week_epoch
+            ), "firstWeekStartEpoch should remain constant"
 
             previous_week = current_week
 
@@ -471,17 +515,25 @@ class TestFarmStateTransitions:
 
         # Ensure rewards are started
         deployer_account.sync_nonce(network_providers.proxy)
-        tx_start_init = farm_contract.start_produce_rewards(deployer_account, network_providers.proxy)
+        tx_start_init = farm_contract.start_produce_rewards(
+            deployer_account, network_providers.proxy
+        )
         blockchain_controller.wait_for_tx(tx_start_init)
 
         try:
             # ---- PHASE 1: Rewards active ----
-            rps_phase1_start = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase1_start = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             blockchain_controller.wait_blocks(10)
-            rps_phase1_end = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase1_end = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             phase1_growth = rps_phase1_end - rps_phase1_start
-            logger.info(f"Phase 1 (active): RPS {rps_phase1_start} -> {rps_phase1_end} "
-                         f"(growth: {phase1_growth})")
+            logger.info(
+                f"Phase 1 (active): RPS {rps_phase1_start} -> {rps_phase1_end} "
+                f"(growth: {phase1_growth})"
+            )
 
             assert rps_phase1_end >= rps_phase1_start, (
                 f"Phase 1: RPS should not decrease while rewards active:\n"
@@ -497,12 +549,18 @@ class TestFarmStateTransitions:
             logger.info("Reward production stopped")
 
             # ---- PHASE 2: Rewards stopped ----
-            rps_phase2_start = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase2_start = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             blockchain_controller.wait_blocks(10)
-            rps_phase2_end = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase2_end = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             phase2_growth = rps_phase2_end - rps_phase2_start
-            logger.info(f"Phase 2 (stopped): RPS {rps_phase2_start} -> {rps_phase2_end} "
-                         f"(growth: {phase2_growth})")
+            logger.info(
+                f"Phase 2 (stopped): RPS {rps_phase2_start} -> {rps_phase2_end} "
+                f"(growth: {phase2_growth})"
+            )
 
             # RPS should be frozen (no growth) when production is stopped
             assert rps_phase2_end == rps_phase2_start, (
@@ -514,18 +572,26 @@ class TestFarmStateTransitions:
 
             # ---- RESTART production ----
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_restart = farm_contract.start_produce_rewards(deployer_account, network_providers.proxy)
+            tx_restart = farm_contract.start_produce_rewards(
+                deployer_account, network_providers.proxy
+            )
             blockchain_controller.wait_for_tx(tx_restart)
             TransactionAssertions.assert_transaction_success(tx_restart, network_providers.proxy)
             logger.info("Reward production restarted")
 
             # ---- PHASE 3: Rewards active again ----
-            rps_phase3_start = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase3_start = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             blockchain_controller.wait_blocks(10)
-            rps_phase3_end = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase3_end = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             phase3_growth = rps_phase3_end - rps_phase3_start
-            logger.info(f"Phase 3 (restarted): RPS {rps_phase3_start} -> {rps_phase3_end} "
-                         f"(growth: {phase3_growth})")
+            logger.info(
+                f"Phase 3 (restarted): RPS {rps_phase3_start} -> {rps_phase3_end} "
+                f"(growth: {phase3_growth})"
+            )
 
             assert rps_phase3_end >= rps_phase3_start, (
                 f"Phase 3: RPS should not decrease after rewards restarted:\n"
@@ -536,7 +602,9 @@ class TestFarmStateTransitions:
         finally:
             # Always ensure rewards are running for subsequent tests
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_ensure = farm_contract.start_produce_rewards(deployer_account, network_providers.proxy)
+            tx_ensure = farm_contract.start_produce_rewards(
+                deployer_account, network_providers.proxy
+            )
             blockchain_controller.wait_for_tx(tx_ensure)
             logger.info("Reward production ensured active (cleanup)")
 
@@ -587,47 +655,59 @@ class TestFarmStateTransitions:
 
         # Ensure Alice has a farm position
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Read the original rate
-        original_rate = farm_contract.get_per_block_reward_amount(network_providers.proxy)
+        original_rate = farm_contract.get_per_second_reward_amount(network_providers.proxy)
         logger.info(f"Original per-block rate: {original_rate}")
 
         # Set a higher rate for Phase 2
-        new_rate = original_rate * 5 if original_rate > 0 else 5
+        new_rate = original_rate * 2 if original_rate > 0 else 5
         num_blocks = 10
 
         try:
             # ---- PHASE 1: Original rate ----
-            rps_phase1_start = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase1_start = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             blockchain_controller.wait_blocks(num_blocks)
-            rps_phase1_end = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase1_end = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             phase1_growth = rps_phase1_end - rps_phase1_start
             logger.info(f"Phase 1 (rate={original_rate}): RPS growth = {phase1_growth}")
 
             # ---- Change rate ----
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_set = farm_contract.set_rewards_per_block(
+            tx_set = farm_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, new_rate
             )
             blockchain_controller.wait_for_tx(tx_set)
             TransactionAssertions.assert_transaction_success(tx_set, network_providers.proxy)
 
             # Verify rate changed
-            actual_rate = farm_contract.get_per_block_reward_amount(network_providers.proxy)
+            actual_rate = farm_contract.get_per_second_reward_amount(network_providers.proxy)
             assert actual_rate == new_rate, (
-                f"Rate should be updated:\n"
-                f"  Expected: {new_rate}\n"
-                f"  Actual: {actual_rate}"
+                f"Rate should be updated:\n  Expected: {new_rate}\n  Actual: {actual_rate}"
             )
             logger.info(f"Rate changed to {new_rate}")
 
             # ---- PHASE 2: New (higher) rate ----
-            rps_phase2_start = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase2_start = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             blockchain_controller.wait_blocks(num_blocks)
-            rps_phase2_end = _get_farm_state(farm_contract, network_providers.proxy)["reward_per_share"]
+            rps_phase2_end = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_per_share"
+            ]
             phase2_growth = rps_phase2_end - rps_phase2_start
             logger.info(f"Phase 2 (rate={new_rate}): RPS growth = {phase2_growth}")
 
@@ -643,13 +723,22 @@ class TestFarmStateTransitions:
             assert len(farm_tokens) > 0, "Alice should have farm tokens"
             ft = max(farm_tokens, key=lambda t: t.token.nonce)
 
-            reserve_before_claim = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-            tx_claim = _claim_rewards(farm_contract, alice, ft.token.nonce, ft.amount,
-                                      network_providers, blockchain_controller)
+            reserve_before_claim = _get_farm_state(farm_contract, network_providers.proxy)[
+                "reward_reserve"
+            ]
+            tx_claim = _claim_rewards(
+                farm_contract,
+                alice,
+                ft.token.nonce,
+                ft.amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
-            reserve_after_claim = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-            reserve_tolerance = 5_000
+            farm_state_after = _get_farm_state(farm_contract, network_providers.proxy)
+            reserve_after_claim = farm_state_after["reward_reserve"]
+            reserve_tolerance = new_rate * 6 * (num_blocks + 1)
             assert reserve_after_claim <= reserve_before_claim + reserve_tolerance, (
                 f"Reserve should not increase significantly after claim:\n"
                 f"  Before: {reserve_before_claim}\n"
@@ -660,12 +749,12 @@ class TestFarmStateTransitions:
         finally:
             # Always restore original rate
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_restore = farm_contract.set_rewards_per_block(
+            tx_restore = farm_contract.set_rewards_per_second(
                 deployer_account, network_providers.proxy, original_rate
             )
             blockchain_controller.wait_for_tx(tx_restore)
 
-            restored_rate = farm_contract.get_per_block_reward_amount(network_providers.proxy)
+            restored_rate = farm_contract.get_per_second_reward_amount(network_providers.proxy)
             assert restored_rate == original_rate, (
                 f"Failed to restore rate: expected {original_rate}, got {restored_rate}"
             )

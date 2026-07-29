@@ -21,11 +21,11 @@ Usage:
 import requests
 from multiversx_sdk import Address
 from multiversx_sdk.network_providers.resources import TokenAmountOnNetwork
+
 from contracts.staking_contract import StakingContract
-from utils.utils_chain import hex_to_string, nominated_amount
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.logger import get_logger
-from tests.helpers import TransactionAssertions
+from utils.utils_chain import hex_to_string, nominated_amount
 
 logger = get_logger(__name__)
 
@@ -58,8 +58,7 @@ def _get_staking_state(staking_contract: StakingContract, proxy):
             - min_unbond_epochs: Unbonding period (int, staking-specific)
     """
     fetcher = StakingContractDataFetcher(
-        Address.new_from_bech32(staking_contract.address),
-        proxy.url
+        Address.new_from_bech32(staking_contract.address), proxy.url
     )
 
     return {
@@ -119,8 +118,16 @@ def _get_stake_amount(staking_contract: StakingContract, proxy):
     return nominated_amount(100)
 
 
-def _stake_farm(staking_contract, user, farming_token, stake_amount, network_providers,
-                blockchain_controller, farm_nonce=0, farm_amount=0):
+def _stake_farm(
+    staking_contract,
+    user,
+    farming_token,
+    stake_amount,
+    network_providers,
+    blockchain_controller,
+    farm_nonce=0,
+    farm_amount=0,
+):
     """Execute stakeFarm and return tx_hash.
 
     Does NOT assert success — the test decides whether to use
@@ -152,15 +159,21 @@ def _stake_farm(staking_contract, user, farming_token, stake_amount, network_pro
         farm_amount=farm_amount,
     )
 
-    initial = (farm_nonce == 0 and farm_amount == 0)
+    initial = farm_nonce == 0 and farm_amount == 0
     tx_hash = staking_contract.stake_farm(network_providers, user, enter_event, initial=initial)
     blockchain_controller.wait_for_tx(tx_hash)
 
     return tx_hash
 
 
-def _unstake_farm(staking_contract, user, farm_token_nonce, farm_token_amount,
-                  network_providers, blockchain_controller):
+def _unstake_farm(
+    staking_contract,
+    user,
+    farm_token_nonce,
+    farm_token_amount,
+    network_providers,
+    blockchain_controller,
+):
     """Execute unstakeFarm and return tx_hash.
 
     Args:
@@ -191,8 +204,14 @@ def _unstake_farm(staking_contract, user, farm_token_nonce, farm_token_amount,
     return tx_hash
 
 
-def _unbond_farm(staking_contract, user, unbond_token_nonce, unbond_token_amount,
-                 network_providers, blockchain_controller):
+def _unbond_farm(
+    staking_contract,
+    user,
+    unbond_token_nonce,
+    unbond_token_amount,
+    network_providers,
+    blockchain_controller,
+):
     """Execute unbondFarm and return tx_hash.
 
     Args:
@@ -225,8 +244,14 @@ def _unbond_farm(staking_contract, user, unbond_token_nonce, unbond_token_amount
     return tx_hash
 
 
-def _claim_rewards(staking_contract, user, farm_token_nonce, farm_token_amount,
-                   network_providers, blockchain_controller):
+def _claim_rewards(
+    staking_contract,
+    user,
+    farm_token_nonce,
+    farm_token_amount,
+    network_providers,
+    blockchain_controller,
+):
     """Execute claimRewards and return tx_hash.
 
     Args:
@@ -256,8 +281,14 @@ def _claim_rewards(staking_contract, user, farm_token_nonce, farm_token_amount,
     return tx_hash
 
 
-def _compound_rewards(staking_contract, user, farm_token_nonce, farm_token_amount,
-                      network_providers, blockchain_controller):
+def _compound_rewards(
+    staking_contract,
+    user,
+    farm_token_nonce,
+    farm_token_amount,
+    network_providers,
+    blockchain_controller,
+):
     """Execute compoundRewards and return tx_hash.
 
     Args:
@@ -303,7 +334,7 @@ def _get_farm_tokens_for_user(staking_contract, user, proxy):
     for token in all_nfts:
         # token.token.identifier includes nonce hex (e.g. "SRIDE-4ab1d4-01")
         # Extract collection (base ID) by stripping the nonce suffix
-        collection = token.token.identifier.rsplit('-', 1)[0]
+        collection = token.token.identifier.rsplit("-", 1)[0]
         if collection != farm_token_id:
             continue
         # Unbond tokens share the same collection but have exactly 8 bytes
@@ -321,57 +352,13 @@ def _get_unbond_tokens_for_user(staking_contract, user, proxy):
     farm_token_id = staking_contract.farm_token
     unbond_tokens = []
     for token in all_nfts:
-        collection = token.token.identifier.rsplit('-', 1)[0]
+        collection = token.token.identifier.rsplit("-", 1)[0]
         if collection != farm_token_id:
             continue
         # Unbond tokens have exactly 8 bytes attributes (u64 unlock_epoch).
         if len(token.attributes) == 8:
             unbond_tokens.append(token)
     return unbond_tokens
-
-
-def _ensure_rewards_available(staking_contract, deployer_account, test_environment,
-                               network_providers, blockchain_controller, ensure_esdt_amounts):
-    """Ensure staking contract has sufficient reward capacity, topping up if exhausted.
-
-    The mainnet state loaded on chain simulator may have fully depleted reward capacity
-    (capacity == accumulated). This helper detects that and calls topUpRewards so that
-    reward-dependent tests (claim, compound, unstake) produce non-zero results.
-
-    Args:
-        staking_contract: StakingContract instance
-        deployer_account: Account with admin rights on the contract
-        test_environment: Test environment (used to detect chain sim)
-        network_providers: NetworkProviders instance
-        blockchain_controller: BlockchainController for tx finalization
-        ensure_esdt_amounts: ensure_esdt_amounts fixture callable
-    """
-    if not _check_staking_has_code(staking_contract, network_providers.proxy):
-        return
-
-    reserve = staking_contract.get_reward_reserve(network_providers.proxy)
-
-    min_reserve = nominated_amount(10_000_000)  # 10M tokens
-    if reserve >= min_reserve:
-        return
-
-    top_up_amount = nominated_amount(50_000_000)  # 50M tokens
-    farming_token = staking_contract.farming_token
-
-    logger.info(
-        f"Reward reserve depleted (reserve={reserve}), "
-        f"topping up staking contract with {top_up_amount} {farming_token}"
-    )
-
-    _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
-    ensure_esdt_amounts(deployer_account, {farming_token: top_up_amount})
-
-    deployer_account.sync_nonce(network_providers.proxy)
-    tx_hash = staking_contract.topup_rewards(deployer_account, network_providers.proxy, top_up_amount)
-    blockchain_controller.wait_for_tx(tx_hash)
-    TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
-
-    logger.info("✓ Staking contract reward capacity topped up")
 
 
 def _ensure_deployer_has_egld(deployer_account, test_environment, network_providers, min_egld=None):
@@ -396,6 +383,5 @@ def _ensure_deployer_has_egld(deployer_account, test_environment, network_provid
         if account_data.balance < min_egld:
             logger.info(f"Funding deployer with {min_egld} EGLD for gas")
             test_environment.chain_sim.fund_users_w_egld(
-                [deployer_account.address.to_bech32()],
-                min_egld
+                [deployer_account.address.to_bech32()], min_egld
             )

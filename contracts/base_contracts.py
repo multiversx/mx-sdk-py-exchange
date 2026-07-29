@@ -265,6 +265,15 @@ class BaseFarmContract(DEXContractInterface, ABC):
             return self._get_storage_int(proxy, 'per_block_reward_amount', 'perBlockRewardAmount')
         return int(raw_results)
     
+    def get_per_second_reward_amount(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getPerSecondRewardAmount')
+        if raw_results is None or raw_results == 0:
+            return 0
+        if raw_results < 0:
+            return self._get_storage_int(proxy, 'per_second_reward_amount', 'perSecondRewardAmount')
+        return int(raw_results)
+    
     def get_reward_per_share(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getRewardPerShare')
@@ -305,7 +314,16 @@ class BaseFarmContract(DEXContractInterface, ABC):
         if raw_results < 0:
             return self._get_storage_int(proxy, 'state')
         return int(raw_results)
-    
+
+    def get_produce_rewards_enabled(self, proxy: ProxyNetworkProvider) -> bool:
+        """Whether per-block reward production is currently enabled.
+
+        There is no view for this flag, so it is read straight from storage.
+        A SingleValueMapper<bool> clears its entry when set to false, so an
+        absent key means production is stopped.
+        """
+        return self._get_storage_int(proxy, 'produce_rewards_enabled') == 1
+
     def get_all_farm_global_stats(self, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
         """Fetches all global stats for a farm."""
 

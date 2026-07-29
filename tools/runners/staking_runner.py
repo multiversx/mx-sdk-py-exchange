@@ -24,11 +24,9 @@ from utils.utils_generic import split_to_chunks, get_file_from_url_or_path
 from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
 import config
 
-from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
-
 from context import Context
 
-from utils.utils_chain import get_bytecode_codehash, log_explorer_transaction
+from utils.utils_chain import get_bytecode_codehash
 from tools.runners.common_config import STAKING_BOOSTED_REWARDS_PERCENTAGE, STAKING_BOOSTED_YIELD_FACTORS
 
 

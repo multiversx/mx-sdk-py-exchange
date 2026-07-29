@@ -18,17 +18,14 @@ Usage:
     )
 """
 
-import base64
 import time
 from typing import Tuple, Optional
 from multiversx_sdk import ProxyNetworkProvider, Address
 
 from utils.contract_data_fetchers import (
     PairContractDataFetcher,
-    FarmContractDataFetcher,
-    RouterContractDataFetcher
 )
-from utils.utils_chain import WrapperAddress, get_current_tokens_for_address
+from utils.utils_chain import get_current_tokens_for_address
 from utils.logger import get_logger
 
 

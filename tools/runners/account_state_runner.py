@@ -6,7 +6,7 @@ from multiversx_sdk import ProxyNetworkProvider, NetworkProviderConfig
 from multiversx_sdk.network_providers.errors import NetworkProviderError
 from utils.errors import GenericError
 import requests
-from utils.utils_generic import log_step_fail, log_step_pass, log_warning, get_continue_confirmation
+from utils.utils_generic import log_step_fail, log_step_pass, log_warning
 from utils.logger import get_logger
 
 

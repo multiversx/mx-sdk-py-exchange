@@ -1,12 +1,10 @@
 from argparse import ArgumentParser
-from typing import Any
 from tools.common import API, OUTPUT_FOLDER, PROXY, get_owner, \
     get_user_continue
 from context import Context
 from contracts.locked_token_position_creator_contract import LockedTokenPositionCreatorContract
 from contracts.dex_proxy_contract import DexProxyContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
-from utils.utils_chain import WrapperAddress as Address
 from utils.utils_tx import NetworkProviders
 from context import Context
 import config

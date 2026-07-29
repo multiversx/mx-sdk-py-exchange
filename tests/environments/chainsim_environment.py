@@ -131,7 +131,7 @@ class ChainsimEnvironment(TestEnvironment):
         if self.state_path and self.state_path.exists():
             logger.info(f"Loading state from {self.state_path}")
             self.loaded_accounts = self.chain_sim.init_state_from_folder(
-                self.state_path, filter_safe_price=True
+                self.state_path, filter_safe_price=False
             )
             self._state_loaded = True
             logger.info(f"Loaded state for {len(self.loaded_accounts)} accounts")

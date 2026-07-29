@@ -28,7 +28,7 @@ class TestMultiUser:
 
     def _get_farming_balance(self, user, farming_token, proxy):
         tokens = proxy.get_fungible_tokens_of_account(user.address)
-        return sum(t.balance for t in tokens if t.identifier == farming_token)
+        return sum(t.amount for t in tokens if t.token.identifier == farming_token)
 
     def test_two_users_equal_stake(
         self,
@@ -66,10 +66,10 @@ class TestMultiUser:
         alice_ft = max(_get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy), key=lambda t: t.token.nonce)
         bob_ft = max(_get_farm_tokens_for_user(staking_contract, bob, network_providers.proxy), key=lambda t: t.token.nonce)
 
-        tx_ca = _claim_rewards(staking_contract, alice, alice_ft.token.nonce, alice_ft.balance, network_providers, blockchain_controller)
+        tx_ca = _claim_rewards(staking_contract, alice, alice_ft.token.nonce, alice_ft.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_ca, network_providers.proxy)
 
-        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.balance, network_providers, blockchain_controller)
+        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
 
         alice_rewards = self._get_farming_balance(alice, farming_token, network_providers.proxy) - alice_before
@@ -129,10 +129,10 @@ class TestMultiUser:
         alice_ft = max(_get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy), key=lambda t: t.token.nonce)
         bob_ft = max(_get_farm_tokens_for_user(staking_contract, bob, network_providers.proxy), key=lambda t: t.token.nonce)
 
-        tx_ca = _claim_rewards(staking_contract, alice, alice_ft.token.nonce, alice_ft.balance, network_providers, blockchain_controller)
+        tx_ca = _claim_rewards(staking_contract, alice, alice_ft.token.nonce, alice_ft.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_ca, network_providers.proxy)
 
-        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.balance, network_providers, blockchain_controller)
+        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
 
         alice_rewards = self._get_farming_balance(alice, farming_token, network_providers.proxy) - alice_before
@@ -178,7 +178,7 @@ class TestMultiUser:
         # Alice exits (unstake)
         alice_ft = max(_get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy), key=lambda t: t.token.nonce)
         tx_unstake = _unstake_farm(
-            staking_contract, alice, alice_ft.token.nonce, alice_ft.balance,
+            staking_contract, alice, alice_ft.token.nonce, alice_ft.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_unstake, network_providers.proxy)
@@ -193,7 +193,7 @@ class TestMultiUser:
 
         bob_before = self._get_farming_balance(bob, farming_token, network_providers.proxy)
         bob_ft = max(_get_farm_tokens_for_user(staking_contract, bob, network_providers.proxy), key=lambda t: t.token.nonce)
-        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.balance, network_providers, blockchain_controller)
+        tx_cb = _claim_rewards(staking_contract, bob, bob_ft.token.nonce, bob_ft.amount, network_providers, blockchain_controller)
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
 
         bob_rewards = self._get_farming_balance(bob, farming_token, network_providers.proxy) - bob_before
@@ -237,7 +237,7 @@ class TestMultiUser:
             if not farm_tokens:
                 continue
             ft = max(farm_tokens, key=lambda t: t.token.nonce)
-            tx_c = _claim_rewards(staking_contract, user, ft.token.nonce, ft.balance, network_providers, blockchain_controller)
+            tx_c = _claim_rewards(staking_contract, user, ft.token.nonce, ft.amount, network_providers, blockchain_controller)
             TransactionAssertions.assert_transaction_success(tx_c, network_providers.proxy)
             after = self._get_farming_balance(user, farming_token, network_providers.proxy)
             total_rewards_claimed += (after - before)

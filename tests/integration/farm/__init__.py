@@ -30,6 +30,7 @@ def _get_farm_state(farm_contract: FarmContract, proxy):
         "farm_token_supply": int(fetcher.get_data("getFarmTokenSupply") or 0),
         "last_reward_block_nonce": int(fetcher.get_data("getLastRewardBlockNonce") or 0),
         "per_block_reward_amount": int(fetcher.get_data("getPerBlockRewardAmount") or 0),
+        "per_second_reward_amount": int(fetcher.get_data("getPerSecondRewardAmount") or 0),
         "reward_reserve": int(fetcher.get_data("getRewardReserve") or 0),
         "reward_per_share": int(fetcher.get_data("getRewardPerShare") or 0),
         "state": int(fetcher.get_data("getState") or 0),
@@ -256,8 +257,8 @@ def _get_farming_token_balance(farm_contract, user, proxy):
     """Get user's balance of the farming token (LP token)."""
     all_tokens = proxy.get_fungible_tokens_of_account(user.address)
     for t in all_tokens:
-        if t.identifier == farm_contract.farmingToken:
-            return t.balance
+        if t.token.identifier == farm_contract.farmingToken:
+            return t.amount
     return 0
 
 

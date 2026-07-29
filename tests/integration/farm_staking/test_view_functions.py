@@ -15,7 +15,6 @@ Coverage: 13 tests (P1)
 
 import pytest
 from utils.logger import get_logger
-from utils.utils_chain import nominated_amount
 from tests.helpers import TransactionAssertions
 from tests.integration.farm_staking import (
     _check_staking_has_code,
@@ -308,7 +307,7 @@ class TestViewFunctions:
 
         # Also verify it matches sum of held farm tokens
         farm_tokens = _get_farm_tokens_for_user(staking_contract, alice, network_providers.proxy)
-        total_held = sum(t.balance for t in farm_tokens)
+        total_held = sum(t.amount for t in farm_tokens)
         # Note: total_held may exceed position if user has unbond tokens; use tolerance
         tolerance = stake_amount
         assert abs(total_held - position_after) <= tolerance, (
@@ -319,6 +318,7 @@ class TestViewFunctions:
 
         logger.info(f"✓ getUserTotalFarmPosition: {position_before} → {position_after}")
 
+    @pytest.mark.usefixtures("seed_staking_rewards")
     def test_calculate_rewards_for_position(
         self,
         staking_contract,
@@ -347,7 +347,7 @@ class TestViewFunctions:
 
         # Get farming token balance before actual claim
         all_tokens_before = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_before = sum(t.balance for t in all_tokens_before if t.identifier == farming_token)
+        balance_before = sum(t.amount for t in all_tokens_before if t.token.identifier == farming_token)
 
         # View-only calculation
         from utils.contract_data_fetchers import StakingContractDataFetcher
@@ -360,13 +360,13 @@ class TestViewFunctions:
         # Since decoding its args is complex, we verify the claim gives reasonable rewards
         from tests.integration.farm_staking import _claim_rewards
         tx_claim = _claim_rewards(
-            staking_contract, alice, farm_token.token.nonce, farm_token.balance,
+            staking_contract, alice, farm_token.token.nonce, farm_token.amount,
             network_providers, blockchain_controller,
         )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         all_tokens_after = network_providers.proxy.get_fungible_tokens_of_account(alice.address)
-        balance_after = sum(t.balance for t in all_tokens_after if t.identifier == farming_token)
+        balance_after = sum(t.amount for t in all_tokens_after if t.token.identifier == farming_token)
         actual_rewards = balance_after - balance_before
 
         assert actual_rewards >= 0, f"Rewards must be >= 0, got {actual_rewards}"

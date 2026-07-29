@@ -7,7 +7,6 @@ converts to WAT format, and searches for specific function names.
 """
 
 import requests
-import base64
 import subprocess
 import json
 import os

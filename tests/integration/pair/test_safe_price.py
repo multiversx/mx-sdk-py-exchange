@@ -21,8 +21,7 @@ Run:
 """
 
 import math
-import time
-from multiversx_sdk import Address, Token
+from multiversx_sdk import Address
 import pytest
 
 from contracts.pair_contract import (
@@ -205,7 +204,7 @@ def _query_safe_price_view(pair_contract, network_providers, pair_address_value,
         network_providers.proxy.url
     )
 
-    from multiversx_sdk.abi import Abi, U64Value
+    from multiversx_sdk.abi import Abi
     import config
     abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
 
@@ -969,7 +968,7 @@ class TestSafePriceViewFunctions:
             network_providers.proxy.url
         )
 
-        from multiversx_sdk.abi import Abi, U64Value
+        from multiversx_sdk.abi import Abi
         import config
         abi_path = config.HOME / "Projects/dex/mx-exchange-sc/dex/pair/output/safe-price-view.abi.json"
 

@@ -5,7 +5,7 @@ from contracts.dex_proxy_contract import DexProxyContract, DexProxyExitFarmEvent
 from contracts.farm_contract import FarmContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
 from tools.runners.common_runner import add_generate_transaction_command, add_upgrade_command, get_acounts_with_token, read_accounts_from_json
-from utils.utils_chain import Account, WrapperAddress, get_token_details_for_address
+from utils.utils_chain import Account, WrapperAddress
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
 from utils.utils_generic import get_file_from_url_or_path

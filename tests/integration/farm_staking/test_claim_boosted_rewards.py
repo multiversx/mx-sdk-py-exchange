@@ -12,13 +12,11 @@ Coverage: 6 tests (P1)
 import pytest
 from events.farm_events import ClaimRewardsFarmEvent
 from utils.logger import get_logger
-from utils.utils_chain import nominated_amount
 from tests.helpers import TransactionAssertions
 from tests.integration.farm_staking import (
     _check_staking_has_code,
     _get_stake_amount,
     _stake_farm,
-    _get_farm_tokens_for_user,
 )
 
 logger = get_logger(__name__)

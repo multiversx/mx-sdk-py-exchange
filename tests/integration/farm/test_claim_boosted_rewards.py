@@ -22,35 +22,23 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders, endpoint_call
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
+    _claim_boosted_rewards,
     _enter_farm,
     _exit_farm,
-    _claim_rewards,
-    _claim_boosted_rewards,
-    _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
-    _get_user_total_farm_position,
-    _get_current_week,
     _get_claim_progress,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _get_current_week,
+    _get_farm_state,
+    _get_farm_tokens_for_user,
+    _get_stake_amount,
+    _get_user_total_farm_position,
 )
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account, nominated_amount
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -58,6 +46,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -110,8 +99,14 @@ class TestFarmClaimBoostedRewards:
 
         # Enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Verify Alice has a farm position
@@ -123,11 +118,14 @@ class TestFarmClaimBoostedRewards:
 
         # Record state before claim
         reserve_before = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        farm_tokens_before = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
+        farm_tokens_before = _get_farm_tokens_for_user(
+            farm_contract, alice, network_providers.proxy
+        )
 
         # Claim boosted rewards
-        tx_claim = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                          blockchain_controller)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         # Alice still has her farm tokens (claimBoostedRewards doesn't consume farm tokens)
@@ -175,6 +173,7 @@ class TestFarmClaimBoostedRewards:
             test_user = test_accounts[3]
             # Ensure this account is funded on chain sim
             from tests.environments import ChainsimEnvironment
+
             if isinstance(test_environment, ChainsimEnvironment) and test_environment.chain_sim:
                 test_environment.chain_sim.fund_users_w_egld(
                     [test_user.address.to_bech32()], nominated_amount(1)
@@ -182,8 +181,9 @@ class TestFarmClaimBoostedRewards:
             test_user.sync_nonce(network_providers.proxy)
 
         # User without position tries to claim boosted rewards
-        tx_claim = _claim_boosted_rewards(farm_contract, test_user, network_providers,
-                                          blockchain_controller)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, test_user, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_failed(tx_claim, network_providers.proxy)
 
         logger.info("PASSED: test_claim_boosted_no_farm_position_fails")
@@ -216,14 +216,21 @@ class TestFarmClaimBoostedRewards:
         position = _get_user_total_farm_position(farm_contract, alice, network_providers.proxy)
         if position == 0:
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                                   network_providers, blockchain_controller)
+            tx_enter = _enter_farm(
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Bob tries to claim for Alice WITHOUT permission
         alice_bech32 = alice.address.to_bech32()
-        tx_claim = _claim_boosted_rewards(farm_contract, bob, network_providers,
-                                          blockchain_controller, for_user=alice_bech32)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, bob, network_providers, blockchain_controller, for_user=alice_bech32
+        )
         TransactionAssertions.assert_transaction_failed(tx_claim, network_providers.proxy)
 
         logger.info("PASSED: test_claim_boosted_unauthorized_for_other_fails")
@@ -236,6 +243,7 @@ class TestFarmClaimBoostedRewards:
         self,
         farm_contract: FarmContract,
         alice: Account,
+        bob: Account,
         network_providers: NetworkProviders,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -260,19 +268,37 @@ class TestFarmClaimBoostedRewards:
 
         # Alice enters farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Advance blocks
         blockchain_controller.wait_blocks(5)
 
+        ensure_esdt_amounts(bob, {farming_token: int(stake_amount / 2)})
+        tx_enter = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            int(stake_amount / 2),
+            network_providers,
+            blockchain_controller,
+        )
+        TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
+
         # Record state before
         state_before = _get_farm_state(farm_contract, network_providers.proxy)
 
         # Claim boosted rewards
-        tx_claim = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                          blockchain_controller)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         # Record state after
@@ -281,8 +307,10 @@ class TestFarmClaimBoostedRewards:
         # Reward reserve approximately unchanged (no energy -> no boosted rewards)
         # Tolerance needed: per_block_reward_amount=1 mints new rewards each block,
         # so blocks generated for tx finalization can increase reserve by ~5-20 units
-        reserve_tolerance = 1_000
-        assert abs(state_after["reward_reserve"] - state_before["reward_reserve"]) <= reserve_tolerance, (
+        reserve_tolerance = state_after["per_second_reward_amount"] * 6
+        assert (
+            abs(state_after["reward_reserve"] - state_before["reward_reserve"]) <= reserve_tolerance
+        ), (
             f"Reward reserve should be approximately unchanged without energy:\n"
             f"  Before: {state_before['reward_reserve']}\n"
             f"  After: {state_after['reward_reserve']}\n"
@@ -324,8 +352,14 @@ class TestFarmClaimBoostedRewards:
 
         # Alice enters farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Get current week and advance to next week boundary
@@ -345,17 +379,16 @@ class TestFarmClaimBoostedRewards:
 
         new_week = _get_current_week(farm_contract, network_providers.proxy)
         logger.info(f"After advance: week={new_week}, target_epoch={target_epoch}")
-        assert new_week > current_week, (
-            f"Week should have advanced: {current_week} -> {new_week}"
-        )
+        assert new_week > current_week, f"Week should have advanced: {current_week} -> {new_week}"
 
         # Get claim progress before
         progress_before = _get_claim_progress(farm_contract, alice, network_providers.proxy)
         logger.info(f"Claim progress before: {progress_before}")
 
         # Claim boosted rewards
-        tx_claim = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                          blockchain_controller)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         # Get claim progress after
@@ -401,8 +434,14 @@ class TestFarmClaimBoostedRewards:
 
         # Alice enters farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Verify position exists
@@ -415,18 +454,29 @@ class TestFarmClaimBoostedRewards:
         # Alice fully exits
         farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         for ft in farm_tokens:
-            tx_exit = _exit_farm(farm_contract, alice, ft.token.nonce, ft.amount,
-                                network_providers, blockchain_controller)
+            tx_exit = _exit_farm(
+                farm_contract,
+                alice,
+                ft.token.nonce,
+                ft.amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_exit, network_providers.proxy)
 
         # Verify position is now 0
-        position_after = _get_user_total_farm_position(farm_contract, alice, network_providers.proxy)
+        position_after = _get_user_total_farm_position(
+            farm_contract, alice, network_providers.proxy
+        )
         if position_after > 0:
-            pytest.skip("Alice still has farm position from other tests — cannot test empty position")
+            pytest.skip(
+                "Alice still has farm position from other tests — cannot test empty position"
+            )
 
         # Try to claim boosted rewards with no position
-        tx_claim = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                          blockchain_controller)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_failed(tx_claim, network_providers.proxy)
 
         logger.info("PASSED: test_claim_boosted_after_full_exit_fails")
@@ -459,8 +509,14 @@ class TestFarmClaimBoostedRewards:
 
         # Alice enters farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Advance a few blocks (stay within same week)
@@ -468,8 +524,9 @@ class TestFarmClaimBoostedRewards:
 
         # First claim
         reserve_before_1 = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_claim_1 = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                            blockchain_controller)
+        tx_claim_1 = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_claim_1, network_providers.proxy)
         reserve_after_1 = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
         delta_1 = reserve_before_1 - reserve_after_1
@@ -477,17 +534,19 @@ class TestFarmClaimBoostedRewards:
 
         # Second claim immediately (same week, no advancement)
         reserve_before_2 = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
-        tx_claim_2 = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                            blockchain_controller)
+        tx_claim_2 = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_claim_2, network_providers.proxy)
-        reserve_after_2 = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        farm_state_after = _get_farm_state(farm_contract, network_providers.proxy)
+        reserve_after_2 = farm_state_after["reward_reserve"]
         delta_2 = reserve_before_2 - reserve_after_2
         logger.info(f"Second claim reserve delta: {delta_2}")
 
         # Second call should have no additional effect (idempotent)
         # Tolerance: per_block_reward_amount=1 mints new rewards each block,
         # so reserve can shift by a few units between measurements
-        reserve_tolerance = 5_000
+        reserve_tolerance = farm_state_after["per_second_reward_amount"] * 6
         assert abs(delta_2) <= reserve_tolerance, (
             f"Second claimBoostedRewards in same week should have ~0 impact:\n"
             f"  First delta: {delta_1}\n"

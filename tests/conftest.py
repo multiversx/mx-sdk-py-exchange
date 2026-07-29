@@ -521,7 +521,7 @@ def farm_contract(dex_context) -> FarmContract:
     Raises:
         pytest.skip: If no farms deployed
     """
-    farms = dex_context.get_contracts(config.FARMS_LOCKED)
+    farms = dex_context.get_contracts(config.FARMS_V2)
     if not farms:
         pytest.skip("No Farm contracts deployed")
     return farms[0]
@@ -757,6 +757,30 @@ def charlie(test_accounts, test_environment, network_providers) -> Account:
     charlie.sync_nonce(network_providers.proxy)
     return charlie
 
+@pytest.fixture
+def shard1_account(dex_context, test_environment, network_providers) -> Account:
+    """
+    A test user whose address resides in shard 1.
+
+    Selected from the loaded wallet set (not limited to the first test accounts),
+    so tests needing a specific shard get a deterministic shard-1 account.
+    Nonce is synced before each test for isolation.
+    For chainsim: Ensures account has at least 1 EGLD for gas.
+
+    Returns:
+        Account: A shard-1 account (skips the test if none is available)
+    """
+    shard1_accounts = dex_context.accounts.get_in_shard(1)
+    if not shard1_accounts:
+        pytest.skip("No test account available in shard 1")
+
+    account = shard1_accounts[0]
+
+    # Ensure account has EGLD for gas (chainsim only)
+    _ensure_account_has_egld(account, test_environment, network_providers.proxy)
+
+    account.sync_nonce(network_providers.proxy)
+    return account
 
 def _ensure_account_has_esdt_amounts(
     account: Account,

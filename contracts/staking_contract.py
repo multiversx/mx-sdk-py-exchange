@@ -302,6 +302,16 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPerBlockRewardAmount", sc_args)
 
+    def set_rewards_per_second(self, deployer: Account, proxy: ProxyNetworkProvider, rewards_amount: int):
+        function_purpose = f"Set rewards per second in stake contract"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            rewards_amount
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPerSecondRewardAmount", sc_args)
+
     def topup_rewards(self, deployer: Account, proxy: ProxyNetworkProvider, rewards_amount: int):
         function_purpose = f"Topup rewards in stake contract"
         logger.info(function_purpose)

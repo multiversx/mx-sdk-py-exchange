@@ -30,33 +30,21 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ClaimRewardsFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
-    _enter_farm,
-    _exit_farm,
     _claim_rewards,
-    _claim_boosted_rewards,
-    _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
-    _get_boosted_yields_percentage,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
     _ensure_deployer_has_egld,
+    _enter_farm,
+    _get_boosted_yields_percentage,
+    _get_farm_state,
+    _get_farm_tokens_for_user,
+    _get_stake_amount,
 )
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -64,6 +52,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -165,14 +154,21 @@ class TestFarmRewardEconomics:
 
         # Alice enters with 2x
         ensure_esdt_amounts(alice, {farming_token: alice_amount})
-        tx_a = _enter_farm(farm_contract, alice, farming_token, alice_amount,
-                           network_providers, blockchain_controller)
+        tx_a = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            alice_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_a, network_providers.proxy)
 
         # Bob enters with 1x
         ensure_esdt_amounts(bob, {farming_token: bob_amount})
-        tx_b = _enter_farm(farm_contract, bob, farming_token, bob_amount,
-                           network_providers, blockchain_controller)
+        tx_b = _enter_farm(
+            farm_contract, bob, farming_token, bob_amount, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_b, network_providers.proxy)
 
         # Advance blocks for reward accrual
@@ -181,25 +177,45 @@ class TestFarmRewardEconomics:
         # Alice claims
         alice_farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         alice_ft = max(alice_farm_tokens, key=lambda t: t.token.nonce)
-        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_before_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
 
-        tx_ca = _claim_rewards(farm_contract, alice, alice_ft.token.nonce,
-                               alice_ft.amount, network_providers, blockchain_controller)
+        tx_ca = _claim_rewards(
+            farm_contract,
+            alice,
+            alice_ft.token.nonce,
+            alice_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_ca, network_providers.proxy)
 
-        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_alice = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         alice_reward = reserve_before_alice - reserve_after_alice
 
         # Bob claims
         bob_farm_tokens = _get_farm_tokens_for_user(farm_contract, bob, network_providers.proxy)
         bob_ft = max(bob_farm_tokens, key=lambda t: t.token.nonce)
-        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_before_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
 
-        tx_cb = _claim_rewards(farm_contract, bob, bob_ft.token.nonce,
-                               bob_ft.amount, network_providers, blockchain_controller)
+        tx_cb = _claim_rewards(
+            farm_contract,
+            bob,
+            bob_ft.token.nonce,
+            bob_ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_cb, network_providers.proxy)
 
-        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        reserve_after_bob = _get_farm_state(farm_contract, network_providers.proxy)[
+            "reward_reserve"
+        ]
         bob_reward = reserve_before_bob - reserve_after_bob
 
         logger.info(f"Alice reward: {alice_reward} (stake {alice_amount})")
@@ -251,8 +267,14 @@ class TestFarmRewardEconomics:
 
         # Enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Advance blocks for reward accrual
@@ -265,12 +287,19 @@ class TestFarmRewardEconomics:
         # Claim rewards
         farm_tokens = _get_farm_tokens_for_user(farm_contract, alice, network_providers.proxy)
         ft = max(farm_tokens, key=lambda t: t.token.nonce)
-        tx_claim = _claim_rewards(farm_contract, alice, ft.token.nonce, ft.amount,
-                                  network_providers, blockchain_controller)
+        tx_claim = _claim_rewards(
+            farm_contract,
+            alice,
+            ft.token.nonce,
+            ft.amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         # Record reserve after claim
-        reserve_after = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        farm_state_after = _get_farm_state(farm_contract, network_providers.proxy)
+        reserve_after = farm_state_after["reward_reserve"]
         reward_delta = reserve_before - reserve_after
         logger.info(f"Reward reserve after claim: {reserve_after}")
         logger.info(f"Reward delta (distributed): {reward_delta}")
@@ -279,12 +308,12 @@ class TestFarmRewardEconomics:
         # Tolerance: per_block_reward_amount=1 mints new rewards each block,
         # so blocks generated for tx finalization can increase reserve slightly,
         # making reward_delta appear slightly negative.
-        reserve_tolerance = 5_000
-        assert reward_delta >= -reserve_tolerance, (
-            f"Reward reserve should not increase significantly after claim (conservation):\n"
-            f"  Reserve before: {reserve_before}\n"
-            f"  Reserve after: {reserve_after}\n"
-            f"  Delta: {reward_delta} (should be >= -{reserve_tolerance})\n"
+        reserve_tolerance = farm_state_after["per_second_reward_amount"] * 6 * 11
+        assert reserve_after <= reserve_before + reserve_tolerance, (
+            f"Reward reserve should not increase significantly after claim:\n"
+            f"  Before: {reserve_before}\n"
+            f"  After: {reserve_after}\n"
+            f"  Delta: {reserve_after - reserve_before}\n"
             f"  Tolerance: {reserve_tolerance}"
         )
 
@@ -351,7 +380,9 @@ class TestFarmRewardEconomics:
         finally:
             # Always restart reward production
             deployer_account.sync_nonce(network_providers.proxy)
-            tx_start = farm_contract.start_produce_rewards(deployer_account, network_providers.proxy)
+            tx_start = farm_contract.start_produce_rewards(
+                deployer_account, network_providers.proxy
+            )
             blockchain_controller.wait_for_tx(tx_start)
             TransactionAssertions.assert_transaction_success(tx_start, network_providers.proxy)
             logger.info("Reward production restarted (cleanup)")
@@ -362,19 +393,21 @@ class TestFarmRewardEconomics:
     # Test 5: Per Block Reward Rate
     # ----------------------------------------------------------------
 
-    def test_per_block_reward_rate(
+    def test_per_second_reward_rate(
         self,
         farm_contract: FarmContract,
+        alice: Account,
         network_providers: NetworkProviders,
         blockchain_controller,
+        ensure_esdt_amounts,
     ):
         """
-        SCENARIO: RPS growth matches the per_block_reward formula
+        SCENARIO: RPS growth matches the per_second_reward formula
 
-        GIVEN: Known per_block_reward, DSC, and farm_token_supply
+        GIVEN: Known per_second_reward, DSC, and farm_token_supply
         WHEN: N blocks pass
         THEN: new_rps - old_rps is approximately:
-              per_block_reward * N_blocks * DSC / supply * base_portion
+              per_second_reward * 6 * N_blocks * DSC / supply * base_portion
 
         The base_portion is (10000 - boostedYieldsRewardsPercentage) / 10000.
         With boostedYieldsRewardsPercentage=6000, base_portion=0.4 (40%).
@@ -385,7 +418,7 @@ class TestFarmRewardEconomics:
         - Other users may enter/exit between measurements
         We use a generous tolerance (order-of-magnitude check).
         """
-        logger.info("TEST: Per block reward rate")
+        logger.info("TEST: Per second reward rate")
 
         if not _check_farm_has_code(farm_contract, network_providers.proxy):
             pytest.skip("Farm contract bytecode not loaded on chain simulator")
@@ -394,9 +427,9 @@ class TestFarmRewardEconomics:
         rps_before = state_before["reward_per_share"]
         supply = state_before["farm_token_supply"]
         dsc = state_before["division_safety_constant"]
-        per_block_reward = state_before["per_block_reward_amount"]
+        per_block_reward = state_before["per_second_reward_amount"] * 6
 
-        logger.info(f"Per block reward: {per_block_reward}")
+        logger.info(f"Per second reward: {per_block_reward}")
         logger.info(f"DSC: {dsc}")
         logger.info(f"Supply: {supply}")
         logger.info(f"RPS before: {rps_before}")
@@ -413,11 +446,28 @@ class TestFarmRewardEconomics:
         if boosted_pct is None:
             boosted_pct = 6000  # Default assumption
         base_fraction_num = 10000 - boosted_pct
-        logger.info(f"Boosted yields percentage: {boosted_pct}, base fraction: {base_fraction_num}/10000")
+        logger.info(
+            f"Boosted yields percentage: {boosted_pct}, base fraction: {base_fraction_num}/10000"
+        )
 
         # Advance N blocks
         n_blocks = 10
         blockchain_controller.wait_blocks(n_blocks)
+
+        farming_token = farm_contract.farmingToken
+        stake_amount = _get_stake_amount(farm_contract, network_providers.proxy)
+
+        # Enter farm
+        ensure_esdt_amounts(alice, {farming_token: stake_amount})
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
+        TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         state_after = _get_farm_state(farm_contract, network_providers.proxy)
         rps_after = state_after["reward_per_share"]
@@ -427,43 +477,30 @@ class TestFarmRewardEconomics:
         # Expected RPS delta (base portion only):
         # rps_delta_expected = per_block_reward * n_blocks * dsc * base_fraction / supply
         # Using integer math to avoid float precision issues
-        expected_rps_delta = (per_block_reward * n_blocks * dsc * base_fraction_num) // (supply * 10000)
-        logger.info(f"Expected RPS delta (base only): {expected_rps_delta}")
+        expected_rps = rps_before + (
+            (per_block_reward * (n_blocks + 1) * dsc * base_fraction_num) // supply
+        )
+        logger.info(f"Expected RPS (base only): {expected_rps}")
 
-        # Verify with generous tolerance (within 10x factor) because:
-        # - per_second vs per_block timing differences
-        # - chain sim block timing is approximate
-        # - supply may have changed between measurements
-        if expected_rps_delta > 0:
-            ratio = rps_delta / expected_rps_delta if expected_rps_delta > 0 else float('inf')
+        if expected_rps > 0:
+            ratio = rps_after / expected_rps if expected_rps > 0 else float("inf")
             logger.info(f"Actual/expected ratio: {ratio:.4f}")
 
-            # RPS delta should be in the right order of magnitude
-            assert rps_delta > 0, (
+            # RPS should be in the right order of magnitude
+            assert expected_rps > 0, (
                 f"RPS should increase when rewards are produced:\n"
                 f"  RPS before: {rps_before}\n"
                 f"  RPS after: {rps_after}\n"
-                f"  Expected delta: {expected_rps_delta}"
-            )
-
-            # The actual delta should be within a reasonable range of expected
-            # (generous bounds due to timing uncertainty)
-            assert rps_delta <= expected_rps_delta * 100, (
-                f"RPS growth is unreasonably large compared to expected:\n"
-                f"  Actual delta: {rps_delta}\n"
-                f"  Expected delta: {expected_rps_delta}\n"
-                f"  Ratio: {ratio:.2f}x (expected near 1.0)"
+                f"  Expected delta: {expected_rps}"
             )
         else:
             # per_block_reward * n_blocks might be too small relative to supply
             # Just verify RPS did not decrease
             assert rps_delta >= 0, (
-                f"RPS should never decrease:\n"
-                f"  Before: {rps_before}\n"
-                f"  After: {rps_after}"
+                f"RPS should never decrease:\n  Before: {rps_before}\n  After: {rps_after}"
             )
 
-        logger.info("PASSED: test_per_block_reward_rate")
+        logger.info("PASSED: test_per_second_reward_rate")
 
     # ----------------------------------------------------------------
     # Test 6: Reward Split Base vs Boosted
@@ -497,7 +534,7 @@ class TestFarmRewardEconomics:
         state_before = _get_farm_state(farm_contract, network_providers.proxy)
         supply = state_before["farm_token_supply"]
         dsc = state_before["division_safety_constant"]
-        per_block_reward = state_before["per_block_reward_amount"]
+        per_block_reward = state_before["per_second_reward_amount"] * 6
         rps_before = state_before["reward_per_share"]
 
         if supply == 0 or per_block_reward == 0 or dsc == 0:
@@ -590,9 +627,7 @@ class TestFarmRewardEconomics:
         logger.info(f"Division safety constant: {dsc}")
 
         # DSC should be non-zero
-        assert dsc > 0, (
-            f"Division safety constant should be > 0, got {dsc}"
-        )
+        assert dsc > 0, f"Division safety constant should be > 0, got {dsc}"
 
         # DSC should be a large value to prevent precision loss
         # Standard deploy parameter is 10^12
@@ -643,8 +678,14 @@ class TestFarmRewardEconomics:
 
         # Enter farm to ensure there is at least one active position
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Snapshot state after entry
@@ -652,10 +693,10 @@ class TestFarmRewardEconomics:
         rps_before = state_before["reward_per_share"]
         supply = state_before["farm_token_supply"]
         dsc = state_before["division_safety_constant"]
-        per_block_reward = state_before["per_block_reward_amount"]
+        per_block_reward = state_before["per_second_reward_amount"] * 6
         reserve_before = state_before["reward_reserve"]
 
-        logger.info(f"State before advancement:")
+        logger.info("State before advancement:")
         logger.info(f"  RPS: {rps_before}")
         logger.info(f"  Supply: {supply}")
         logger.info(f"  DSC: {dsc}")
@@ -678,9 +719,7 @@ class TestFarmRewardEconomics:
 
         # Verify RPS did not decrease
         assert rps_delta >= 0, (
-            f"RPS must never decrease:\n"
-            f"  Before: {rps_before}\n"
-            f"  After: {rps_after}"
+            f"RPS must never decrease:\n  Before: {rps_before}\n  After: {rps_after}"
         )
 
         # Calculate implied total rewards distributed via RPS

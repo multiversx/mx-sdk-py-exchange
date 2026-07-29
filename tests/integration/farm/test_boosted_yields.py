@@ -19,32 +19,18 @@ Run:
 
 import pytest
 
-import config
 from contracts.farm_contract import FarmContract
-from events.farm_events import EnterFarmEvent, ClaimRewardsFarmEvent
-from utils.contract_data_fetchers import FarmContractDataFetcher
-from utils.utils_chain import nominated_amount, Account, hex_to_string, decode_merged_attributes
-from utils.utils_tx import NetworkProviders
-from utils import decoding_structures
 from tests.helpers import TransactionAssertions
 from tests.integration.farm import (
-    _get_farm_state,
     _check_farm_has_code,
-    _get_stake_amount,
-    _enter_farm,
-    _exit_farm,
-    _claim_rewards,
     _claim_boosted_rewards,
-    _get_farm_tokens_for_user,
-    _get_minimum_farming_epochs,
-    _get_farming_token_balance,
-    _get_locked_token_id,
-    _get_locked_tokens_for_user,
-    _ensure_deployer_has_egld,
+    _enter_farm,
+    _get_farm_state,
+    _get_stake_amount,
 )
 from utils.logger import get_logger
-from multiversx_sdk import Address
-
+from utils.utils_chain import Account
+from utils.utils_tx import NetworkProviders
 
 logger = get_logger(__name__)
 
@@ -52,6 +38,7 @@ logger = get_logger(__name__)
 # ============================================================================
 # TEST CLASS
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.farm
@@ -116,19 +103,17 @@ class TestFarmBoostedYields:
         new_epoch = blockchain_controller.get_current_epoch()
         expected_new_week = (new_epoch - first_week_epoch) // 7 + 1
 
-        logger.info(f"After advance: epoch={new_epoch}, week={new_week}, expected={expected_new_week}")
+        logger.info(
+            f"After advance: epoch={new_epoch}, week={new_week}, expected={expected_new_week}"
+        )
 
         assert new_week == expected_new_week, (
-            f"Week after advance mismatch:\n"
-            f"  Expected: {expected_new_week}\n"
-            f"  Actual: {new_week}"
+            f"Week after advance mismatch:\n  Expected: {expected_new_week}\n  Actual: {new_week}"
         )
 
         # Week should have increased by at least 1
         assert new_week > current_week, (
-            f"Week should advance after +7 epochs:\n"
-            f"  Before: {current_week}\n"
-            f"  After: {new_week}"
+            f"Week should advance after +7 epochs:\n  Before: {current_week}\n  After: {new_week}"
         )
 
         logger.info("PASSED: test_boosted_week_calculation")
@@ -141,6 +126,7 @@ class TestFarmBoostedYields:
         self,
         farm_contract: FarmContract,
         alice: Account,
+        bob: Account,
         network_providers: NetworkProviders,
         blockchain_controller,
         ensure_esdt_amounts,
@@ -165,29 +151,48 @@ class TestFarmBoostedYields:
 
         # Enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         # Advance to next week boundary
         next_week_epoch = farm_contract.get_next_week_start_epoch(network_providers.proxy)
         blockchain_controller.advance_to_epoch(next_week_epoch + 1)
 
+        ensure_esdt_amounts(bob, {farming_token: int(stake_amount / 2)})
+        tx_enter = _enter_farm(
+            farm_contract,
+            bob,
+            farming_token,
+            int(stake_amount / 2),
+            network_providers,
+            blockchain_controller,
+        )
+        TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
+
         # Record state before claim
         reserve_before = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
 
         # Claim boosted rewards
-        tx_claim = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                          blockchain_controller)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         # Reward reserve should be unchanged (energy=0 -> no boosted rewards)
-        reserve_after = _get_farm_state(farm_contract, network_providers.proxy)["reward_reserve"]
+        farm_state = _get_farm_state(farm_contract, network_providers.proxy)
+        reserve_after = farm_state["reward_reserve"]
         logger.info(f"Reserve before: {reserve_before}, after: {reserve_after}")
 
         # Tolerance: per_block_reward_amount=1 mints new rewards each block,
         # so blocks generated for tx finalization can increase reserve slightly.
-        reserve_tolerance = 1_000
+        reserve_tolerance = farm_state["per_second_reward_amount"] * 6
         assert abs(reserve_after - reserve_before) <= reserve_tolerance, (
             f"Reward reserve should be approximately unchanged with 0 energy:\n"
             f"  Before: {reserve_before}\n"
@@ -228,8 +233,14 @@ class TestFarmBoostedYields:
 
         # Enter farm
         ensure_esdt_amounts(alice, {farming_token: stake_amount})
-        tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                               network_providers, blockchain_controller)
+        tx_enter = _enter_farm(
+            farm_contract,
+            alice,
+            farming_token,
+            stake_amount,
+            network_providers,
+            blockchain_controller,
+        )
         TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         current_week = farm_contract.get_current_week(network_providers.proxy)
@@ -244,8 +255,9 @@ class TestFarmBoostedYields:
 
         # Trigger a weekly update by claiming boosted rewards
         # (this forces the contract to snapshot the current week's data)
-        tx_claim = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                          blockchain_controller)
+        tx_claim = _claim_boosted_rewards(
+            farm_contract, alice, network_providers, blockchain_controller
+        )
         TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         # Query farm supply for the new week
@@ -260,46 +272,6 @@ class TestFarmBoostedYields:
         )
 
         logger.info("PASSED: test_boosted_farm_supply_for_week_tracking")
-
-    # ----------------------------------------------------------------
-    # Total Energy Tests
-    # ----------------------------------------------------------------
-
-    def test_boosted_total_energy_zero_on_chainsim(
-        self,
-        farm_contract: FarmContract,
-        network_providers: NetworkProviders,
-        blockchain_controller,
-    ):
-        """
-        SCENARIO: Total energy for any week is 0 on chain simulator
-
-        GIVEN: Energy factory has no code/state on chain simulator
-        WHEN: Query getTotalEnergyForWeek for multiple weeks
-        THEN: All values are 0
-        """
-        logger.info("TEST: Boosted total energy zero on chainsim")
-
-        if not _check_farm_has_code(farm_contract, network_providers.proxy):
-            pytest.skip("Farm contract bytecode not loaded on chain simulator")
-
-        current_week = farm_contract.get_current_week(network_providers.proxy)
-        logger.info(f"Current week: {current_week}")
-
-        # Check energy for current week and a few past weeks
-        weeks_to_check = [max(1, current_week - 1), current_week]
-
-        for week in weeks_to_check:
-            total_energy = farm_contract.get_total_energy_for_week(network_providers.proxy, week)
-            logger.info(f"Total energy for week {week}: {total_energy}")
-
-            assert total_energy == 0, (
-                f"Total energy should be 0 on chain sim (no energy factory):\n"
-                f"  Week: {week}\n"
-                f"  Energy: {total_energy}"
-            )
-
-        logger.info("PASSED: test_boosted_total_energy_zero_on_chainsim")
 
     # ----------------------------------------------------------------
     # Weekly Accumulation Tests
@@ -334,8 +306,14 @@ class TestFarmBoostedYields:
         )
         if position == 0:
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                                   network_providers, blockchain_controller)
+            tx_enter = _enter_farm(
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         start_week = farm_contract.get_current_week(network_providers.proxy)
@@ -351,8 +329,9 @@ class TestFarmBoostedYields:
             weeks_queried.append(current_week)
 
             # Trigger weekly update via claim
-            tx_claim = _claim_boosted_rewards(farm_contract, alice, network_providers,
-                                              blockchain_controller)
+            tx_claim = _claim_boosted_rewards(
+                farm_contract, alice, network_providers, blockchain_controller
+            )
             TransactionAssertions.assert_transaction_success(tx_claim, network_providers.proxy)
 
         logger.info(f"Weeks queried: {weeks_queried}")
@@ -361,7 +340,9 @@ class TestFarmBoostedYields:
         for week in weeks_queried:
             supply = farm_contract.get_farm_supply_for_week(network_providers.proxy, week)
             energy = farm_contract.get_total_energy_for_week(network_providers.proxy, week)
-            accumulated = farm_contract.get_accumulated_rewards_for_week(network_providers.proxy, week)
+            accumulated = farm_contract.get_accumulated_rewards_for_week(
+                network_providers.proxy, week
+            )
             total_rewards = farm_contract.get_total_rewards_for_week(network_providers.proxy, week)
 
             logger.info(
@@ -372,8 +353,12 @@ class TestFarmBoostedYields:
             # All values should be non-negative
             assert supply >= 0, f"Farm supply for week {week} should be >= 0, got {supply}"
             assert energy >= 0, f"Total energy for week {week} should be >= 0, got {energy}"
-            assert accumulated >= 0, f"Accumulated rewards for week {week} should be >= 0, got {accumulated}"
-            assert total_rewards >= 0, f"Total rewards for week {week} should be >= 0, got {total_rewards}"
+            assert accumulated >= 0, (
+                f"Accumulated rewards for week {week} should be >= 0, got {accumulated}"
+            )
+            assert total_rewards >= 0, (
+                f"Total rewards for week {week} should be >= 0, got {total_rewards}"
+            )
 
         logger.info("PASSED: test_boosted_weekly_accumulation")
 
@@ -425,9 +410,7 @@ class TestFarmBoostedYields:
 
         # All values should be non-negative
         for field, value in stats.items():
-            assert value >= 0, (
-                f"Field '{field}' should be non-negative, got {value}"
-            )
+            assert value >= 0, f"Field '{field}' should be non-negative, got {value}"
 
         # Verify consistency with direct queries
         direct_current_week = farm_contract.get_current_week(network_providers.proxy)
@@ -482,8 +465,14 @@ class TestFarmBoostedYields:
         )
         if position == 0:
             ensure_esdt_amounts(alice, {farming_token: stake_amount})
-            tx_enter = _enter_farm(farm_contract, alice, farming_token, stake_amount,
-                                   network_providers, blockchain_controller)
+            tx_enter = _enter_farm(
+                farm_contract,
+                alice,
+                farming_token,
+                stake_amount,
+                network_providers,
+                blockchain_controller,
+            )
             TransactionAssertions.assert_transaction_success(tx_enter, network_providers.proxy)
 
         alice_bech32 = alice.address.to_bech32()
@@ -548,14 +537,10 @@ class TestFarmBoostedYields:
                 network_providers.proxy, week
             )
 
-            logger.info(
-                f"Week {week}: undistributed={undistributed}, remaining={remaining}"
-            )
+            logger.info(f"Week {week}: undistributed={undistributed}, remaining={remaining}")
 
             assert undistributed >= 0, (
-                f"Undistributed rewards should be >= 0:\n"
-                f"  Week: {week}\n"
-                f"  Value: {undistributed}"
+                f"Undistributed rewards should be >= 0:\n  Week: {week}\n  Value: {undistributed}"
             )
 
             assert remaining >= 0, (

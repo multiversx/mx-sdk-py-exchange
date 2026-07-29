@@ -16,7 +16,7 @@ from multiversx_sdk import Address, Token
 import pytest
 
 from contracts.pair_contract import (
-    PairContract, SwapFixedInputEvent, AddLiquidityEvent, RemoveLiquidityEvent
+    PairContract, SwapFixedInputEvent, AddLiquidityEvent
 )
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.utils_chain import nominated_amount, Account

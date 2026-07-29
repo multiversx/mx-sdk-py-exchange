@@ -19,7 +19,7 @@ from multiversx_sdk.abi import Abi
 from multiversx_sdk.network_providers.errors import TransactionFetchingError
 from utils.logger import get_logger
 from utils.errors import GenericError
-from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
+from utils.utils_chain import Account, log_explorer_transaction, get_bytecode_codehash
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
                                  log_unexpected_args, split_to_chunks, get_file_from_url_or_path)
 

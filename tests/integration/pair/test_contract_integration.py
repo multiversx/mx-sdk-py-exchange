@@ -10,7 +10,6 @@ Run:
     pytest --env=chainsim tests/integration/pair/test_contract_integration.py
 """
 
-import config
 from multiversx_sdk import Address, Token
 import pytest
 
