@@ -30,18 +30,35 @@ def _withdraw_seeded_rewards(
     test_environment,
     network_providers,
     blockchain_controller,
-    target_amount,
+    baseline_remaining,
 ):
+    """Withdraw the reward capacity this fixture seeded, down to the baseline.
+
+    withdrawRewards aggregates pending rewards before validating the requested
+    amount, so any amount sized from a view read is stale by whatever accrued in
+    between. The fixture only seeds when the pre-existing reserve is nearly
+    depleted, so there is no headroom to absorb that and a request for the full
+    excess is rejected. Stopping reward production first settles the pending
+    rewards and halts further accrual, which makes the views exact and lets a
+    single withdrawal restore the baseline precisely.
+    """
     _ensure_deployer_has_egld(deployer_account, test_environment, network_providers)
 
-    for attempt in range(3):
-        current_remaining = _remaining_uncollected_rewards(
+    was_producing = staking_contract.get_produce_rewards_enabled(network_providers.proxy)
+    if was_producing:
+        deployer_account.sync_nonce(network_providers.proxy)
+        tx_hash = staking_contract.end_produce_rewards(deployer_account, network_providers.proxy)
+        blockchain_controller.wait_for_tx(tx_hash)
+        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+
+    try:
+        # Re-read after the freeze: endProduceRewards just aggregated the
+        # pending rewards, so this is the settled figure the contract will
+        # check the withdrawal against.
+        outstanding = _remaining_uncollected_rewards(
             staking_contract, network_providers.proxy
-        )
-        withdraw_amount = min(target_amount, current_remaining)
-        if attempt > 0:
-            withdraw_amount = withdraw_amount * 99 // 100
-        if withdraw_amount <= 0:
+        ) - baseline_remaining
+        if outstanding <= 0:
             return
 
         deployer_account.sync_nonce(network_providers.proxy)
@@ -51,15 +68,20 @@ def _withdraw_seeded_rewards(
             deployer_account,
             Address(staking_contract.address),
             "withdrawRewards",
-            [withdraw_amount],
+            [outstanding],
         )
         blockchain_controller.wait_for_tx(tx_hash)
-        tx_data = network_providers.proxy.get_transaction(tx_hash)
-        if tx_data.status.is_successful:
-            TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
-            return
-
-        if "Withdraw amount is higher than the remaining uncollected rewards!" not in str(tx_data):
+        TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
+    finally:
+        # Always hand the contract back producing rewards, even if the
+        # withdrawal failed — leaving it frozen would silently zero out
+        # rewards for every later test in the session.
+        if was_producing:
+            deployer_account.sync_nonce(network_providers.proxy)
+            tx_hash = staking_contract.start_produce_rewards(
+                deployer_account, network_providers.proxy
+            )
+            blockchain_controller.wait_for_tx(tx_hash)
             TransactionAssertions.assert_transaction_success(tx_hash, network_providers.proxy)
 
 
@@ -103,8 +125,7 @@ def seed_staking_rewards(
     yield
 
     remaining_after = _remaining_uncollected_rewards(staking_contract, network_providers.proxy)
-    excess_remaining = max(0, remaining_after - remained_rewards)
-    if excess_remaining == 0:
+    if remaining_after <= remained_rewards:
         return
 
     _withdraw_seeded_rewards(
@@ -113,5 +134,5 @@ def seed_staking_rewards(
         test_environment,
         network_providers,
         blockchain_controller,
-        excess_remaining,
+        remained_rewards,
     )
