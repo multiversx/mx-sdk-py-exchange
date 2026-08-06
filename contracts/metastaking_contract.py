@@ -11,7 +11,6 @@ from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 import config
 
-from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 
 logger = get_logger(__name__)
 

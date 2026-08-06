@@ -26,7 +26,6 @@ import config
 
 from context import Context
 
-from contracts.metastaking_contract import MetaStakingContract
 
 
 METASTAKINGS_V1_LABEL = "metastakingsv1"

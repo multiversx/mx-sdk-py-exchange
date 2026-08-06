@@ -6,7 +6,6 @@ from contracts.locked_token_position_creator_contract import LockedTokenPosition
 from contracts.dex_proxy_contract import DexProxyContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from utils.utils_tx import NetworkProviders
-from context import Context
 import config
 
 POSITION_CREATOR_LABEL = "position_creator"
