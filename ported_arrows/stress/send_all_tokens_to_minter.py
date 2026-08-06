@@ -27,27 +27,27 @@ def main(cli_args: List[str]):
 
     transactions: List[Transaction] = []
 
+    def prep_txs(account: Account, payments: List[TokenPayment]):
+        if len(payments) == 0:
+            return
+        send_config = DefaultTransactionBuildersConfiguration(network.chain_id)
+        transaction = MultiESDTNFTTransferBuilder(
+            config=send_config,
+            sender=account.address,
+            destination=minter.address,
+            payments=payments,
+        ).build()
+        transaction.nonce = account.nonce
+        transaction.signature = account.sign_transaction(transaction)
+        account.nonce += 1
+
+        transactions.append(transaction)
+
     for account in accounts.get_all():
         account.sync_nonce(proxy)
         fungibles = proxy.get_fungible_tokens_of_account(account.address)
         nonfungibles = proxy.get_non_fungible_tokens_of_account(account.address)
 
-        def prep_txs(payments: List[TokenPayment]):
-            if len(payments) == 0:
-                return
-            send_config = DefaultTransactionBuildersConfiguration(network.chain_id)
-            transaction = MultiESDTNFTTransferBuilder(
-                config=send_config,
-                sender=account.address,
-                destination=minter.address,
-                payments=payments,
-            ).build()
-            transaction.nonce = account.nonce
-            transaction.signature = account.sign_transaction(transaction)
-            account.nonce += 1
-
-            transactions.append(transaction)
-        
         payments: List[TokenPayment] = []
 
         for fungible in fungibles:
@@ -58,7 +58,7 @@ def main(cli_args: List[str]):
                 continue
             payments.append(TokenPayment.meta_esdt_from_integer(nonfungible.collection, nonfungible.nonce, nonfungible.balance, 18))
         
-        prep_txs(payments)
+        prep_txs(account, payments)
 
     broadcast_transactions(transactions, proxy, 10, confirm_yes=True)
 
