@@ -154,7 +154,7 @@ def upgrade_pair_contracts(args: Any):
     context = Context()
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
-    router_contract = RouterContract.load_contract_by_address(router_contract)
+    router_contract = RouterContract.load_contract_by_address(router_address)
     router_contract.version = RouterContractVersion.V2
     pair_addresses = get_all_pair_addresses()
 
