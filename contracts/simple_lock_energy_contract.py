@@ -450,19 +450,6 @@ class SimpleLockEnergyContract(DEXContractInterface):
         return multi_esdt_endpoint_call(function_purpose, proxy, 10000000,
                                         user, Address(self.address), "extendLockingPeriod", args)
 
-    def extend_lock(self, user: Account, proxy: ProxyNetworkProvider, args: list):
-        """ Expected as args:
-            type[List[ESDTToken]]: tokens list
-            type[int]: new lock option
-        """
-        function_purpose = "extend lock period"
-        logger.info(function_purpose)
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 10000000,
-                                        user, Address(self.address), "extendLockingPeriod", args)
-
     def add_liquidity_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                     type[List[ESDTToken]]: tokens list
