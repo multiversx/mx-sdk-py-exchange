@@ -71,7 +71,6 @@ class LockedAssetContract(DEXContractInterface):
 
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
-        tx_hash = ""
 
         if no_init:
             arguments = []
