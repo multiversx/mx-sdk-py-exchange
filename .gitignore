@@ -3,6 +3,7 @@
 /.idea
 /.vscode
 /logs/*
+/tests/logs/
 /tools/notebooks/env.py
 /tools/notebooks/*.log
 .venv
