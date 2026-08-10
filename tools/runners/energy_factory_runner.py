@@ -11,7 +11,8 @@ from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
 from contracts.locked_asset_contract import LockedAssetContract
 from contracts.dex_proxy_contract import DexProxyContract
 from tools.common import get_user_continue, fetch_contracts_states, fetch_new_and_compare_contract_states
-from tools.runners.common_runner import ExportedAccount, ExportedToken, add_generate_transaction_command, add_upgrade_command, add_verify_command,\
+from tools.runners.common_runner import ExportedAccount, ExportedToken, add_contract_group_parser,\
+    add_generate_transaction_command, add_upgrade_command, add_verify_command,\
       fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json,\
         sync_account_nonce, verify_contracts, write_accounts_to_json
 
@@ -23,12 +24,9 @@ from utils.decoding_structures import XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for energy factory commands"""
-    group_parser = subparsers.add_parser('energy-factory', help='energy factory group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='energy factory contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, subgroup_parser, contract_group = add_contract_group_parser(
+        subparsers, 'energy-factory', 'energy factory group commands',
+        'energy factory contract commands')
     add_upgrade_command(contract_group, upgrade_energy_factory)
     add_verify_command(contract_group, verify_energy_factory)
 

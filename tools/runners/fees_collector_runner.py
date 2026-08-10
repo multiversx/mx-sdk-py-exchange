@@ -4,7 +4,7 @@ from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_upgrade_command, add_verify_command, verify_contracts
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_command, add_verify_command, verify_contracts
 from tools.runners.pair_runner import get_all_pair_addresses
 from typing import Any
 
@@ -18,12 +18,9 @@ FEES_COLLECTOR_LABEL = 'fees_collector'
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for fees collector commands"""
-    group_parser = subparsers.add_parser('fees-collector', help='fees collector group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='fees collector contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, _, contract_group = add_contract_group_parser(
+        subparsers, 'fees-collector', 'fees collector group commands',
+        'fees collector contract commands')
     add_upgrade_command(contract_group, upgrade_fees_collector_contract)
     add_verify_command(contract_group, verify_fees_collector)
 

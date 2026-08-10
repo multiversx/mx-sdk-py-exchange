@@ -4,7 +4,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue
 from context import Context
-from tools.runners.common_runner import add_upgrade_all_command
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_all_command
 from contracts.position_creator_contract import PositionCreatorContract
 from contracts.farm_contract import FarmContract, FarmContractVersion
 from contracts.staking_contract import StakingContract, StakingContractVersion
@@ -24,12 +24,9 @@ OUTPUT_POSITION_CREATOR_FILE = OUTPUT_FOLDER / "position_creator_data.json"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for position creator commands"""
-    group_parser = subparsers.add_parser('position-creator', help='position creator group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='position creator contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, _, contract_group = add_contract_group_parser(
+        subparsers, 'position-creator', 'position creator group commands',
+        'position creator contract commands')
     add_upgrade_all_command(contract_group, upgrade_position_creator_contract)
 
     command_parser = contract_group.add_parser('deploy', help='deploy contract command')

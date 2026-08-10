@@ -13,10 +13,7 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
-from tools.runners.common_runner import add_generate_transaction_command, \
-    add_upgrade_command, fund_shadowfork_accounts, \
-    get_acounts_with_token, get_default_signature, read_accounts_from_json, \
-    sync_account_nonce, verify_contracts, add_verify_command
+from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
 from tools.runners.metastaking_runner import get_metastaking_addresses_from_chain
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.utils_chain import Account, WrapperAddress
@@ -36,12 +33,8 @@ OUTPUT_STAKING_CONTRACTS_FILE = OUTPUT_FOLDER / "staking_data.json"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for staking commands"""
-    group_parser = subparsers.add_parser('stakings', help='stakings group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='stakings contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, subgroup_parser, contract_group = add_contract_group_parser(
+        subparsers, 'stakings', 'stakings group commands', 'stakings contract commands')
     add_upgrade_command(contract_group, upgrade_staking_contracts)
     add_verify_command(contract_group, verify_staking_contracts)
 

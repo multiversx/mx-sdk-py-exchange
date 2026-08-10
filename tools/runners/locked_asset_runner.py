@@ -4,7 +4,7 @@ from contracts.locked_asset_contract import LockedAssetContract
 from tools.common import API, PROXY, \
     fetch_new_and_compare_contract_states, get_owner, get_user_continue
 import config
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_upgrade_only_group_parser
 from utils.utils_tx import NetworkProviders
 
 from utils.utils_chain import get_bytecode_codehash
@@ -15,15 +15,9 @@ LOCKED_ASSET_LABEL = "locked_asset"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for locked asset commands"""
-    group_parser = subparsers.add_parser('locked-assets', help='locked assets group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='locked assets contract commands')
-
-    contract_group = contract_parser.add_subparsers()
-    add_upgrade_command(contract_group, upgrade_locked_asset_contracts)
-
-    return group_parser
+    return add_upgrade_only_group_parser(
+        subparsers, 'locked-assets', 'locked assets group commands',
+        'locked assets contract commands', upgrade_locked_asset_contracts)
 
 
 def upgrade_locked_asset_contracts(_):

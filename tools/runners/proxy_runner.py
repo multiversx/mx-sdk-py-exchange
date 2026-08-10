@@ -4,7 +4,7 @@ from context import Context
 from contracts.dex_proxy_contract import DexProxyContract, DexProxyExitFarmEvent
 from contracts.farm_contract import FarmContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_generate_transaction_command, add_upgrade_command, get_acounts_with_token, read_accounts_from_json
+from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, get_acounts_with_token, read_accounts_from_json
 from utils.utils_chain import Account, WrapperAddress
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
@@ -18,12 +18,8 @@ from utils.utils_chain import hex_to_string
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for proxy dex commands"""
-    group_parser = subparsers.add_parser('proxy-dex', help='proxy dex group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='proxy dex contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, subgroup_parser, contract_group = add_contract_group_parser(
+        subparsers, 'proxy-dex', 'proxy dex group commands', 'proxy dex contract commands')
     add_upgrade_command(contract_group, upgrade_proxy_dex_contracts)
 
     transaction_parser = subgroup_parser.add_parser('generate-transactions', help='proxy dex transaction commands')

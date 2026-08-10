@@ -9,7 +9,7 @@ from contracts.router_contract import RouterContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue, run_graphql_query, fetch_and_save_contracts, get_saved_contract_addresses
-from tools.runners.common_runner import add_upgrade_all_command
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_all_command
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
 from utils.utils_tx import NetworkProviders
 
@@ -24,12 +24,8 @@ OUTPUT_PAIR_CONTRACTS_FILE = OUTPUT_FOLDER / "pairs_data.json"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for pair commands"""
-    group_parser = subparsers.add_parser('pairs', help='pairs group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='pairs contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, _, contract_group = add_contract_group_parser(
+        subparsers, 'pairs', 'pairs group commands', 'pairs contract commands')
     add_upgrade_all_command(contract_group, upgrade_pair_contracts)
 
     command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')

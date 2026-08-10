@@ -15,7 +15,7 @@ from events.farm_events import EnterFarmEvent, ExitFarmEvent
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
-from tools.runners.common_runner import add_upgrade_all_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_all_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
 from utils.contract_data_fetchers import FarmContractDataFetcher, SimpleLockContractDataFetcher
 from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, hex_to_string
@@ -35,12 +35,8 @@ OUTPUT_FARMV2_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv2_data.json"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for farms commands"""
-    group_parser = subparsers.add_parser('farms', help='farms group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='farms contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, _, contract_group = add_contract_group_parser(
+        subparsers, 'farms', 'farms group commands', 'farms contract commands')
     add_upgrade_command(contract_group, upgrade_farmv2_contract)
     add_upgrade_all_command(contract_group, upgrade_farmv2_contracts)
     add_verify_command(contract_group, verify_farmv2_contracts)

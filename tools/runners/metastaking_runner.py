@@ -12,11 +12,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, rule_of_three, run_graphql_query
-from tools.runners.common_runner import add_generate_transaction_command, \
-    add_upgrade_command, \
-    get_acounts_with_token, read_accounts_from_json, \
-    add_verify_command, verify_contracts, fund_shadowfork_accounts, \
-    get_default_signature, sync_account_nonce
+from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
 from tools.runners.farm_runner import get_farm_addresses_from_chain
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, base64_to_hex
 from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
@@ -36,12 +32,8 @@ OUTPUT_METASTAKING_V2_CONTRACTS_FILE = OUTPUT_FOLDER / "metastakingv2_data.json"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for metastaking commands"""
-    group_parser = subparsers.add_parser('metastakings', help='metastaking group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='metastaking contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, subgroup_parser, contract_group = add_contract_group_parser(
+        subparsers, 'metastakings', 'metastaking group commands', 'metastaking contract commands')
     
     command_parser = contract_group.add_parser('fetch-all', help='fetch all contracts command')
     command_parser.set_defaults(func=fetch_and_save_metastakings_from_chain)

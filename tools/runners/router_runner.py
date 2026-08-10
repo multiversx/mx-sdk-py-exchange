@@ -9,7 +9,7 @@ from contracts.pair_contract import PairContract
 from tools.common import API, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, \
     get_owner, get_user_continue
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_command
 from utils.contract_data_fetchers import RouterContractDataFetcher
 
 from utils.utils_tx import NetworkProviders
@@ -22,12 +22,8 @@ TEMPLATE_PAIR_LABEL = "template_pair"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for router commands"""
-    group_parser = subparsers.add_parser('router', help='router group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='router contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, _, contract_group = add_contract_group_parser(
+        subparsers, 'router', 'router group commands', 'router contract commands')
     add_upgrade_command(contract_group, upgrade_router_contract)
 
     command_parser = contract_group.add_parser('upgrade-template', help='upgrade template contract command')

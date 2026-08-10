@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from typing import Any
 from contracts.simple_lock_contract import SimpleLockContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_upgrade_command
+from tools.runners.common_runner import add_upgrade_only_group_parser
 from utils.utils_tx import NetworkProviders
 from utils.utils_chain import get_bytecode_codehash
 from utils.utils_generic import get_file_from_url_or_path
@@ -11,15 +11,9 @@ import config
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for proxy dex commands"""
-    group_parser = subparsers.add_parser('simple-lock', help='simple lock group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='simple lock commands')
-
-    contract_group = contract_parser.add_subparsers()
-    add_upgrade_command(contract_group, upgrade_simple_lock_contract)
-
-    return group_parser
+    return add_upgrade_only_group_parser(
+        subparsers, 'simple-lock', 'simple lock group commands', 'simple lock commands',
+        upgrade_simple_lock_contract)
 
 
 def upgrade_simple_lock_contract(args: Any):

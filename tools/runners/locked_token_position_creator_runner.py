@@ -5,6 +5,7 @@ from context import Context
 from contracts.locked_token_position_creator_contract import LockedTokenPositionCreatorContract
 from contracts.dex_proxy_contract import DexProxyContract
 from contracts.simple_lock_energy_contract import SimpleLockEnergyContract
+from tools.runners.common_runner import add_contract_group_parser
 from utils.utils_tx import NetworkProviders
 import config
 
@@ -14,12 +15,10 @@ OUTPUT_POSITION_CREATOR_FILE = OUTPUT_FOLDER / "position_creator_data.json"
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
     """Set up argument parser for locked token position creator commands"""
-    group_parser = subparsers.add_parser('locked-token-position-creator', help='locked token position creator group commands')
-    subgroup_parser = group_parser.add_subparsers()
-
-    contract_parser = subgroup_parser.add_parser('contract', help='locked token position creator contract commands')
-
-    contract_group = contract_parser.add_subparsers()
+    group_parser, _, contract_group = add_contract_group_parser(
+        subparsers, 'locked-token-position-creator',
+        'locked token position creator group commands',
+        'locked token position creator contract commands')
 
     command_parser = contract_group.add_parser('deploy', help='deploy contract command')
     command_parser.set_defaults(func=deploy_position_creator_contract)

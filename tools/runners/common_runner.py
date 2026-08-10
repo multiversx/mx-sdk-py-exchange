@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from time import sleep
 from typing import Any, List
 import json
@@ -212,6 +213,34 @@ def verify_contracts(args: Any, contract_addresses: list[str]) -> None:
         trigger_contract_verification(packaged_src, owner, contract, verifier_url, docker_image, contract_variant)
         
         count += 1
+
+
+def add_contract_group_parser(subparsers, group_name: str, group_help: str,
+                              contract_help: str) -> tuple[ArgumentParser, Any, Any]:
+    """Open a runner's command group: the group, its subgroups, and its contract commands.
+
+    Every runner starts here, so a new one begins from shared support rather than as a copy of an
+    existing one. Returns the group parser to hand back from `setup_parser`, the subgroup parser for
+    further command families such as `generate-transactions`, and the contract command group that
+    `add_upgrade_command` and friends register on.
+    """
+
+    group_parser = subparsers.add_parser(group_name, help=group_help)
+    subgroup_parser = group_parser.add_subparsers()
+    contract_parser = subgroup_parser.add_parser('contract', help=contract_help)
+
+    return group_parser, subgroup_parser, contract_parser.add_subparsers()
+
+
+def add_upgrade_only_group_parser(subparsers, group_name: str, group_help: str, contract_help: str,
+                                  upgrade_func: Any) -> ArgumentParser:
+    """A whole runner group whose only command is `contract upgrade`."""
+
+    group_parser, _, contract_group = add_contract_group_parser(
+        subparsers, group_name, group_help, contract_help)
+    add_upgrade_command(contract_group, upgrade_func)
+
+    return group_parser
 
 
 def add_upgrade_command(subparsers, func: Any) -> None:
