@@ -803,24 +803,33 @@ def generateRandomExitFarmProxyEvent(context: Context):
     generateExitFarmProxyEvent(context, userAccount, farmContract)
 
 
-def generateClaimRewardsProxyEvent(context: Context, userAccount: Account, farmContract: FarmContract):
+def _generate_rewards_proxy_event(context: Context, user_account: Account, farm_contract: FarmContract, event_class):
+    """Send a user's whole proxied farm position back through the proxy's claim endpoint.
 
+    Claiming and compounding are the same call; only the event built for it differs. That both go
+    through `claimRewardsProxy` is what this code already did, and is preserved deliberately —
+    see the Tier C note in `docs/CLEANUP.md`.
+    """
     try:
-        farm_token = farmContract.proxyContract.farm_token
-        underlying_token = farmContract.farmToken
+        farm_token = farm_contract.proxyContract.farm_token
+        underlying_token = farm_contract.farmToken
 
-        farm_tk_nonce, farm_tk_amount, _ = get_token_details_for_address(farm_token, userAccount.address,
+        farm_tk_nonce, farm_tk_amount, _ = get_token_details_for_address(farm_token, user_account.address,
                                                                          context.network_provider.proxy, underlying_token)
         if farm_tk_nonce == 0:
             return
 
-        event = DexProxyClaimRewardsEvent(
-            farmContract, farm_token, farm_tk_nonce, farm_tk_amount
+        event = event_class(
+            farm_contract, farm_token, farm_tk_nonce, farm_tk_amount
         )
-        context.dexProxyContract.claimRewardsProxy(context, userAccount, event)
+        context.dexProxyContract.claimRewardsProxy(context, user_account, event)
 
     except Exception as ex:
         print(ex)
+
+
+def generateClaimRewardsProxyEvent(context: Context, userAccount: Account, farmContract: FarmContract):
+    _generate_rewards_proxy_event(context, userAccount, farmContract, DexProxyClaimRewardsEvent)
 
 
 def generateRandomClaimRewardsProxyEvent(context: Context):
@@ -830,23 +839,7 @@ def generateRandomClaimRewardsProxyEvent(context: Context):
 
 
 def generateCompoundRewardsProxyEvent(context: Context, userAccount: Account, farmContract: FarmContract):
-
-    try:
-        farm_token = farmContract.proxyContract.farm_token
-        underlying_token = farmContract.farmToken
-
-        farmTkNonce, farmTkAmount, _ = get_token_details_for_address(farm_token, userAccount.address,
-                                                                     context.network_provider.proxy, underlying_token)
-        if farmTkNonce == 0:
-            return
-
-        event = DexProxyCompoundRewardsEvent(
-            farmContract, farm_token, farmTkNonce, farmTkAmount
-        )
-        context.dexProxyContract.claimRewardsProxy(context, userAccount, event)
-
-    except Exception as ex:
-        print(ex)
+    _generate_rewards_proxy_event(context, userAccount, farmContract, DexProxyCompoundRewardsEvent)
 
 
 def generateRandomCompoundRewardsProxyEvent(context: Context):
@@ -883,11 +876,17 @@ def generate_random_deposit_pd_liquidity_event(context: Context):
     generate_deposit_pd_liquidity_event(context, user_account, pd_contract)
 
 
-def generate_withdraw_pd_liquidity_event(context: Context, user_account: Account, pd_contract: PriceDiscoveryContract):
-    # TODO: find a smarter/more configurable method of choosing which token to use
+def _generate_pd_redeem_token_event(context: Context, user_account: Account, pd_contract: PriceDiscoveryContract,
+                                    action: str, event_class, submit):
+    """Spend a randomly chosen redeem token holding on a price discovery contract.
+
+    Withdrawing and redeeming walk the user's redeem tokens identically; they differ only in what
+    they are called in a failure report, the event they build, and the endpoint they submit through.
+    """
+    # TODO: find a smarter/more configurable method of choosing which token to use and how much
     tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.network_provider.proxy)
     if len(tokens) == 0:
-        log_step_fail(f"Generate withdraw price discovery liquidity failed! No redeem tokens available.")
+        log_step_fail(f"Generate {action} price discovery liquidity failed! No redeem tokens available.")
         return
 
     random.shuffle(tokens)
@@ -895,16 +894,21 @@ def generate_withdraw_pd_liquidity_event(context: Context, user_account: Account
     nonce = int(deposit_token['nonce'])
     amount = random.randrange(int(deposit_token['balance']))
 
-    event = WithdrawPDLiquidityEvent(pd_contract.redeem_token, nonce, amount)
-    tx_hash = pd_contract.withdraw_liquidity(context.network_provider, user_account, event)
+    event = event_class(pd_contract.redeem_token, nonce, amount)
+    tx_hash = submit(context.network_provider, user_account, event)
 
     # track and check event results
     # TODO: has to be reworked
     # if hasattr(context, 'price_discovery_trackers'):
     #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-    #     context.price_discovery_trackers[index].withdraw_event_tracking(
+    #     context.price_discovery_trackers[index].{action}_event_tracking(
     #         event, user_account.address, tx_hash
     #     )
+
+
+def generate_withdraw_pd_liquidity_event(context: Context, user_account: Account, pd_contract: PriceDiscoveryContract):
+    _generate_pd_redeem_token_event(context, user_account, pd_contract,
+                                    "withdraw", WithdrawPDLiquidityEvent, pd_contract.withdraw_liquidity)
 
 
 def generate_random_withdraw_pd_liquidity_event(context: Context):
@@ -914,27 +918,8 @@ def generate_random_withdraw_pd_liquidity_event(context: Context):
 
 
 def generate_redeem_pd_liquidity_event(context: Context, user_account: Account, pd_contract: PriceDiscoveryContract):
-    # TODO: find a smarter/more configurable method of choosing which token to use and how much
-    tokens = get_all_token_nonces_details_for_account(pd_contract.redeem_token, user_account.address, context.network_provider.proxy)
-    if len(tokens) == 0:
-        log_step_fail(f"Generate redeem price discovery liquidity failed! No redeem tokens available.")
-        return
-
-    random.shuffle(tokens)
-    deposit_token = tokens[0]
-    nonce = int(deposit_token['nonce'])
-    amount = random.randrange(int(deposit_token['balance']))
-
-    event = RedeemPDLPTokensEvent(pd_contract.redeem_token, nonce, amount)
-    tx_hash = pd_contract.redeem_liquidity_position(context.network_provider, user_account, event)
-
-    # track and check event results
-    # TODO: has to be reworked
-    # if hasattr(context, 'price_discovery_trackers'):
-    #     index = context.get_contract_index(config.PRICE_DISCOVERIES, pd_contract)
-    #     context.price_discovery_trackers[index].redeem_event_tracking(
-    #         event, user_account.address, tx_hash
-    #     )
+    _generate_pd_redeem_token_event(context, user_account, pd_contract,
+                                    "redeem", RedeemPDLPTokensEvent, pd_contract.redeem_liquidity_position)
 
 
 def generate_random_redeem_pd_liquidity_event(context: Context):
