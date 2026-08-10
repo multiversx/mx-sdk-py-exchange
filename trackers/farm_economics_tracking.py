@@ -8,6 +8,7 @@ from events.farm_events import (EnterFarmEvent, ExitFarmEvent,
                                 ClaimRewardsFarmEvent, SetTokenBalanceEvent)
 from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
+from trackers.rewards_economics_base import _RewardsEconomicsBase
 from utils.utils_chain import get_current_tokens_for_address
 from contracts.contract_identities import FarmContractVersion
 
@@ -156,7 +157,18 @@ class FarmAccountEconomics(Subscriber):
                 self.set_token_balance(publisher.event)
 
 
-class FarmEconomics(Subscriber):
+class FarmEconomics(_RewardsEconomicsBase):
+
+    _TRACKING_HEADER = "Farm"
+
+    _TRACKED_FIELDS = (
+        ("Farm token supply", "farm_token_supply"),
+        ("Rewards per block", "rewards_per_block"),
+        ("Rewards reserve", "rewards_reserve"),
+        ("Rewards per share", "rewards_per_share"),
+        ("Last rewards block nonce", "last_rewards_block_nonce"),
+        ("Last block offline calculated rewards", "last_block_calculated_rewards"),
+    )
 
     def __init__(self, contract_address: str, version: FarmContractVersion, network_provider: NetworkProviders):
         self.contract_address = Address(contract_address, "erd")
@@ -181,41 +193,12 @@ class FarmEconomics(Subscriber):
 
         self.report_current_tracking_data()
 
-    def report_current_tracking_data(self):
-        print(f"Farm: {self.contract_address.bech32()}")
-        print(f"Farm token supply: {self.farm_token_supply}")
-        print(f"Rewards per block: {self.rewards_per_block}")
-        print(f"Rewards reserve: {self.rewards_reserve}")
-        print(f"Rewards per share: {self.rewards_per_share}")
-        print(f"Last rewards block nonce: {self.last_rewards_block_nonce}")
-        print(f"Last block offline calculated rewards: {self.last_block_calculated_rewards}")
+    @property
+    def _rewards_data_fetcher(self):
+        return self.farm_data_fetcher
 
-    # checks and updates the farm contract invariant properties
-    def check_invariant_properties(self):
-        # TODO: replace test reporting with logger
-        new_rewards_per_share = self.farm_data_fetcher.get_data("getRewardPerShare")
-        new_last_rewards_block_nonce = self.farm_data_fetcher.get_data("getLastRewardBlockNonce")
-        chain_rewards_per_block = self.farm_data_fetcher.get_data("getPerBlockRewardAmount")
-        chain_division_safety_constant = self.farm_data_fetcher.get_data("getDivisionSafetyConstant")
-
-        if self.rewards_per_share > new_rewards_per_share:
-            log_step_fail("TEST CHECK FAIL: Rewards per share decreased!")
-            log_substep(f"Old rewards per share: {self.rewards_per_share}")
-            log_substep(f"New rewards per share: {new_rewards_per_share}")
-        if self.last_rewards_block_nonce > new_last_rewards_block_nonce:
-            log_step_fail("TEST CHECK FAIL: Last rewards block nonce decreased!")
-            log_substep(f"Old rewards block nonce: {self.last_rewards_block_nonce}")
-            log_substep(f"New rewards block nonce: {new_last_rewards_block_nonce}")
-        if self.rewards_per_block != chain_rewards_per_block:
-            log_step_fail("TEST CHECK FAIL: Rewards per block has changed!")
-            log_substep(f"Old rewards per block: {self.rewards_per_block}")
-            log_substep(f"New rewards per block: {chain_rewards_per_block}")
-        if self.division_safety_constant != chain_division_safety_constant:
-            log_step_fail("TEST CHECK FAIL: Division safety constant has changed!")
-            log_substep(f"Old division safety constant: {self.division_safety_constant}")
-            log_substep(f"New division safety constant: {chain_division_safety_constant}")
-
-        log_step_pass("Checked invariant properties!")
+    def _refresh_tracking_data(self) -> None:
+        self.update_tracking_data()
 
     def check_enter_farm_properties(self):
         # track event dependent properties
@@ -501,26 +484,13 @@ class FarmEconomics(Subscriber):
         log_step_pass("Updated farm tracking data!")
 
     def enter_farm_event_tracking(self, account: Account, event: EnterFarmEvent, txhash: str, lock: int = 0):
-        # TODO: replace error reporting with logger
-        # track invariant properties
-        self.check_invariant_properties()
-        self.check_enter_farm_properties()
-        self.check_enter_farm_tx_data(event, txhash)
-        self.update_tracking_data()
+        self._track_event(self.check_enter_farm_properties, self.check_enter_farm_tx_data, event, txhash)
 
     def exit_farm_event_tracking(self, account: Account, event: ExitFarmEvent, txhash: str):
-        # TODO: replace error reporting with logger
-        # track invariant properties
-        self.check_invariant_properties()
-        self.check_exit_farm_properties()
-        self.check_exit_farm_tx_data(event, txhash)
-        self.update_tracking_data()
+        self._track_event(self.check_exit_farm_properties, self.check_exit_farm_tx_data, event, txhash)
 
     def claim_rewards_farm_event_tracking(self, account: Account, event: ExitFarmEvent, txhash: str):
-        self.check_invariant_properties()
-        self.check_claim_rewards_properties()
-        self.check_claim_rewards_farm_tx_data(event, txhash)
-        self.update_tracking_data()
+        self._track_event(self.check_claim_rewards_properties, self.check_claim_rewards_farm_tx_data, event, txhash)
 
     def update(self, publisher: Observable):
         if publisher.contract is not None:

@@ -136,23 +136,28 @@ class MetastakingEconomics(Subscriber):
                                                       second_token_deserialized['token_id'], second_tk_amount)
         self.pair_tracker.check_remove_liquidity(remove_liquidity_event)
 
-    def check_enter_metastaking(self, publisher: Observable):
+    def __check_metastaking_event(self, publisher: Observable, staking_properties_check,
+                                  data_check, checked_message: str):
+        """Every metastaking check clears the staking tracker first, then its own data."""
         self.staking_tracker.check_invariant_properties()
-        self.staking_tracker.check_enter_staking_properties()
-        self.check_enter_metastaking_data(publisher)
-        log_step_pass('Checked enter metastaking event economics!')
+        staking_properties_check()
+        data_check(publisher)
+        log_step_pass(checked_message)
+
+    def check_enter_metastaking(self, publisher: Observable):
+        self.__check_metastaking_event(publisher, self.staking_tracker.check_enter_staking_properties,
+                                       self.check_enter_metastaking_data,
+                                       'Checked enter metastaking event economics!')
 
     def check_exit_metastaking(self, publisher: Observable):
-        self.staking_tracker.check_invariant_properties()
-        self.staking_tracker.check_exit_staking_properties()
-        self.check_exit_metastaking_data(publisher)
-        log_step_pass('Checked exit metastaking event economics!')
+        self.__check_metastaking_event(publisher, self.staking_tracker.check_exit_staking_properties,
+                                       self.check_exit_metastaking_data,
+                                       'Checked exit metastaking event economics!')
 
     def check_claim_rewards(self, publisher: Observable):
-        self.staking_tracker.check_invariant_properties()
-        self.staking_tracker.check_claim_rewards_properties()
-        self.check_claim_rewards_data(publisher)
-        log_step_pass('Checked claim metastaking rewards event economics!')
+        self.__check_metastaking_event(publisher, self.staking_tracker.check_claim_rewards_properties,
+                                       self.check_claim_rewards_data,
+                                       'Checked claim metastaking rewards event economics!')
 
     def update_trackers_data(self):
         self.staking_tracker.update_data()

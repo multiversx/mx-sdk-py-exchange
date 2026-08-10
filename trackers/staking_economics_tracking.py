@@ -1,13 +1,25 @@
 from multiversx_sdk import Address
 from utils.utils_tx import NetworkProviders
-from trackers.abstract_observer import Subscriber
 from trackers.concrete_observer import Observable
+from trackers.rewards_economics_base import _RewardsEconomicsBase
 from events.farm_events import EnterFarmEvent, ExitFarmEvent, ClaimRewardsFarmEvent
 from utils.contract_data_fetchers import StakingContractDataFetcher, ChainDataFetcher
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep
 
 
-class StakingEconomics(Subscriber):
+class StakingEconomics(_RewardsEconomicsBase):
+
+    _TRACKING_HEADER = "Staking contract address"
+
+    _TRACKED_FIELDS = (
+        ("Staking farm token supply", "token_supply"),
+        ("Rewards per block", "rewards_per_block"),
+        ("Last rewards block nonce", "last_rewards_block_nonce"),
+        ("Annual percentage rewards", "annual_percentage_rewards"),
+        ("Rewards capacity", "rewards_capacity"),
+        ("Rewards per share", "rewards_per_share"),
+    )
+
     def __init__(self, address: str, network_provider: NetworkProviders):
         self.contract_address = Address(address, "erd")
         self.network_provider = network_provider
@@ -38,39 +50,13 @@ class StakingEconomics(Subscriber):
         self.min_unbond_epochs = self.data_fetcher.get_data('getMinUnbondEpochs')
         self.division_safety_constant = self.data_fetcher.get_data('getDivisionSafetyConstant')
 
-    def report_current_tracking_data(self):
-        print(f"Staking contract address: {self.contract_address.bech32()}")
-        print(f"Staking farm token supply: {self.token_supply}")
-        print(f"Rewards per block: {self.rewards_per_block}")
-        print(f"Last rewards block nonce: {self.last_rewards_block_nonce}")
-        print(f"Annual percentage rewards: {self.annual_percentage_rewards}")
-        print(f"Rewards capacity: {self.rewards_capacity}")
-        print(f"Rewards per share: {self.rewards_per_share}")
+    @property
+    def _rewards_data_fetcher(self):
+        return self.data_fetcher
 
-    def check_invariant_properties(self):
-        new_rewards_per_share = self.data_fetcher.get_data("getRewardPerShare")
-        new_last_rewards_block_nonce = self.data_fetcher.get_data("getLastRewardBlockNonce")
-        chain_rewards_per_block = self.data_fetcher.get_data("getPerBlockRewardAmount")
-        chain_division_safety_constant = self.data_fetcher.get_data("getDivisionSafetyConstant")
-
-        if self.rewards_per_share > new_rewards_per_share:
-            log_step_fail("TEST CHECK FAIL: Rewards per share decreased!")
-            log_substep(f"Old rewards per share: {self.rewards_per_share}")
-            log_substep(f"New rewards per share: {new_rewards_per_share}")
-        if self.last_rewards_block_nonce > new_last_rewards_block_nonce:
-            log_step_fail("TEST CHECK FAIL: Last rewards block nonce decreased!")
-            log_substep(f"Old rewards block nonce: {self.last_rewards_block_nonce}")
-            log_substep(f"New rewards block nonce: {new_last_rewards_block_nonce}")
-        if self.rewards_per_block != chain_rewards_per_block:
-            log_step_fail("TEST CHECK FAIL: Rewards per block has changed!")
-            log_substep(f"Old rewards per block: {self.rewards_per_block}")
-            log_substep(f"New rewards per block: {chain_rewards_per_block}")
-        if self.division_safety_constant != chain_division_safety_constant:
-            log_step_fail("TEST CHECK FAIL: Division safety constant has changed!")
-            log_substep(f"Old division safety constant: {self.division_safety_constant}")
-            log_substep(f"New division safety constant: {chain_division_safety_constant}")
-
-        log_step_pass("Checked invariant properties!")
+    def _refresh_tracking_data(self) -> None:
+        self.update_data()
+        self.report_current_tracking_data()
 
     def check_enter_staking_properties(self):
         new_token_supply = self.data_fetcher.get_data("getFarmTokenSupply")
@@ -195,25 +181,13 @@ class StakingEconomics(Subscriber):
         log_step_pass("Checked claim staking rewards data!")
 
     def enter_staking_event(self, event: EnterFarmEvent, tx_hash):
-        self.check_invariant_properties()
-        self.check_enter_staking_properties()
-        self.check_enter_staking_data(event, tx_hash)
-        self.update_data()
-        self.report_current_tracking_data()
+        self._track_event(self.check_enter_staking_properties, self.check_enter_staking_data, event, tx_hash)
 
     def exit_staking_event(self, event: ExitFarmEvent, tx_hash):
-        self.check_invariant_properties()
-        self.check_exit_staking_properties()
-        self.check_exit_staking_data(event, tx_hash)
-        self.update_data()
-        self.report_current_tracking_data()
+        self._track_event(self.check_exit_staking_properties, self.check_exit_staking_data, event, tx_hash)
 
     def claim_rewards_staking_event(self, tx_hash):
-        self.check_invariant_properties()
-        self.check_claim_rewards_properties()
-        self.check_claim_rewards_data(tx_hash)
-        self.update_data()
-        self.report_current_tracking_data()
+        self._track_event(self.check_claim_rewards_properties, self.check_claim_rewards_data, tx_hash)
 
     def update(self, publisher: Observable):
         if publisher.contract is not None:
