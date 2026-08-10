@@ -14,11 +14,11 @@ from tools.common import get_user_continue, fetch_contracts_states, fetch_new_an
 from tools.runners.common_runner import ExportedAccount, ExportedToken, add_contract_group_parser,\
     add_generate_transaction_command, add_upgrade_command, add_verify_command,\
       fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json,\
-        run_verify_command, sync_account_nonce, write_accounts_to_json
+        resolve_upgrade_bytecode, run_verify_command, sync_account_nonce, write_accounts_to_json
 
 from utils.utils_tx import ESDTToken, NetworkProviders, prepare_contract_call_tx, _prep_legacy_args
-from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
-from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, decode_merged_attributes, base64_to_hex, dec_to_padded_hex, hex_to_base64
+from utils.utils_generic import split_to_chunks
+from utils.utils_chain import Account, WrapperAddress, decode_merged_attributes, base64_to_hex, dec_to_padded_hex, hex_to_base64
 from utils.decoding_structures import XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES
 
 
@@ -67,12 +67,9 @@ def upgrade_energy_factory(args: Any):
     energy_contract = SimpleLockEnergyContract.load_contract_by_address(energy_factory_address)
     print(f"Upgrade energy factory contract: {energy_factory_address}")
 
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH)
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.SIMPLE_LOCK_ENERGY_BYTECODE_PATH,
+                                             config.FORCE_CONTINUE_PROMPT)
+    if bytecode_path is None:
         return
 
     if compare_states:

@@ -4,13 +4,11 @@ from context import Context
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_contract_group_parser, add_upgrade_command, add_verify_command, run_verify_command
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_command, add_verify_command, resolve_upgrade_bytecode, run_verify_command
 from tools.runners.pair_runner import get_all_pair_addresses
 from typing import Any
 
 from utils.utils_tx import NetworkProviders
-from utils.utils_generic import get_file_from_url_or_path
-from utils.utils_chain import get_bytecode_codehash
 
 
 FEES_COLLECTOR_LABEL = 'fees_collector'
@@ -71,13 +69,9 @@ def upgrade_fees_collector_contract(args: Any):
 
     print(f"Upgrading fees collector contract: {fees_collector_contract.address}")
 
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.FEES_COLLECTOR_BYTECODE_PATH)
-        
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.FEES_COLLECTOR_BYTECODE_PATH,
+                                             config.FORCE_CONTINUE_PROMPT)
+    if bytecode_path is None:
         return
 
     if compare_states:

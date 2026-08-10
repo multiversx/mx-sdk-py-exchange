@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from collections.abc import Callable
+from pathlib import Path
 from time import sleep
 from typing import Any, List
 import json
@@ -7,8 +8,9 @@ import json
 from multiversx_sdk import Address
 from multiversx_sdk import TransactionsFactoryConfig, TransferTransactionsFactory
 from tools.contract_verifier import trigger_contract_verification
-from tools.common import API, PROXY
-from utils.utils_chain import Account, WrapperAddress
+from tools.common import API, PROXY, fetch_contracts_states, \
+    fetch_new_and_compare_contract_states, get_user_continue
+from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash
 from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
 from utils.utils_tx import NetworkProviders
 import config
@@ -214,6 +216,71 @@ def verify_contracts(args: Any, contract_addresses: list[str]) -> None:
         trigger_contract_verification(packaged_src, owner, contract, verifier_url, docker_image, contract_variant)
         
         count += 1
+
+
+def resolve_upgrade_bytecode(bytecode_override: str, default_bytecode: str,
+                             force_continue: bool = False) -> Path | None:
+    """Resolve the bytecode an upgrade will use, report its codehash and take confirmation.
+
+    Returns None when the operator declines, which every caller answers by returning without
+    upgrading anything.
+    """
+
+    bytecode_path = get_file_from_url_or_path(bytecode_override or default_bytecode)
+
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(force_continue):
+        return None
+
+    return bytecode_path
+
+
+def fetch_states_before_upgrade(network_providers: NetworkProviders, contract_addresses: list[str],
+                                label: str, force_continue: bool = False) -> bool:
+    """Snapshot every contract's state so the upgrade can be compared against it afterwards.
+
+    False when the operator declines to continue past the snapshot.
+    """
+
+    print("Fetching contracts states before upgrade...")
+    fetch_contracts_states("pre", network_providers, contract_addresses, label)
+
+    return get_user_continue(force_continue)
+
+
+def upgrade_contracts(contract_addresses: list[str], label: str,
+                      upgrade_contract: Callable[[str], str],
+                      network_providers: NetworkProviders, tx_description: str,
+                      compare_states: bool = False, force_continue: bool = False,
+                      complex_tx_status: bool = False, always_compare: bool = False) -> None:
+    """Upgrade a family of contracts one at a time, reporting progress and confirming as it goes.
+
+    `upgrade_contract` receives one address and returns the upgrade transaction hash; everything
+    around it — the progress line, the transaction check, the state comparison and the two
+    confirmation points — is the same in every runner and lives only here.
+
+    The two flags that read as arbitrary are the two the copies genuinely disagreed on: whether the
+    upgrade transaction is checked as a simple or a complex one, and whether the after-state is
+    compared unconditionally or only when the operator asked to compare states.
+    """
+
+    check_tx_status = (network_providers.check_complex_tx_status if complex_tx_status
+                       else network_providers.check_simple_tx_status)
+
+    for count, contract_address in enumerate(contract_addresses, start=1):
+        print(f"Processing contract {count} / {len(contract_addresses)}: {contract_address}")
+
+        tx_hash = upgrade_contract(contract_address)
+
+        if not check_tx_status(tx_hash, f"{tx_description}: {contract_address}") \
+                and not get_user_continue(force_continue):
+            return
+
+        if compare_states or always_compare:
+            fetch_new_and_compare_contract_states(label, contract_address, network_providers)
+
+        if not get_user_continue(force_continue):
+            return
 
 
 def run_verify_command(args: Any, description: str, get_addresses: Callable[[], list[str]]) -> None:

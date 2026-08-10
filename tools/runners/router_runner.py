@@ -9,12 +9,10 @@ from contracts.pair_contract import PairContract
 from tools.common import API, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, \
     get_owner, get_user_continue
-from tools.runners.common_runner import add_contract_group_parser, add_upgrade_command
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_command, resolve_upgrade_bytecode
 from utils.contract_data_fetchers import RouterContractDataFetcher
 
 from utils.utils_tx import NetworkProviders
-from utils.utils_generic import get_file_from_url_or_path
-from utils.utils_chain import get_bytecode_codehash
 
 
 TEMPLATE_PAIR_LABEL = "template_pair"
@@ -55,13 +53,9 @@ def upgrade_router_contract(args: Any):
 
     router_contract = RouterContract.load_contract_by_address(router_address)
 
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.ROUTER_V2_BYTECODE_PATH)
-
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.ROUTER_V2_BYTECODE_PATH,
+                                             config.FORCE_CONTINUE_PROMPT)
+    if bytecode_path is None:
         return
 
     if compare_states:
@@ -96,13 +90,9 @@ def upgrade_template_pair_contract(args: Any):
     template_pair = PairContract.load_contract_by_address(template_pair_address)
     print(f"Upgrade template pair contract: {template_pair_address}")
 
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.PAIR_V2_BYTECODE_PATH)
-
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.PAIR_V2_BYTECODE_PATH,
+                                             config.FORCE_CONTINUE_PROMPT)
+    if bytecode_path is None:
         return
 
     if compare_states:

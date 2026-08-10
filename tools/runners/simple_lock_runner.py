@@ -2,10 +2,8 @@ from argparse import ArgumentParser
 from typing import Any
 from contracts.simple_lock_contract import SimpleLockContract
 from tools.common import API, PROXY, fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, get_user_continue
-from tools.runners.common_runner import add_upgrade_only_group_parser
+from tools.runners.common_runner import add_upgrade_only_group_parser, resolve_upgrade_bytecode
 from utils.utils_tx import NetworkProviders
-from utils.utils_chain import get_bytecode_codehash
-from utils.utils_generic import get_file_from_url_or_path
 import config
 
 
@@ -26,13 +24,9 @@ def upgrade_simple_lock_contract(args: Any):
 
     print(f"Upgrading simple lock contract: {address}")
 
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.SIMPLE_LOCK_BYTECODE_PATH)
-
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.SIMPLE_LOCK_BYTECODE_PATH,
+                                             config.FORCE_CONTINUE_PROMPT)
+    if bytecode_path is None:
         return
 
     if compare_states:

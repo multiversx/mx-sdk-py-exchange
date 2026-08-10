@@ -12,11 +12,11 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, rule_of_three, run_graphql_query
-from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, run_verify_command, sync_account_nonce
+from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fetch_states_before_upgrade, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, resolve_upgrade_bytecode, run_verify_command, sync_account_nonce, upgrade_contracts
 from tools.runners.farm_runner import get_farm_addresses_from_chain
-from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, base64_to_hex
+from utils.utils_chain import Account, WrapperAddress, base64_to_hex
 from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
-from utils.utils_generic import get_file_from_url_or_path, split_to_chunks
+from utils.utils_generic import split_to_chunks
 
 import config
 
@@ -108,46 +108,25 @@ def upgrade_metastaking_contracts(label: str, file: str, bytecode_path: str = ''
         print("No metastaking contracts available!")
         return
     print(f"Processing {len(metastaking_addresses)} metastaking contracts.")
-    
+
     version = MetaStakingContractVersion.V1 if label == METASTAKINGS_V1_LABEL else MetaStakingContractVersion.V2
+    config_bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V2 else config.STAKING_PROXY_V2_BYTECODE_PATH
 
-    if bytecode_path:
-        bytecode = get_file_from_url_or_path(bytecode_path)
-    else:
-        config_bytecode = config.STAKING_PROXY_V3_BYTECODE_PATH if version == MetaStakingContractVersion.V2 else config.STAKING_PROXY_V2_BYTECODE_PATH
-        bytecode = get_file_from_url_or_path(config_bytecode)
-
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode = resolve_upgrade_bytecode(bytecode_path, config_bytecode, config.FORCE_CONTINUE_PROMPT)
+    if bytecode is None:
         return
 
-    if compare_states:
-        print("Fetching contracts states before upgrade...")
-        fetch_contracts_states("pre", network_providers, metastaking_addresses, label)
+    if compare_states and not fetch_states_before_upgrade(network_providers, metastaking_addresses, label,
+                                                          config.FORCE_CONTINUE_PROMPT):
+        return
 
-        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-            return
-
-    count = 1
-    for metastaking_address in metastaking_addresses:
-        print(f"Processing contract {count} / {len(metastaking_addresses)}: {metastaking_address}")
-
+    def upgrade(metastaking_address: str) -> str:
         metastaking_contract = MetaStakingContract.load_contract_by_address(metastaking_address, version)
+        return metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode, [])
 
-        tx_hash = metastaking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode, [])
-
-        if not network_providers.check_simple_tx_status(tx_hash,
-                                                         f"upgrade metastaking contract: {metastaking_address}"):
-            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                return
-
-        if compare_states:
-            fetch_new_and_compare_contract_states(label, metastaking_address, network_providers)
-
-        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-            return
-
-        count += 1
+    upgrade_contracts(metastaking_addresses, label, upgrade, network_providers,
+                      "upgrade metastaking contract", compare_states=compare_states,
+                      force_continue=config.FORCE_CONTINUE_PROMPT)
 
 
 def upgrade_metastaking_v1_contracts(args: Any):
@@ -191,13 +170,8 @@ def upgrade_metastaking_contract(args: Any):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.STAKING_PROXY_V3_BYTECODE_PATH)
-
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue():
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.STAKING_PROXY_V3_BYTECODE_PATH)
+    if bytecode_path is None:
         return
 
     if compare_states:

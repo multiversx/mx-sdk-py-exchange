@@ -4,14 +4,12 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
     get_user_continue
 from context import Context
-from tools.runners.common_runner import add_contract_group_parser, add_upgrade_all_command
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_all_command, resolve_upgrade_bytecode
 from contracts.position_creator_contract import PositionCreatorContract
 from contracts.farm_contract import FarmContract, FarmContractVersion
 from contracts.staking_contract import StakingContract, StakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract, MetaStakingContractVersion
-from utils.utils_chain import get_bytecode_codehash
 from utils.utils_tx import NetworkProviders
-from utils.utils_generic import get_file_from_url_or_path
 from tools.runners.farm_runner import get_farm_addresses_from_chain
 from tools.runners.staking_runner import get_staking_addresses_from_chain
 from tools.runners.metastaking_runner import get_metastaking_addresses_from_chain_by_farms
@@ -53,13 +51,9 @@ def upgrade_position_creator_contract(args: Any):
     position_creator_contract.egld_wrapper_address = deploy_structure_list[0]["egld_wrapped_address"]
     position_creator_contract.router_address = deploy_structure_list[0]["router_address"]
 
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.POSITION_CREATOR_BYTECODE_PATH)
-
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.POSITION_CREATOR_BYTECODE_PATH,
+                                             config.FORCE_CONTINUE_PROMPT)
+    if bytecode_path is None:
         return
 
     if compare_states:

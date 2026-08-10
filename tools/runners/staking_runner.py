@@ -13,17 +13,16 @@ from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, run_graphql_query
-from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, run_verify_command, sync_account_nonce
+from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fetch_states_before_upgrade, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, resolve_upgrade_bytecode, run_verify_command, sync_account_nonce, upgrade_contracts
 from tools.runners.metastaking_runner import get_metastaking_addresses_from_chain
 from utils.contract_data_fetchers import StakingContractDataFetcher
 from utils.utils_chain import Account, WrapperAddress
-from utils.utils_generic import split_to_chunks, get_file_from_url_or_path
+from utils.utils_generic import split_to_chunks
 from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
 import config
 
 from context import Context
 
-from utils.utils_chain import get_bytecode_codehash
 from tools.runners.common_config import STAKING_BOOSTED_REWARDS_PERCENTAGE, STAKING_BOOSTED_YIELD_FACTORS
 
 
@@ -198,44 +197,24 @@ def upgrade_staking_contracts(args: Any):
         return
     
     print(f"Processing {len(staking_addresses)} staking contracts.")
-    
-    if args.bytecode:
-        bytecode_path = get_file_from_url_or_path(args.bytecode)
-    else:
-        bytecode_path = get_file_from_url_or_path(config.STAKING_V3_BYTECODE_PATH)
 
-    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
-    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+    bytecode_path = resolve_upgrade_bytecode(args.bytecode, config.STAKING_V3_BYTECODE_PATH,
+                                             config.FORCE_CONTINUE_PROMPT)
+    if bytecode_path is None:
         return
 
-    if compare_states:
-        print("Fetching contracts states before upgrade...")
-        fetch_contracts_states("pre", network_providers, staking_addresses, STAKINGS_LABEL)
+    if compare_states and not fetch_states_before_upgrade(network_providers, staking_addresses, STAKINGS_LABEL):
+        return
 
-        if not get_user_continue():
-            return
-
-    count = 1
-    for staking_address in staking_addresses:
-        print(f"Processing contract {count} / {len(staking_addresses)}: {staking_address}")
-
+    def upgrade(staking_address: str) -> str:
         staking_contract = StakingContract.load_contract_by_address(staking_address, StakingContractVersion.V3Boosted)
 
         staking_contract.version = StakingContractVersion.V3Boosted
-        tx_hash = staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path, 
-                                                    [], True)
+        return staking_contract.contract_upgrade(dex_owner, network_providers.proxy, bytecode_path,
+                                                 [], True)
 
-        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade staking contract: {staking_address}"):
-            if not get_user_continue():
-                return
-
-        if compare_states:
-            fetch_new_and_compare_contract_states(STAKINGS_LABEL, staking_address, network_providers)
-
-        if not get_user_continue():
-            return
-
-        count += 1
+    upgrade_contracts(staking_addresses, STAKINGS_LABEL, upgrade, network_providers,
+                      "upgrade staking contract", compare_states=compare_states)
 
 
 def verify_staking_contracts(args: Any):
