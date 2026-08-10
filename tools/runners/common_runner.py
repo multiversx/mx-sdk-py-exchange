@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from collections.abc import Callable
 from time import sleep
 from typing import Any, List
 import json
@@ -213,6 +214,20 @@ def verify_contracts(args: Any, contract_addresses: list[str]) -> None:
         trigger_contract_verification(packaged_src, owner, contract, verifier_url, docker_image, contract_variant)
         
         count += 1
+
+
+def run_verify_command(args: Any, description: str, get_addresses: Callable[[], list[str]]) -> None:
+    """Verify a family of contracts, reporting around it.
+
+    The addresses arrive as a callable rather than a list because resolving them reaches the chain
+    or a saved export, and every runner does that after announcing what it is about to verify.
+    """
+
+    print(f"Verifying {description}...")
+
+    verify_contracts(args, get_addresses())
+
+    print("All contracts have been verified.")
 
 
 def add_contract_group_parser(subparsers, group_name: str, group_help: str,

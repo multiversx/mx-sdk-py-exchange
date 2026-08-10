@@ -12,7 +12,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_and_save_contracts, fetch_contracts_states, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, rule_of_three, run_graphql_query
-from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
+from tools.runners.common_runner import add_contract_group_parser, add_generate_transaction_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, run_verify_command, sync_account_nonce
 from tools.runners.farm_runner import get_farm_addresses_from_chain
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, base64_to_hex
 from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
@@ -225,21 +225,13 @@ def upgrade_metastaking_contract(args: Any):
     
 
 def verify_metastaking_v1_contracts(args: Any):
-    print("Verifying metastaking v1 contracts...")
-
-    all_addresses = get_metastaking_addresses(METASTAKINGS_V1_LABEL, OUTPUT_METASTAKING_V1_CONTRACTS_FILE)
-    verify_contracts(args, all_addresses)
-    
-    print("All contracts have been verified.")
+    run_verify_command(args, "metastaking v1 contracts", lambda: get_metastaking_addresses(
+        METASTAKINGS_V1_LABEL, OUTPUT_METASTAKING_V1_CONTRACTS_FILE))
 
 
 def verify_metastaking_v2_contracts(args: Any):
-    print("Verifying metastaking v2 contracts...")
-
-    all_addresses = get_metastaking_addresses(METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE)
-    verify_contracts(args, all_addresses)
-    
-    print("All contracts have been verified.")
+    run_verify_command(args, "metastaking v2 contracts", lambda: get_metastaking_addresses(
+        METASTAKINGS_V2_LABEL, OUTPUT_METASTAKING_V2_CONTRACTS_FILE))
 
 
 def set_energy_factory(_):

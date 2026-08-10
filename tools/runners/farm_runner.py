@@ -15,7 +15,7 @@ from events.farm_events import EnterFarmEvent, ExitFarmEvent
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, \
     PROXY, fetch_and_save_contracts, fetch_new_and_compare_contract_states, \
     get_owner, get_saved_contract_addresses, get_user_continue, run_graphql_query, fetch_contracts_states
-from tools.runners.common_runner import add_contract_group_parser, add_upgrade_all_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, sync_account_nonce, verify_contracts
+from tools.runners.common_runner import add_contract_group_parser, add_upgrade_all_command, add_upgrade_command, add_verify_command, fund_shadowfork_accounts, get_acounts_with_token, get_default_signature, read_accounts_from_json, run_verify_command, sync_account_nonce
 from utils.contract_data_fetchers import FarmContractDataFetcher, SimpleLockContractDataFetcher
 from utils.utils_tx import ESDTToken, NetworkProviders, _prep_legacy_args
 from utils.utils_chain import Account, WrapperAddress, get_bytecode_codehash, hex_to_string
@@ -387,12 +387,7 @@ def upgrade_farmv2_contract(args: Any):
     
 
 def verify_farmv2_contracts(args: Any):
-    print("Verifying v2 farms...")
-
-    all_addresses = get_all_farm_v2_addresses()
-    verify_contracts(args, all_addresses)
-    
-    print("All contracts have been verified.")
+    run_verify_command(args, "v2 farms", get_all_farm_v2_addresses)
 
 
 def set_transfer_role_farmv13_contracts():
