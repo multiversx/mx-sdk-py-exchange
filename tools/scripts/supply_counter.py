@@ -46,7 +46,9 @@ def main(args: list[str]):
     #   the total supply of each token and the number of holders for each token.
     ###
     if len(args) == 0:
-        print("Usage: python supply_counter.py <file1> <file2> ...")
+        # Run from the repository root: the account-export readers live in the runner support, so
+        # this script needs the project on the import path like every other script here.
+        print("Usage: PYTHONPATH=. python tools/scripts/supply_counter.py <file1> <file2> ...")
         sys.exit(1)
     
     # Check if all files exist before processing
