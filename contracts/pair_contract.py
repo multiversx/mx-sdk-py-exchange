@@ -455,8 +455,7 @@ class PairContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setStateActiveNoSwaps", sc_args)
     
     def get_safe_price_round_save_interval(self, proxy: ProxyNetworkProvider):
-        data_fetcher = PairContractDataFetcher(Address(self.address), proxy.url)
-        return data_fetcher.get_data("getSafePriceRoundSaveInterval")
+        return self._query_view(proxy, PairContractDataFetcher, "getSafePriceRoundSaveInterval")
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         _ = self.resume(deployer, proxy)

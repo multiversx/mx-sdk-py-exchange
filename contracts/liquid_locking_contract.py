@@ -4,7 +4,7 @@ from utils.contract_data_fetchers import LiquidLockingContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
+from utils.utils_chain import Account, WrapperAddress as Address
 from utils import decoding_structures
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue
@@ -131,55 +131,33 @@ class LiquidLockingContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, user, Address(self.address), "unbond", sc_args)
     
     def get_locked_token_amounts(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
-        data_fetcher = LiquidLockingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('lockedTokenAmounts', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
-            return {}
-        locked_token_amounts = decode_merged_attributes(raw_results, decoding_structures.LIQUID_LOCKING_LOCKED_TOKEN_AMOUNTS)
+        return self._query_view(proxy, LiquidLockingContractDataFetcher, 'lockedTokenAmounts',
+                                [AddressValue.new_from_address(Address(user_address))],
+                                returns=decoding_structures.LIQUID_LOCKING_LOCKED_TOKEN_AMOUNTS)
 
-        return locked_token_amounts
-    
     def get_unlocked_token_amounts(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
-        data_fetcher = LiquidLockingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('unlockedTokenAmounts', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
-            return {}
-        unlocked_token_amounts = decode_merged_attributes(raw_results, decoding_structures.LIQUID_LOCKING_UNLOCKED_TOKEN_AMOUNTS)
+        return self._query_view(proxy, LiquidLockingContractDataFetcher, 'unlockedTokenAmounts',
+                                [AddressValue.new_from_address(Address(user_address))],
+                                returns=decoding_structures.LIQUID_LOCKING_UNLOCKED_TOKEN_AMOUNTS)
 
-        return unlocked_token_amounts
-    
+    # The three token lists below answer `{}` rather than `[]` when the view is empty, which is what
+    # they have always done and what their `Dict[str, Any]` annotation claims they always return.
     def get_locked_tokens(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
-        data_fetcher = LiquidLockingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('lockedTokens', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
-            return {}
-        locked_tokens = [hex_to_string(entry) for entry in raw_results]
-
-        return locked_tokens
+        return self._query_view(proxy, LiquidLockingContractDataFetcher, 'lockedTokens',
+                                [AddressValue.new_from_address(Address(user_address))],
+                                returns=[str], empty={})
 
     def get_unlocked_tokens(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
-        data_fetcher = LiquidLockingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('unlockedTokens', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
-            return {}
-        unlocked_tokens = [hex_to_string(entry) for entry in raw_results]
+        return self._query_view(proxy, LiquidLockingContractDataFetcher, 'unlockedTokens',
+                                [AddressValue.new_from_address(Address(user_address))],
+                                returns=[str], empty={})
 
-        return unlocked_tokens
-    
     def get_whitelisted_tokens(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
-        data_fetcher = LiquidLockingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('whitelistedTokens')
-        if not raw_results:
-            return {}
-        tokens = [hex_to_string(entry) for entry in raw_results]
+        return self._query_view(proxy, LiquidLockingContractDataFetcher, 'whitelistedTokens',
+                                returns=[str], empty={})
 
-        return tokens
-    
     def get_unbond_period(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
-        data_fetcher = LiquidLockingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('unbondPeriod')
-
-        return raw_results
+        return self._query_view(proxy, LiquidLockingContractDataFetcher, 'unbondPeriod')
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

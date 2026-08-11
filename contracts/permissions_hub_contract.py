@@ -110,15 +110,12 @@ class PermissionsHubContract(DEXContractInterface):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeBlacklist", sc_args)
     
     def is_whitelisted(self, user: str, address: str, proxy: ProxyNetworkProvider) -> bool:
-        data_fetcher = PermissionsHubContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('isWhitelisted', 
-                                            [
-                                                AddressValue.new_from_address(Address(address)),
-                                                AddressValue.new_from_address(Address(user))
-                                            ])
-        if not raw_results:
-            return False
-        return bool(raw_results)
+        return self._query_view(proxy, PermissionsHubContractDataFetcher, 'isWhitelisted',
+                                [
+                                    AddressValue.new_from_address(Address(address)),
+                                    AddressValue.new_from_address(Address(user))
+                                ],
+                                returns=bool)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass

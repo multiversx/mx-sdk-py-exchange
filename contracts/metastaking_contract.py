@@ -268,13 +268,8 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
                              [energy_address])
     
     def get_energy_factory_address(self, proxy: ProxyNetworkProvider) -> str:
-        data_fetcher = MetaStakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getEnergyFactoryAddress')
-        if not raw_results:
-            return ""
-        address = Address.from_hex(raw_results).bech32()
-
-        return address
+        return self._query_view(proxy, MetaStakingContractDataFetcher, 'getEnergyFactoryAddress',
+                                returns=Address, empty="")
     
     def get_decoded_metastake_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
                                                               holder_address: str, token_nonce: int) -> Dict[str, Any]:

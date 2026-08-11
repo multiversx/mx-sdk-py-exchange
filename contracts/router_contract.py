@@ -348,20 +348,17 @@ class RouterContract(DEXContractInterface):
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setDefaultSafePriceRoundsOffset", sc_args)
     
+    # Alone among the View Getters, this one names no `empty`: an address is the one kind with no
+    # empty value, so a view that answers with nothing still raises here rather than returning "".
     def get_pair_template_address(self, proxy: ProxyNetworkProvider):
-        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
-        template_pair_address = Address.from_hex(router_data_fetcher.get_data("getPairTemplateAddress")).bech32()
-        return template_pair_address
+        return self._query_view(proxy, RouterContractDataFetcher, "getPairTemplateAddress",
+                                returns=Address)
 
     def get_safe_price_round_save_interval(self, proxy: ProxyNetworkProvider):
-        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
-        interval = router_data_fetcher.get_data("getSafePriceRoundSaveInterval")
-        return int(interval)
+        return self._query_view(proxy, RouterContractDataFetcher, "getSafePriceRoundSaveInterval")
 
     def get_default_safe_price_rounds_offset(self, proxy: ProxyNetworkProvider):
-        router_data_fetcher = RouterContractDataFetcher(Address(self.address), proxy.url)
-        offset = router_data_fetcher.get_data("getDefaultSafePriceRoundsOffset")
-        return int(offset)
+        return self._query_view(proxy, RouterContractDataFetcher, "getDefaultSafePriceRoundsOffset")
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

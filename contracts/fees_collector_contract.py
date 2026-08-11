@@ -4,7 +4,7 @@ from contracts.pair_contract import PairContract
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, upgrade_call
 from utils.utils_generic import log_step_pass, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
+from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider, SmartContractTransactionsFactory, TransactionComputer
 from multiversx_sdk.abi import Abi, U64Value, StringValue
 from utils.contract_data_fetchers import FeeCollectorContractDataFetcher
@@ -355,69 +355,50 @@ class FeesCollectorContract(BaseBoostedContract):
             list[str]: List of reward token addresses
         """
         
-        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
-        hex_results = data_fetcher.get_data("getRewardTokens")
-        if not hex_results:
-            return []
-            
-        return [hex_to_string(token) for token in hex_results]
-    
+        return self._query_view(proxy, FeeCollectorContractDataFetcher, "getRewardTokens",
+                                returns=[str])
+
     def get_accumulated_fees(self, proxy: ProxyNetworkProvider, token: str) -> int:
         """Query the contract for the accumulated fees (current week).
-        
+
         Returns:
             int: accumulated fees for token
         """
-        
-        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
         current_week = self.get_current_week(proxy)
-        result = data_fetcher.get_data("getAccumulatedFees", [U64Value(current_week), StringValue(token)])
-        if not result:
-            return 0
-            
-        return int(result)
-    
+        return self._query_view(proxy, FeeCollectorContractDataFetcher, "getAccumulatedFees",
+                                [U64Value(current_week), StringValue(token)])
+
     def get_total_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int, abi: Abi) -> int:
         """Query the contract for rewards to distribute in a specific week (last 4 weeks).
-        
+
         Returns:
             list[TokenPayment]: List of reward tokens
-        """        
-        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
-        hex_results = data_fetcher.get_data("getTotalRewardsForWeek", [U64Value(week)])
-        if not hex_results:
-            return []
-        
-        decoded = abi.decode_endpoint_output_parameters("getTotalRewardsForWeek", [bytes.fromhex(hex_results)])
-        if len(decoded) == 0:
-            return []
-        return decoded[0]
-    
+        """
+        def decode_rewards(hex_result: str):
+            decoded = abi.decode_endpoint_output_parameters("getTotalRewardsForWeek",
+                                                            [bytes.fromhex(hex_result)])
+            return decoded[0] if decoded else []
+
+        return self._query_view(proxy, FeeCollectorContractDataFetcher, "getTotalRewardsForWeek",
+                                [U64Value(week)], returns=decode_rewards, empty=[])
+
     def get_rewards_claimed(self, proxy: ProxyNetworkProvider, week: int, token: str) -> int:
         """Query the contract for rewards claimed in a specific week (last 4 weeks).
-        
+
         Returns:
             int: rewards claimed for week
         """
-        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
-        result = data_fetcher.get_data("getRewardsClaimed", [U64Value(week), StringValue(token)])
-        if not result:
-            return 0
-            
-        return int(result)
-    
+        return self._query_view(proxy, FeeCollectorContractDataFetcher, "getRewardsClaimed",
+                                [U64Value(week), StringValue(token)])
+
     def get_known_contracts(self, proxy: ProxyNetworkProvider) -> list[str]:
         """Query the contract for the list of reward tokens.
-        
+
         Returns:
             list[str]: List of known contract addresses
         """
-        data_fetcher = FeeCollectorContractDataFetcher(Address(self.address), proxy.url)
-        hex_results = data_fetcher.get_data("getAllKnownContracts")
-        if not hex_results:
-            return []
-            
-        return [Address.from_hex(address).to_bech32() for address in hex_results]
+        return self._query_view(proxy, FeeCollectorContractDataFetcher, "getAllKnownContracts",
+                                returns=[Address])
     
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass

@@ -12,6 +12,38 @@ from multiversx_sdk import ProxyNetworkProvider
 
 logger = get_logger(__name__)
 
+# The marker for "no value", distinct from every value a view could legitimately answer with.
+_UNSET = object()
+
+# What each return kind yields for a view that answers with nothing. `Address` and the custom
+# converters are deliberately absent: an empty answer is not an address and not something a
+# converter can be handed, so those getters either name an `empty` of their own or let the
+# conversion raise — which is what the hand-written bodies did.
+_EMPTY_RESULTS = {int: 0, str: "", bool: False}
+
+
+def _empty_result(returns: Any) -> Any:
+    """The value an empty view yields for this return kind, or `_UNSET` when it has none."""
+    if isinstance(returns, list):
+        return []
+    if isinstance(returns, Mapping):
+        return {}
+    return _EMPTY_RESULTS.get(returns, _UNSET)
+
+
+def _decode_view_result(raw_result: Any, returns: Any) -> Any:
+    """Convert one raw view answer into the kind the caller asked for."""
+    if isinstance(returns, list):
+        element_kind, = returns
+        return [_decode_view_result(entry, element_kind) for entry in raw_result]
+    if isinstance(returns, Mapping):
+        return decode_merged_attributes(raw_result, returns)
+    if returns is str:
+        return hex_to_string(raw_result)
+    if returns is Address:
+        return Address.from_hex(raw_result).bech32()
+    return returns(raw_result)
+
 
 class DEXContractIdentityInterface(ABC):
 
@@ -29,13 +61,28 @@ class DEXContractInterface(ABC):
                     args: list | None = None,
                     *,
                     returns: Any = int,
+                    empty: Any = _UNSET,
                     fallback: Callable[[], Any] | None = None) -> Any:
         """Run one read-only contract view and return its result as `returns`.
 
-        `returns` is the type the caller wants back — `int`, `str` for a hex-encoded string, `bool`,
-        or a decoding structure from `utils.decoding_structures` for a struct. A view that answers
-        with nothing yields that type's zero value (`0`, `""`, `False`, `{}`) rather than raising,
-        which is the guard every hand-written View Getter carried.
+        `returns` is the kind the caller wants back:
+
+        | `returns`            | the answer becomes                                    |
+        |----------------------|-------------------------------------------------------|
+        | `int` / `bool`       | that type, built from the raw answer                  |
+        | `str`                | text, decoded from a hex-encoded string               |
+        | `Address`            | a bech32 address, decoded from a hex pubkey           |
+        | a decoding structure | a `dict`, per `utils.decoding_structures`             |
+        | `[<any of the above>]` | a list, each entry converted as that kind           |
+        | any callable         | whatever it makes of the raw answer                   |
+
+        A view that answers with nothing yields that kind's empty value — `0`, `""`, `False`, `{}`,
+        `[]` — rather than raising, which is the guard every hand-written View Getter carried.
+        `empty` overrides it, and is how the getters that disagree keep disagreeing: the permissions
+        views report an empty answer as `-1`, the liquid-locking token lists report theirs as `{}`.
+        `Address` and callable converters have no empty value of their own, so a getter that wants
+        one names it and a getter that does not lets the conversion raise, as `get_pair_template_address`
+        always has.
 
         `fallback` covers the other case. A `DataFetcher` returns `-1` from an integer view whose
         query *failed*, as opposed to `0` for a view that is genuinely empty, so a negative result
@@ -47,16 +94,14 @@ class DEXContractInterface(ABC):
         raw_result = data_fetcher.get_data(view_name, args if args is not None else [])
 
         if not raw_result:
-            return {} if isinstance(returns, Mapping) else returns()
+            empty_result = _empty_result(returns) if empty is _UNSET else empty
+            if empty_result is not _UNSET:
+                return empty_result
 
         if fallback is not None and isinstance(raw_result, int) and raw_result < 0:
             return fallback()
 
-        if isinstance(returns, Mapping):
-            return decode_merged_attributes(raw_result, returns)
-        if returns is str:
-            return hex_to_string(raw_result)
-        return returns(raw_result)
+        return _decode_view_result(raw_result, returns)
 
     @abstractmethod
     def get_config_dict(self) -> dict[str, Any]:

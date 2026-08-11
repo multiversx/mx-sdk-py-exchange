@@ -519,20 +519,12 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "endProduceRewards", sc_args)
 
     def get_lp_address(self, proxy: ProxyNetworkProvider) -> str:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPairContractManagedAddress')
-        if not raw_results:
-            return ""
-        address = Address.from_hex(raw_results).bech32()
+        return self._query_view(proxy, FarmContractDataFetcher, 'getPairContractManagedAddress',
+                                returns=Address, empty="")
 
-        return address
-    
     def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = FarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPermissions', [AddressValue.new_from_address(Address(address))])
-        if not raw_results:
-            return -1
-        return int(raw_results)
+        return self._query_view(proxy, FarmContractDataFetcher, 'getPermissions',
+                                [AddressValue.new_from_address(Address(address))], empty=-1)
     
     def get_all_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
         all_stats = {}

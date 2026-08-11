@@ -467,39 +467,20 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "updateOwnerOrAdmin", sc_args)
     
     def get_reward_capacity(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getRewardCapacity')
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
+        return self._query_view(proxy, StakingContractDataFetcher, 'getRewardCapacity')
+
     def get_accumulated_rewards(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getAccumulatedRewards')
-        if not raw_results:
-            return 0
-        return int(raw_results)
+        return self._query_view(proxy, StakingContractDataFetcher, 'getAccumulatedRewards')
 
     def get_max_apr(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getAnnualPercentageRewards')
-        if not raw_results:
-            return 0
-        return int(raw_results)
+        return self._query_view(proxy, StakingContractDataFetcher, 'getAnnualPercentageRewards')
 
     def get_min_unbond_epochs(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getMinUnbondEpochs')
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
+        return self._query_view(proxy, StakingContractDataFetcher, 'getMinUnbondEpochs')
+
     def get_permissions(self, address: str, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPermissions', [AddressValue.new_from_address(Address(address))])
-        if not raw_results:
-            return -1
-        return int(raw_results)
+        return self._query_view(proxy, StakingContractDataFetcher, 'getPermissions',
+                                [AddressValue.new_from_address(Address(address))], empty=-1)
     
     def get_decoded_farm_token_attributes_from_proxy(self, proxy: ProxyNetworkProvider, 
                                                               holder_address: str, token_nonce: int) -> Dict[str, Any]:

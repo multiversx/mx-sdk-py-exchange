@@ -6,7 +6,7 @@ from utils import decoding_structures
 from utils.logger import get_logger
 from utils.utils_tx import multi_esdt_endpoint_call, endpoint_call, deploy, upgrade_call
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
+from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue
 import config
@@ -558,21 +558,10 @@ class SimpleLockEnergyContract(DEXContractInterface):
         log_substep(f"Locked Farm token: {self.farm_proxy_token}")
 
     def get_lock_options(self, proxy: ProxyNetworkProvider) -> List[Dict[str, Any]]:
-        data_fetcher = SimpleLockEnergyContractDataFetcher(Address(self.address), proxy.url)
-        raw_result = data_fetcher.get_data("getLockOptions")
-        if not raw_result:
-            return []
-        decoded_results = []
-        for entry in raw_result:
-            decoded_entry = decode_merged_attributes(entry, decoding_structures.LOCK_OPTIONS)
-            decoded_results.append(decoded_entry)
-        return decoded_results
+        return self._query_view(proxy, SimpleLockEnergyContractDataFetcher, "getLockOptions",
+                                returns=[decoding_structures.LOCK_OPTIONS])
 
     def get_energy_for_user(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
-        data_fetcher = SimpleLockEnergyContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getEnergyEntryForUser', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
-            return {}
-        energy_entry_user = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
-
-        return energy_entry_user
+        return self._query_view(proxy, SimpleLockEnergyContractDataFetcher, 'getEnergyEntryForUser',
+                                [AddressValue.new_from_address(Address(user_address))],
+                                returns=decoding_structures.ENERGY_ENTRY)
