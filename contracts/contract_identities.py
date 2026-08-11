@@ -1,3 +1,4 @@
+import logging
 from abc import abstractmethod, ABC
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -6,7 +7,8 @@ from enum import Enum
 from typing import Any, ClassVar
 from utils.contract_data_fetchers import DataFetcher
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
-from utils.utils_tx import endpoint_call
+from utils.utils_generic import log_unexpected_args
+from utils.utils_tx import endpoint_call, multi_esdt_endpoint_call
 from utils.logger import get_logger
 from multiversx_sdk import ProxyNetworkProvider
 
@@ -87,6 +89,46 @@ class _ConfigField:
         return self.enum(raw) if self.enum is not None and raw is not None else raw
 
 
+@dataclass(frozen=True)
+class _Endpoint:
+    """One endpoint of a contract: everything a call to it needs beyond the caller's arguments.
+
+    A contract declares one of these per Endpoint Wrapper, and the wrapper's whole body becomes a
+    hand-off to `DEXContractInterface._call_endpoint`. The first three fields are what every
+    hand-written body varied in — what the call is for, what it costs, what the contract calls it.
+
+    `exactly`, `at_least` and `build` together are the argument specification: how many arguments
+    the endpoint requires, and what it makes of them. A wrapper that accepts whatever it is handed
+    declares none of the three, which is what "this one never checked" looks like — the state seven
+    of the hand-written bodies were in, and not something to smooth away into a default check.
+
+    The last two axes exist for the same reason: `value` because the three token issuances are the
+    only endpoints that send EGLD, and `transfers` because an endpoint whose first argument is a
+    list of ESDT transfers goes out through a different dispatcher entirely.
+    """
+
+    purpose: str                                 # what the call is for, as logged
+    gas_limit: int
+    name: str                                    # the endpoint as the contract spells it
+    exactly: int | None = None                   # the number of arguments it requires
+    at_least: int | None = None                  # the fewest number it requires
+    build: Callable[[list], list] | None = None  # the arguments it sends, when not the ones given
+    value: int | str = 0                         # the EGLD it sends
+    transfers: bool = False                      # its first argument is a list of ESDT transfers
+
+    def accepts(self, args: list) -> bool:
+        """Whether `args` satisfies this endpoint's argument count."""
+        if self.exactly is not None:
+            return len(args) == self.exactly
+        if self.at_least is not None:
+            return len(args) >= self.at_least
+        return True
+
+    def arguments(self, args: list) -> list:
+        """The arguments to send, out of the ones the wrapper was handed."""
+        return args if self.build is None else self.build(args)
+
+
 class DEXContractIdentityInterface(ABC):
 
     address: str = NotImplemented
@@ -162,6 +204,42 @@ class DEXContractInterface(ABC):
             return fallback()
 
         return _decode_view_result(raw_result, returns)
+
+    def _call_endpoint(self, endpoint: _Endpoint, caller: Account, proxy: ProxyNetworkProvider,
+                       args: list) -> str:
+        """Send one transaction to `endpoint` on this contract, and answer with its hash.
+
+        The one place a change to how contracts dispatch transactions is made. Every step here was
+        written out by hand in each Endpoint Wrapper, in this order, and the order is behaviour: the
+        purpose is announced *before* the arguments are checked, so a rejected call is still visible
+        in `logs/trace.log` under the name of what it was trying to do.
+
+        An endpoint whose argument specification refuses `args` answers `""` without sending
+        anything — the same value a dispatcher answers with when the network refuses it, which is
+        what every caller already treats as failure.
+
+        An endpoint declaring `transfers` goes out through `multi_esdt_endpoint_call`, which reads
+        `args[0]` as the tokens to transfer and the rest as the endpoint's own arguments. It is
+        handed the purpose as well, because it names it in its own failure message.
+
+        The purpose is announced under the *contract's* module name rather than this one, which is
+        what the hand-written bodies did and what `logs/trace.log` prints: it is how an operator
+        tells which contract a line came from, and it would otherwise read `contract_identities`
+        for all 23 of them.
+        """
+        logging.getLogger(type(self).__module__).info(endpoint.purpose)
+
+        if not endpoint.accepts(args):
+            log_unexpected_args(endpoint.purpose, args)
+            return ""
+
+        sc_args = endpoint.arguments(args)
+        if endpoint.transfers:
+            return multi_esdt_endpoint_call(endpoint.purpose, proxy, endpoint.gas_limit, caller,
+                                            Address(self.address), endpoint.name, sc_args,
+                                            value=endpoint.value)
+        return endpoint_call(proxy, endpoint.gas_limit, caller, Address(self.address),
+                             endpoint.name, sc_args, value=endpoint.value)
 
     def get_config_dict(self) -> dict[str, Any]:
         """This contract as the dict `save_deployed_contracts` writes to `deployed_*.json`.
