@@ -1,5 +1,6 @@
 from typing import Any
 from contracts.base_contracts import BaseBoostedContract
+from contracts.contract_identities import _ConfigField
 from contracts.pair_contract import PairContract
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, upgrade_call
@@ -14,21 +15,12 @@ logger = get_logger(__name__)
 transaction_computer = TransactionComputer()
 
 class FeesCollectorContract(BaseBoostedContract):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+    )
+
     def __init__(self, address: str = ""):
         self.address = address
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return FeesCollectorContract(address=config_dict['address'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):

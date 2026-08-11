@@ -1,5 +1,5 @@
 import config
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.contract_data_fetchers import LiquidLockingContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call
@@ -15,24 +15,16 @@ logger = get_logger(__name__)
 
 
 class LiquidLockingContract(DEXContractInterface):
+    # `whitelisted_tokens` are the tokens this contract accepts, not ones it issues, so it is
+    # persisted but absent from `_CONTRACT_TOKENS`.
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        _ConfigField("whitelisted_tokens"),
+    )
+
     def __init__(self, whitelisted_tokens: List = None, address: str = ""):
         self.address = address
         self.whitelisted_tokens = whitelisted_tokens
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "whitelisted_tokens": self.whitelisted_tokens
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return LiquidLockingContract(address=config_dict['address'],
-                                     whitelisted_tokens=config_dict['whitelisted_tokens'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):

@@ -1,5 +1,5 @@
 import config
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call, upgrade_call
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
@@ -13,24 +13,16 @@ logger = get_logger(__name__)
 
 
 class GovernanceContract(DEXContractInterface):
+    # `fee_token` is the token proposals are paid in, not one this contract issues, so it is
+    # persisted but absent from `_CONTRACT_TOKENS`.
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        _ConfigField("fee_token"),
+    )
+
     def __init__(self, fee_token: str = "", address: str = ""):
         self.address = address
         self.fee_token = fee_token
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "fee_token": self.fee_token
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return GovernanceContract(address=config_dict['address'],
-                                  fee_token=config_dict['fee_token'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):

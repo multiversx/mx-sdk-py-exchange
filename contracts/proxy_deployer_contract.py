@@ -1,7 +1,7 @@
 import sys
 import traceback
 
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, get_deployed_address_from_tx
 from utils.utils_generic import log_step_fail, log_step_pass, log_warning, log_unexpected_args
@@ -13,27 +13,17 @@ logger = get_logger(__name__)
 
 
 class ProxyDeployerContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        _ConfigField("template", arg="template_name"),
+    )
+
     def __init__(self, template_name: str, address: str = ""):
         """
         template_name: should be one of the defined names in config
         """
         self.address = address
         self.template = template_name
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "template": self.template
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return ProxyDeployerContract(address=config_dict['address'],
-                                     template_name=config_dict['template'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):

@@ -1,7 +1,7 @@
 import sys
 import traceback
 
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.logger import get_logger
 from utils.utils_tx import endpoint_call, deploy, upgrade_call
 from utils.utils_chain import log_explorer_transaction
@@ -14,21 +14,12 @@ logger = get_logger(__name__)
 
 
 class UnstakerContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+    )
+
     def __init__(self, address: str = ""):
         self.address = address
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return UnstakerContract(address=config_dict['address'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return []
 
     @classmethod
     def load_contract_by_address(cls, address: str):
