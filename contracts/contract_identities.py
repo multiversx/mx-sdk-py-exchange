@@ -1,8 +1,10 @@
 from abc import abstractmethod, ABC
+from collections.abc import Callable, Mapping
 from enum import Enum
 
 from typing import Any
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.contract_data_fetchers import DataFetcher
+from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from utils.utils_tx import endpoint_call
 from utils.logger import get_logger
 from multiversx_sdk import ProxyNetworkProvider
@@ -19,6 +21,42 @@ class DEXContractIdentityInterface(ABC):
 class DEXContractInterface(ABC):
 
     address: str = NotImplemented
+
+    def _query_view(self,
+                    proxy: ProxyNetworkProvider,
+                    fetcher: type[DataFetcher],
+                    view_name: str,
+                    args: list | None = None,
+                    *,
+                    returns: Any = int,
+                    fallback: Callable[[], Any] | None = None) -> Any:
+        """Run one read-only contract view and return its result as `returns`.
+
+        `returns` is the type the caller wants back — `int`, `str` for a hex-encoded string, `bool`,
+        or a decoding structure from `utils.decoding_structures` for a struct. A view that answers
+        with nothing yields that type's zero value (`0`, `""`, `False`, `{}`) rather than raising,
+        which is the guard every hand-written View Getter carried.
+
+        `fallback` covers the other case. A `DataFetcher` returns `-1` from an integer view whose
+        query *failed*, as opposed to `0` for a view that is genuinely empty, so a negative result
+        is the only signal that the chain did not answer. Getters that can answer such a query some
+        other way — from raw storage, from a related view — pass that second source here. Getters
+        without one leave `fallback` unset and pass the `-1` on to their caller, unchanged.
+        """
+        data_fetcher = fetcher(Address(self.address), proxy.url)
+        raw_result = data_fetcher.get_data(view_name, args if args is not None else [])
+
+        if not raw_result:
+            return {} if isinstance(returns, Mapping) else returns()
+
+        if fallback is not None and isinstance(raw_result, int) and raw_result < 0:
+            return fallback()
+
+        if isinstance(returns, Mapping):
+            return decode_merged_attributes(raw_result, returns)
+        if returns is str:
+            return hex_to_string(raw_result)
+        return returns(raw_result)
 
     @abstractmethod
     def get_config_dict(self) -> dict[str, Any]:

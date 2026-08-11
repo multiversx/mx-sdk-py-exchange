@@ -8,7 +8,7 @@ from utils.logger import get_logger
 from multiversx_sdk import ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue, U64Value
 from contracts.contract_identities import DEXContractInterface
-from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
+from utils.utils_chain import Account, WrapperAddress as Address
 from utils.utils_generic import log_unexpected_args
 from utils.utils_tx import endpoint_call
 from utils.contract_data_fetchers import BaseBoostedContractDataFetcher, BaseContractWhitelistDataFetcher, BaseFarmContractDataFetcher
@@ -35,47 +35,35 @@ class BaseBoostedContract(DEXContractInterface, ABC):
             pass
         return 0
     
+    def _sum_farm_token_holdings(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
+        """The user's farm position summed from their farm tokens — what answers when the view cannot."""
+        try:
+            all_nfts = proxy.get_non_fungible_tokens_of_account(Address(user_address))
+            farm_prefix = self.farmToken.split("-")[0]
+            return sum(t.amount for t in all_nfts if t.token.identifier.startswith(farm_prefix))
+        except Exception:
+            return 0
+
+    def _week_from_epochs(self, proxy: ProxyNetworkProvider) -> int:
+        """The current week derived from the epoch — what answers when the view cannot."""
+        current_epoch = proxy.get_network_status().current_epoch
+        first_week = self.get_first_week_start_epoch(proxy)
+        if current_epoch < first_week:
+            return 0
+        return ((current_epoch - first_week) // 7) + 1
+
     def get_user_total_farm_position(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserTotalFarmPosition', [AddressValue.new_from_address(Address(user_address))])
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            try:
-                all_nfts = proxy.get_non_fungible_tokens_of_account(Address(user_address))
-                farm_prefix = self.farmToken.split("-")[0]
-                return sum(t.amount for t in all_nfts if t.token.identifier.startswith(farm_prefix))
-            except Exception:
-                return 0
-        user_farm_position = int(raw_results)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getUserTotalFarmPosition',
+                                [AddressValue.new_from_address(Address(user_address))],
+                                fallback=lambda: self._sum_farm_token_holdings(user_address, proxy))
 
-        return user_farm_position
-    
     def get_current_week(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentWeek')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            current_epoch = proxy.get_network_status().current_epoch
-            first_week = self.get_first_week_start_epoch(proxy)
-            if current_epoch < first_week:
-                return 0
-            return ((current_epoch - first_week) // 7) + 1
-        current_week = int(raw_results)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getCurrentWeek',
+                                fallback=lambda: self._week_from_epochs(proxy))
 
-        return current_week
-    
     def get_first_week_start_epoch(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFirstWeekStartEpoch')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, "firstWeekStartEpoch", "first_week_start_epoch")
-        result = int(raw_results)
-
-        return result
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getFirstWeekStartEpoch',
+                                fallback=lambda: self._get_storage_int(proxy, "firstWeekStartEpoch", "first_week_start_epoch"))
 
     def get_next_week_start_epoch(self, proxy: ProxyNetworkProvider) -> int:
         first_week = self.get_first_week_start_epoch(proxy)
@@ -83,95 +71,55 @@ class BaseBoostedContract(DEXContractInterface, ABC):
         next_week_at_epoch = first_week + current_week * 7
 
         return next_week_at_epoch
-    
+
     def get_last_global_update_week(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastGlobalUpdateWeek')
-        if not raw_results:
-            return 0
-        result = int(raw_results)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getLastGlobalUpdateWeek')
 
-        return result
-    
     def get_user_energy_for_week(self, user_address: str, proxy: ProxyNetworkProvider, week: int) -> Dict[str, Any]:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUserEnergyForWeek', [AddressValue.new_from_address(Address(user_address)), U64Value(week)])
-        if not raw_results:
-            return {}
-        user_energy_for_week = decode_merged_attributes(raw_results, decoding_structures.ENERGY_ENTRY)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getUserEnergyForWeek',
+                                [AddressValue.new_from_address(Address(user_address)), U64Value(week)],
+                                returns=decoding_structures.ENERGY_ENTRY)
 
-        return user_energy_for_week
-    
     def get_last_active_week_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastActiveWeekForUser', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
-            return 0
-        week = int(raw_results)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getLastActiveWeekForUser',
+                                [AddressValue.new_from_address(Address(user_address))])
 
-        return week
-    
     def get_current_claim_progress_for_user(self, user_address: str, proxy: ProxyNetworkProvider) -> Dict[str, Any]:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getCurrentClaimProgress', [AddressValue.new_from_address(Address(user_address))])
-        if not raw_results:
-            return {}
-        response = decode_merged_attributes(raw_results, decoding_structures.USER_CLAIM_PROGRESS)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getCurrentClaimProgress',
+                                [AddressValue.new_from_address(Address(user_address))],
+                                returns=decoding_structures.USER_CLAIM_PROGRESS)
 
-        return response
-    
     def get_farm_supply_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFarmSupplyForWeek', [U64Value(week)])
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self.get_farm_token_supply(proxy)
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getFarmSupplyForWeek',
+                                [U64Value(week)],
+                                fallback=lambda: self.get_farm_token_supply(proxy))
+
     def get_total_locked_tokens_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalLockedTokensForWeek', [U64Value(week)])
-        if not raw_results:
-            return 0
-        return int(raw_results)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getTotalLockedTokensForWeek',
+                                [U64Value(week)])
 
     def get_accumulated_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getAccumulatedRewardsForWeek', [U64Value(week)])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getAccumulatedRewardsForWeek',
+                                [U64Value(week)])
+
     def get_total_energy_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalEnergyForWeek', [U64Value(week)])
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return 0
-        return int(raw_results)
-    
+        # Alone among the boosted getters, this one reports a failed query as 0 rather than passing
+        # the sentinel on.
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getTotalEnergyForWeek',
+                                [U64Value(week)],
+                                fallback=lambda: 0)
+
     def get_total_rewards_for_week(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getTotalRewardsForWeek', [U64Value(week)])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getTotalRewardsForWeek',
+                                [U64Value(week)])
+
     def get_remaining_boosted_rewards_to_distribute(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getRemainingBoostedRewardsToDistribute', [U64Value(week)])
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getRemainingBoostedRewardsToDistribute',
+                                [U64Value(week)])
+
     def get_undistributed_boosted_rewards(self, proxy: ProxyNetworkProvider, week: int) -> int:
-        data_fetcher = BaseBoostedContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getUndistributedBoostedRewards', [U64Value(week)])
-        if not raw_results:
-            return 0
-        return int(raw_results)
+        return self._query_view(proxy, BaseBoostedContractDataFetcher, 'getUndistributedBoostedRewards',
+                                [U64Value(week)])
 
     def get_all_boosted_global_stats(self, proxy: ProxyNetworkProvider, week: int = None) -> Dict[str, Any]:
         """Fetches all global stats for a given week. If no week is provided, it will fetch the current week."""
@@ -223,97 +171,45 @@ class BaseFarmContract(DEXContractInterface, ABC):
         return 0
     
     def get_farm_token_supply(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFarmTokenSupply')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'farm_token_supply', 'farmTokenSupply')
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getFarmTokenSupply',
+                                fallback=lambda: self._get_storage_int(proxy, 'farm_token_supply', 'farmTokenSupply'))
+
     def get_reward_reserve(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getRewardReserve')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'reward_reserve', 'rewardReserve')
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getRewardReserve',
+                                fallback=lambda: self._get_storage_int(proxy, 'reward_reserve', 'rewardReserve'))
+
     def get_last_reward_block_nonce(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastRewardBlockNonce')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'last_reward_block_nonce', 'lastRewardBlockNonce')
-        return int(raw_results)
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getLastRewardBlockNonce',
+                                fallback=lambda: self._get_storage_int(proxy, 'last_reward_block_nonce', 'lastRewardBlockNonce'))
 
     def get_last_reward_timestamp(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getLastRewardTimestamp')
-        if not raw_results:
-            return 0
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getLastRewardTimestamp')
+
     def get_per_block_reward_amount(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPerBlockRewardAmount')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'per_block_reward_amount', 'perBlockRewardAmount')
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getPerBlockRewardAmount',
+                                fallback=lambda: self._get_storage_int(proxy, 'per_block_reward_amount', 'perBlockRewardAmount'))
+
     def get_per_second_reward_amount(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getPerSecondRewardAmount')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'per_second_reward_amount', 'perSecondRewardAmount')
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getPerSecondRewardAmount',
+                                fallback=lambda: self._get_storage_int(proxy, 'per_second_reward_amount', 'perSecondRewardAmount'))
+
     def get_reward_per_share(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getRewardPerShare')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'reward_per_share', 'rewardPerShare')
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getRewardPerShare',
+                                fallback=lambda: self._get_storage_int(proxy, 'reward_per_share', 'rewardPerShare'))
+
     def get_division_safety_constant(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getDivisionSafetyConstant')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'division_safety_constant', 'divisionSafetyConstant')
-        return int(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getDivisionSafetyConstant',
+                                fallback=lambda: self._get_storage_int(proxy, 'division_safety_constant', 'divisionSafetyConstant'))
+
     def get_farm_token_id(self, proxy: ProxyNetworkProvider) -> str:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFarmTokenId')
-        if not raw_results:
-            return ""
-        return hex_to_string(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getFarmTokenId', returns=str)
+
     def get_farming_token_id(self, proxy: ProxyNetworkProvider) -> str:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getFarmingTokenId')
-        if not raw_results:
-            return ""
-        return hex_to_string(raw_results)
-    
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getFarmingTokenId', returns=str)
+
     def get_state(self, proxy: ProxyNetworkProvider) -> int:
-        data_fetcher = BaseFarmContractDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('getState')
-        if raw_results is None or raw_results == 0:
-            return 0
-        if raw_results < 0:
-            return self._get_storage_int(proxy, 'state')
-        return int(raw_results)
+        return self._query_view(proxy, BaseFarmContractDataFetcher, 'getState',
+                                fallback=lambda: self._get_storage_int(proxy, 'state'))
 
     def get_produce_rewards_enabled(self, proxy: ProxyNetworkProvider) -> bool:
         """Whether per-block reward production is currently enabled.
@@ -361,11 +257,9 @@ class BaseSCWhitelistContract(DEXContractInterface, ABC):
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeSCAddressFromWhitelist", sc_args)
     
     def is_contract_whitelisted(self, address: str, proxy: ProxyNetworkProvider) -> bool:
-        data_fetcher = BaseContractWhitelistDataFetcher(Address(self.address), proxy.url)
-        raw_results = data_fetcher.get_data('isSCAddressWhitelisted', [AddressValue.new_from_address(Address(address))])
-        if not raw_results:
-            return False
-        return bool(raw_results)
+        return self._query_view(proxy, BaseContractWhitelistDataFetcher, 'isSCAddressWhitelisted',
+                                [AddressValue.new_from_address(Address(address))],
+                                returns=bool)
     
 
 class BasePermissionsHubContract(DEXContractInterface, ABC):
