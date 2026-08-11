@@ -1,6 +1,6 @@
 from typing import Dict, List, Any
 
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.contract_data_fetchers import SimpleLockEnergyContractDataFetcher
 from utils import decoding_structures
 from utils.logger import get_logger
@@ -16,6 +16,15 @@ logger = get_logger(__name__)
 
 
 class SimpleLockEnergyContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        _ConfigField("base_token"),
+        _ConfigField("locked_token"),
+        _ConfigField("lp_proxy_token"),
+        _ConfigField("farm_proxy_token"),
+    )
+    _CONTRACT_TOKENS = ("locked_token",)
+
     def __init__(self, base_token: str, locked_token: str = "", lp_proxy_token: str = "", farm_proxy_token: str = "",
                  address: str = ""):
         self.address = address
@@ -23,27 +32,6 @@ class SimpleLockEnergyContract(DEXContractInterface):
         self.locked_token = locked_token
         self.lp_proxy_token = lp_proxy_token
         self.farm_proxy_token = farm_proxy_token
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "base_token": self.base_token,
-            "locked_token": self.locked_token,
-            "lp_proxy_token": self.lp_proxy_token,
-            "farm_proxy_token": self.farm_proxy_token
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return SimpleLockEnergyContract(address=config_dict['address'],
-                                        base_token=config_dict['base_token'],
-                                        locked_token=config_dict['locked_token'],
-                                        lp_proxy_token=config_dict['lp_proxy_token'],
-                                        farm_proxy_token=config_dict['farm_proxy_token'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.locked_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

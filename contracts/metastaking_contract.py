@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Tuple, override
-from contracts.contract_identities import DEXContractInterface, MetaStakingContractVersion
+from contracts.contract_identities import DEXContractInterface, MetaStakingContractVersion, _ConfigField
 from contracts.base_contracts import BaseSCWhitelistContract, BasePermissionsHubContract
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 from utils.logger import get_logger
@@ -16,6 +16,20 @@ logger = get_logger(__name__)
 
 
 class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        _ConfigField("metastake_token"),
+        _ConfigField("staking_token"),
+        _ConfigField("lp_token"),
+        _ConfigField("farm_token"),
+        _ConfigField("stake_token"),
+        _ConfigField("lp_address"),
+        _ConfigField("farm_address"),
+        _ConfigField("stake_address"),
+        _ConfigField("version", enum=MetaStakingContractVersion),
+    )
+    _CONTRACT_TOKENS = ("metastake_token",)
+
     def __init__(self, staking_token: str, lp_token: str, farm_token: str, stake_token: str,
                  lp_address: str, farm_address: str, stake_address: str,
                  version: MetaStakingContractVersion, metastake_token: str = "", address: str = ""):
@@ -29,37 +43,6 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
         self.farm_address = farm_address
         self.stake_address = stake_address
         self.version = version
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "metastake_token": self.metastake_token,
-            "staking_token": self.staking_token,
-            "lp_token": self.lp_token,
-            "farm_token": self.farm_token,
-            "stake_token": self.stake_token,
-            "lp_address": self.lp_address,
-            "farm_address": self.farm_address,
-            "stake_address": self.stake_address,
-            "version": self.version.value,
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return MetaStakingContract(address=config_dict['address'],
-                                   metastake_token=config_dict['metastake_token'],
-                                   staking_token=config_dict['staking_token'],
-                                   lp_token=config_dict['lp_token'],
-                                   farm_token=config_dict['farm_token'],
-                                   stake_token=config_dict['stake_token'],
-                                   lp_address=config_dict['lp_address'],
-                                   farm_address=config_dict['farm_address'],
-                                   stake_address=config_dict['stake_address'],
-                                   version=MetaStakingContractVersion(config_dict['version']))
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.metastake_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=MetaStakingContractVersion.V3Boosted):

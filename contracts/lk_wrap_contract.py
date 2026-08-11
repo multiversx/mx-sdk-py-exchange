@@ -1,5 +1,5 @@
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call, upgrade_call
@@ -10,24 +10,18 @@ logger = get_logger(__name__)
 
 
 class LkWrapContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        # ⚠️ `attr` names an attribute nothing assigns, so `get_config_dict` raises
+        # `AttributeError` for every LkWrapContract and the `lk_wraps` group cannot be saved at
+        # all. Preserved exactly as it behaves today — see docs/CLEANUP.md.
+        _ConfigField("wrapped_token", attr="wrap_lk_token"),
+    )
+    _CONTRACT_TOKENS = ("wrapped_token",)
+
     def __init__(self, address: str = "", wrapped_token: str = ""):
         self.address = address
         self.wrapped_token = wrapped_token
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "wrapped_token": self.wrap_lk_token
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return LkWrapContract(address=config_dict['address'],
-                              wrapped_token=config_dict['wrapped_token'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.wrapped_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

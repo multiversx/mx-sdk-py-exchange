@@ -1,6 +1,6 @@
 from typing import Any, Dict
 import config
-from contracts.contract_identities import StakingContractVersion
+from contracts.contract_identities import StakingContractVersion, _ConfigField
 from contracts.base_contracts import (BaseFarmContract, BaseBoostedContract, 
                                       BaseSCWhitelistContract, BasePermissionsHubContract)
 from utils.logger import get_logger
@@ -20,6 +20,17 @@ logger = get_logger(__name__)
 
 
 class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract, BasePermissionsHubContract):
+    _CONFIG_FIELDS = (
+        _ConfigField("farming_token"),
+        _ConfigField("farm_token"),
+        _ConfigField("address"),
+        _ConfigField("max_apr"),
+        _ConfigField("rewards_per_block"),
+        _ConfigField("unbond_epochs"),
+        _ConfigField("version", enum=StakingContractVersion),
+    )
+    _CONTRACT_TOKENS = ("farm_token",)
+
     def __init__(self, farming_token: str, max_apr: int, rewards_per_block: int, unbond_epochs: int,
                  version: StakingContractVersion, farm_token: str = "", address: str = ""):
         self.farming_token = farming_token
@@ -30,31 +41,6 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         self.rewards_per_block = rewards_per_block
         self.unbond_epochs = unbond_epochs
         self.version = version
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "farming_token": self.farming_token,
-            "farm_token": self.farm_token,
-            "address": self.address,
-            "max_apr": self.max_apr,
-            "rewards_per_block": self.rewards_per_block,
-            "unbond_epochs": self.unbond_epochs,
-            "version": self.version.value
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return StakingContract(farming_token=config_dict['farming_token'],
-                               farm_token=config_dict['farm_token'],
-                               address=config_dict['address'],
-                               max_apr=config_dict['max_apr'],
-                               rewards_per_block=config_dict['rewards_per_block'],
-                               unbond_epochs=config_dict['unbond_epochs'],
-                               version=StakingContractVersion(config_dict['version']))
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.farm_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=StakingContractVersion.V3Boosted):

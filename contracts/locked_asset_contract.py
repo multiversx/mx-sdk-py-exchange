@@ -2,7 +2,7 @@ import sys
 import traceback
 
 import config
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.contract_data_fetchers import LockedAssetContractDataFetcher
 from utils.utils_tx import multi_esdt_endpoint_call, prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
@@ -14,27 +14,17 @@ logger = get_logger(__name__)
 
 
 class LockedAssetContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        _ConfigField("unlocked_asset"),
+        _ConfigField("locked_asset"),
+    )
+    _CONTRACT_TOKENS = ("locked_asset",)
+
     def __init__(self, unlocked_asset: str, locked_asset: str = "", address: str = ""):
         self.address = address
         self.unlocked_asset = unlocked_asset
         self.locked_asset = locked_asset
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "unlocked_asset": self.unlocked_asset,
-            "locked_asset": self.locked_asset
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return LockedAssetContract(address=config_dict['address'],
-                                   unlocked_asset=config_dict['unlocked_asset'],
-                                   locked_asset=config_dict['locked_asset'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.locked_asset]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

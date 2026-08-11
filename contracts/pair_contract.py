@@ -2,7 +2,7 @@ import sys
 import traceback
 import config
 
-from contracts.contract_identities import (DEXContractInterface, PairContractVersion)
+from contracts.contract_identities import (DEXContractInterface, PairContractVersion, _ConfigField)
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.logger import get_logger
 from utils.utils_tx import NetworkProviders, endpoint_call, upgrade_call, deploy, ESDTToken, multi_esdt_endpoint_call
@@ -54,6 +54,15 @@ class SetCorrectReservesEvent:
 
 
 class PairContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("firstToken"),
+        _ConfigField("secondToken"),
+        _ConfigField("lpToken"),
+        _ConfigField("address"),
+        _ConfigField("version", enum=PairContractVersion),
+    )
+    _CONTRACT_TOKENS = ("lpToken",)
+
     def __init__(self, firstToken: str, secondToken: str,  version: PairContractVersion,
                  lpToken: str = "", address: str = "", proxy_contract=None):
         self.firstToken = firstToken
@@ -62,27 +71,6 @@ class PairContract(DEXContractInterface):
         self.lpToken = lpToken
         self.address = address
         self.proxy_contract = proxy_contract
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "firstToken": self.firstToken,
-            "secondToken": self.secondToken,
-            "lpToken": self.lpToken,
-            "address": self.address,
-            "version": self.version.value
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return PairContract(firstToken=config_dict['firstToken'],
-                            secondToken=config_dict['secondToken'],
-                            lpToken=config_dict['lpToken'],
-                            address=config_dict['address'],
-                            version=PairContractVersion(config_dict['version']))
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.lpToken]
 
     @classmethod
     def load_contract_by_address(cls, address: str, version=PairContractVersion.V2, proxy_contract=None):

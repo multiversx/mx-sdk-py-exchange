@@ -10,7 +10,7 @@ from contracts.base_contracts import (
     BasePermissionsHubContract,
     BaseSCWhitelistContract,
 )
-from contracts.contract_identities import FarmContractVersion
+from contracts.contract_identities import FarmContractVersion, _ConfigField
 from events.farm_events import (
     ClaimRewardsFarmEvent,
     CompoundRewardsFarmEvent,
@@ -37,6 +37,15 @@ logger = get_logger(__name__)
 
 
 class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContract, BasePermissionsHubContract):
+    _CONFIG_FIELDS = (
+        _ConfigField("farmingToken", arg="farming_token"),
+        _ConfigField("farmToken", arg="farm_token"),
+        _ConfigField("farmedToken", arg="farmed_token"),
+        _ConfigField("address"),
+        _ConfigField("version", enum=FarmContractVersion),
+    )
+    _CONTRACT_TOKENS = ("farmToken",)
+
     def __init__(self, farming_token, farm_token, farmed_token, address, version: FarmContractVersion,
                  proxy_contract=None):
         self.farmingToken = farming_token
@@ -46,27 +55,6 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         self.version = version
         self.last_token_nonce = 0
         self.proxyContract = proxy_contract
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "farmingToken": self.farmingToken,
-            "farmToken": self.farmToken,
-            "farmedToken": self.farmedToken,
-            "address": self.address,
-            "version": self.version.value,
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return FarmContract(farming_token=config_dict['farmingToken'],
-                            farm_token=config_dict['farmToken'],
-                            farmed_token=config_dict['farmedToken'],
-                            address=config_dict['address'],
-                            version=FarmContractVersion(config_dict['version']))
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.farmToken]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

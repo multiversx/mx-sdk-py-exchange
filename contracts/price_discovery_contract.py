@@ -2,7 +2,7 @@ import sys
 import traceback
 
 import config
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.logger import get_logger
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, ESDTToken, \
     multi_esdt_endpoint_call, deploy, endpoint_call
@@ -18,6 +18,26 @@ logger = get_logger(__name__)
 
 
 class PriceDiscoveryContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("launched_token_id"),
+        _ConfigField("accepted_token", arg="accepted_token_id"),
+        _ConfigField("redeem_token"),
+        _ConfigField("first_redeem_token_nonce"),      # launched token
+        _ConfigField("second_redeem_token_nonce"),     # accepted token
+        _ConfigField("address"),
+        _ConfigField("locking_sc_address"),
+        _ConfigField("start_block"),
+        _ConfigField("no_limit_phase_duration_blocks"),
+        _ConfigField("linear_penalty_phase_duration_blocks"),
+        _ConfigField("fixed_penalty_phase_duration_blocks"),
+        _ConfigField("unlock_epoch"),
+        _ConfigField("min_launched_token_price"),
+        _ConfigField("min_penalty_percentage"),
+        _ConfigField("max_penalty_percentage"),
+        _ConfigField("fixed_penalty_percentage"),
+    )
+    _CONTRACT_TOKENS = ("redeem_token",)
+
     def __init__(self,
                  launched_token_id: str,
                  accepted_token_id: str,
@@ -52,53 +72,6 @@ class PriceDiscoveryContract(DEXContractInterface):
         self.min_penalty_percentage = min_penalty_percentage
         self.max_penalty_percentage = max_penalty_percentage
         self.fixed_penalty_percentage = fixed_penalty_percentage
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "launched_token_id": self.launched_token_id,
-            "accepted_token": self.accepted_token,
-            "redeem_token": self.redeem_token,
-            "first_redeem_token_nonce": self.first_redeem_token_nonce,
-            "second_redeem_token_nonce": self.second_redeem_token_nonce,
-            "address": self.address,
-            "locking_sc_address": self.locking_sc_address,
-            "start_block": self.start_block,
-            "no_limit_phase_duration_blocks": self.no_limit_phase_duration_blocks,
-            "linear_penalty_phase_duration_blocks": self.linear_penalty_phase_duration_blocks,
-            "fixed_penalty_phase_duration_blocks": self.fixed_penalty_phase_duration_blocks,
-            "unlock_epoch": self.unlock_epoch,
-            "min_launched_token_price": self.min_launched_token_price,
-            "min_penalty_percentage": self.min_penalty_percentage,
-            "max_penalty_percentage": self.max_penalty_percentage,
-            "fixed_penalty_percentage": self.fixed_penalty_percentage,
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return PriceDiscoveryContract(launched_token_id=config_dict['launched_token_id'],  # launched token
-                                      accepted_token_id=config_dict['accepted_token'],  # accepted token
-                                      redeem_token=config_dict['redeem_token'],
-                                      first_redeem_token_nonce=config_dict['first_redeem_token_nonce'],
-                                      # launched token
-                                      second_redeem_token_nonce=config_dict['second_redeem_token_nonce'],
-                                      # accepted token
-                                      address=config_dict['address'],
-                                      locking_sc_address=config_dict['locking_sc_address'],
-                                      start_block=config_dict['start_block'],
-                                      no_limit_phase_duration_blocks=config_dict['no_limit_phase_duration_blocks'],
-                                      linear_penalty_phase_duration_blocks=config_dict[
-                                          'linear_penalty_phase_duration_blocks'],
-                                      fixed_penalty_phase_duration_blocks=config_dict[
-                                          'fixed_penalty_phase_duration_blocks'],
-                                      unlock_epoch=config_dict['unlock_epoch'],
-                                      min_launched_token_price=config_dict['min_launched_token_price'],
-                                      min_penalty_percentage=config_dict['min_penalty_percentage'],
-                                      max_penalty_percentage=config_dict['max_penalty_percentage'],
-                                      fixed_penalty_percentage=config_dict['fixed_penalty_percentage'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.redeem_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

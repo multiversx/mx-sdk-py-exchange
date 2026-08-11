@@ -1,4 +1,4 @@
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _ConfigField
 from utils.logger import get_logger
 from utils.utils_tx import deploy, endpoint_call, ESDTToken, multi_esdt_endpoint_call
 from utils.utils_generic import log_step_pass
@@ -10,24 +10,15 @@ logger = get_logger(__name__)
 
 
 class EgldWrapContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("address"),
+        _ConfigField("wrapped_token"),
+    )
+    _CONTRACT_TOKENS = ("wrapped_token",)
+
     def __init__(self, wrapped_token, address: str = ""):
         self.address = address
         self.wrapped_token = wrapped_token
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "address": self.address,
-            "wrapped_token": self.wrapped_token
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return EgldWrapContract(address=config_dict['address'],
-                                wrapped_token=config_dict['wrapped_token'])
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [self.wrapped_token]
 
     @classmethod
     def load_contract_by_address(cls, address: str):

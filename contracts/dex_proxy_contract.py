@@ -1,5 +1,5 @@
 import config
-from contracts.contract_identities import DEXContractInterface, ProxyContractVersion
+from contracts.contract_identities import DEXContractInterface, ProxyContractVersion, _ConfigField
 from contracts.farm_contract import FarmContract
 from contracts.pair_contract import PairContract
 from multiversx_sdk import ApiNetworkProvider, ProxyNetworkProvider, CodeMetadata
@@ -79,6 +79,16 @@ class DexProxyCompoundRewardsEvent:
 
 
 class DexProxyContract(DEXContractInterface):
+    _CONFIG_FIELDS = (
+        _ConfigField("token"),
+        _ConfigField("locked_tokens"),
+        _ConfigField("proxy_farm_token"),
+        _ConfigField("proxy_lp_token"),
+        _ConfigField("address"),
+        _ConfigField("version", enum=ProxyContractVersion),
+    )
+    _CONTRACT_TOKENS = ("proxy_lp_token", "proxy_farm_token")
+
     def __init__(self, locked_tokens: list, token: str, version: ProxyContractVersion,
                  address: str = "", proxy_lp_token: str = "", proxy_farm_token: str = ""):
         self.address = address
@@ -87,32 +97,6 @@ class DexProxyContract(DEXContractInterface):
         self.locked_tokens = locked_tokens
         self.token = token
         self.version = version
-
-    def get_config_dict(self) -> dict:
-        output_dict = {
-            "token": self.token,
-            "locked_tokens": self.locked_tokens,
-            "proxy_farm_token": self.proxy_farm_token,
-            "proxy_lp_token": self.proxy_lp_token,
-            "address": self.address,
-            "version": self.version.value
-        }
-        return output_dict
-
-    @classmethod
-    def load_config_dict(cls, config_dict: dict):
-        return DexProxyContract(token=config_dict['token'],
-                                locked_tokens=config_dict['locked_tokens'],
-                                proxy_farm_token=config_dict['proxy_farm_token'],
-                                proxy_lp_token=config_dict['proxy_lp_token'],
-                                address=config_dict['address'],
-                                version=ProxyContractVersion(config_dict['version']))
-    
-    def get_contract_tokens(self) -> list[str]:
-        return [
-            self.proxy_lp_token,
-            self.proxy_farm_token
-        ]
 
     @classmethod
     def load_contract_by_address(cls, address: str):
