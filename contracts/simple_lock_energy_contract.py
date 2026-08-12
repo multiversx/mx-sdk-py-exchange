@@ -1,6 +1,7 @@
 from typing import Dict, List, Any
 
-from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
+from contracts.contract_identities import (DEXContractInterface, _as_addresses, _ConfigField,
+                                           _Endpoint)
 from utils.contract_data_fetchers import SimpleLockEnergyContractDataFetcher
 from utils import decoding_structures
 from utils.logger import get_logger
@@ -21,11 +22,6 @@ _ISSUE_COST = "50000000000000000"
 def _issue_arguments(args: list) -> list:
     """A token issued under one name: display name, ticker, decimals."""
     return [args[0], args[0], 18]
-
-
-def _as_addresses(args: list) -> list:
-    """Every argument as an address — what the whitelists and the multisig setter send."""
-    return [Address(argument) for argument in args]
 
 
 # The contract's endpoints, one declaration each: what the call is for, what it costs, what the

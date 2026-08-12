@@ -34,6 +34,16 @@ def _empty_result(returns: Any) -> Any:
     return _EMPTY_RESULTS.get(returns, _UNSET)
 
 
+def _as_addresses(args: list) -> list:
+    """Every argument as an address — the argument builder for endpoints that take bech32 text.
+
+    Shared rather than copied per contract: eleven wrappers across the energy, farm and staking
+    contracts convert this way, and the six that pass the same text straight through instead are a
+    disagreement worth being able to see at a glance.
+    """
+    return [Address(argument) for argument in args]
+
+
 def _decode_view_result(raw_result: Any, returns: Any) -> Any:
     """Convert one raw view answer into the kind the caller asked for."""
     if isinstance(returns, list):
@@ -102,9 +112,12 @@ class _Endpoint:
     declares none of the three, which is what "this one never checked" looks like — the state seven
     of the hand-written bodies were in, and not something to smooth away into a default check.
 
-    The last two axes exist for the same reason: `value` because the three token issuances are the
-    only endpoints that send EGLD, and `transfers` because an endpoint whose first argument is a
-    list of ESDT transfers goes out through a different dispatcher entirely.
+    The last three axes exist for the same reason: `value` because the three token issuances are
+    the only endpoints that send EGLD, `transfers` because an endpoint whose first argument is a
+    list of ESDT transfers goes out through a different dispatcher entirely, and
+    `announces_endpoint` because three of the on-behalf wrappers log a second line naming the
+    endpoint they are about to call, which appears in `logs/trace.log` between the purpose and the
+    transaction.
     """
 
     purpose: str                                 # what the call is for, as logged
@@ -115,6 +128,7 @@ class _Endpoint:
     build: Callable[[list], list] | None = None  # the arguments it sends, when not the ones given
     value: int | str = 0                         # the EGLD it sends
     transfers: bool = False                      # its first argument is a list of ESDT transfers
+    announces_endpoint: bool = False             # it logs a second line naming what it is calling
 
     def accepts(self, args: list) -> bool:
         """Whether `args` satisfies this endpoint's argument count."""
@@ -225,9 +239,13 @@ class DEXContractInterface(ABC):
         The purpose is announced under the *contract's* module name rather than this one, which is
         what the hand-written bodies did and what `logs/trace.log` prints: it is how an operator
         tells which contract a line came from, and it would otherwise read `contract_identities`
-        for all 23 of them.
+        for all 23 of them. An endpoint declaring `announces_endpoint` follows it with the second
+        line its wrapper wrote by hand, naming what it is about to call.
         """
-        logging.getLogger(type(self).__module__).info(endpoint.purpose)
+        announce = logging.getLogger(type(self).__module__)
+        announce.info(endpoint.purpose)
+        if endpoint.announces_endpoint:
+            announce.info(f"Calling {endpoint.name} endpoint...")
 
         if not endpoint.accepts(args):
             log_unexpected_args(endpoint.purpose, args)
