@@ -1,8 +1,8 @@
 import config
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.contract_data_fetchers import LiquidLockingContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call
+from utils.utils_tx import deploy
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils import decoding_structures
@@ -12,6 +12,21 @@ from typing import List, Dict, Any
 
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and how many arguments it requires. `_call_endpoint` on `DEXContractInterface`
+# does the rest, so each wrapper below carries only its signature and the argument documentation its
+# callers depend on.
+#
+# `lock` is the only endpoint here that moves tokens, and — alone among the five — the only one that
+# does not count what it was handed: its opposite number `unlock` *names* the token rather than
+# sending it, so it goes out as a plain call. The two `*_token` endpoints are also the only
+# snake_case endpoint names on the contract.
+_WHITELIST_TOKEN = _Endpoint("Whitelist token", 20000000, "whitelist_token", exactly=1)
+_BLACKLIST_TOKEN = _Endpoint("Blacklist token", 20000000, "blacklist_token", exactly=1)
+_LOCK = _Endpoint("lock tokens", 30000000, "lock", transfers=True)
+_UNLOCK = _Endpoint("unlock tokens", 20000000, "unlock", exactly=1)
+_UNBOND = _Endpoint("unbond tokens", 20000000, "unbond", exactly=1)
 
 
 class LiquidLockingContract(DEXContractInterface):
@@ -53,75 +68,33 @@ class LiquidLockingContract(DEXContractInterface):
         """ Expected as args:
             type[str]: token identifier
         """
-        function_purpose = f"Whitelist token"
-        logger.info(function_purpose)
+        return self._call_endpoint(_WHITELIST_TOKEN, deployer, proxy, args)
 
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 20000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "whitelist_token", sc_args)
-    
     def blacklist_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: token identifier
         """
-        function_purpose = f"Blacklist token"
-        logger.info(function_purpose)
-
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 20000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "blacklist_token", sc_args)
+        return self._call_endpoint(_BLACKLIST_TOKEN, deployer, proxy, args)
 
     def lock(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[List[ESDTToken]]: locked tokens
         """
-        function_purpose = f"lock tokens"
-        logger.info(function_purpose)
+        return self._call_endpoint(_LOCK, user, proxy, args)
 
-        gas_limit = 30000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
-                                        Address(self.address), "lock", args)
-    
     def unlock(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[List[ESDTToken]]: tokens to unlock
         """
-        function_purpose = f"unlock tokens"
-        logger.info(function_purpose)
+        return self._call_endpoint(_UNLOCK, user, proxy, args)
 
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        
-
-
-        gas_limit = 20000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "unlock", sc_args)
-    
     def unbond(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[list[str]]: token identifiers
         """
-        function_purpose = f"unbond tokens"
-        logger.info(function_purpose)
+        return self._call_endpoint(_UNBOND, user, proxy, args)
 
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
 
-        gas_limit = 20000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "unbond", sc_args)
-    
     def get_locked_token_amounts(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
         return self._query_view(proxy, LiquidLockingContractDataFetcher, 'lockedTokenAmounts',
                                 [AddressValue.new_from_address(Address(user_address))],

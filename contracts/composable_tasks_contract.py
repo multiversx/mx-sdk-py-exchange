@@ -1,11 +1,21 @@
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, upgrade_call
+from utils.utils_tx import deploy, upgrade_call
 from utils.utils_generic import log_step_pass
 
 logger = get_logger(__name__)
+
+# The contract's four endpoints, one declaration each: the same 10M gas, no argument check on any of
+# them, and every argument sent as it arrived — the two collaborator addresses included, which makes
+# this contract one of the ones that does not convert.
+_SET_WRAP_EGLD_ADDR = _Endpoint("Set wrap egld address", 10000000, "setWrapEgldAddr")
+_SET_ROUTER_ADDR = _Endpoint("Set router address", 10000000, "setRouterAddr")
+_SET_SMART_SWAP_FEE_PERCENTAGE = _Endpoint("Set smart swap fees", 10000000,
+                                           "setSmartSwapFeePercentage")
+_WITHDRAW_SMART_SWAP_FEES = _Endpoint("Withdraw smart swap fees", 10000000,
+                                      "withdrawSmartSwapFees")
 
 
 class ComposableTasksContract(DEXContractInterface):
@@ -55,38 +65,22 @@ class ComposableTasksContract(DEXContractInterface):
         """ Expected as args:
             Type[str]: wrap egld address
         """
-
-        function_purpose = "Set wrap egld address"
-        logger.info(function_purpose)
-
-        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setWrapEgldAddr", args)
+        return self._call_endpoint(_SET_WRAP_EGLD_ADDR, deployer, proxy, args)
 
     def set_router_address(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             Type[str]: router address
         """
-
-        function_purpose = "Set router address"
-        logger.info(function_purpose)
-
-        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setRouterAddr", args)
+        return self._call_endpoint(_SET_ROUTER_ADDR, deployer, proxy, args)
 
     def set_smart_swap_fee(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             Type[number]: fee percentage
         """
-
-        function_purpose = "Set smart swap fees"
-        logger.info(function_purpose)
-
-        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setSmartSwapFeePercentage", args)
+        return self._call_endpoint(_SET_SMART_SWAP_FEE_PERCENTAGE, deployer, proxy, args)
 
     def withdraw_smart_swap_fees(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             Type[string]: tokens identifiers
         """
-
-        function_purpose = "Withdraw smart swap fees"
-        logger.info(function_purpose)
-
-        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "withdrawSmartSwapFees", args)
+        return self._call_endpoint(_WITHDRAW_SMART_SWAP_FEES, deployer, proxy, args)

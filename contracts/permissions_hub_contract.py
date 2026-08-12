@@ -1,14 +1,25 @@
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.contract_data_fetchers import PermissionsHubContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import endpoint_call, deploy
+from utils.utils_tx import deploy
 from utils.utils_chain import log_explorer_transaction
-from utils.utils_generic import log_step_fail, log_step_pass, log_unexpected_args
+from utils.utils_generic import log_step_fail, log_step_pass
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue
 
 logger = get_logger(__name__)
+
+# The contract's four endpoints, one declaration each: two lists in and two lists out, at the same
+# 30M gas, each requiring at least one address and sending them all as the bech32 text they arrived
+# as. The flattest table in `contracts/` — the only thing separating the four is what they are
+# called and what they announce.
+_WHITELIST = _Endpoint("Add addresses to whitelist", 30000000, "whitelist", at_least=1)
+_REMOVE_WHITELIST = _Endpoint("Remove addresses to whitelist", 30000000, "removeWhitelist",
+                              at_least=1)
+_BLACKLIST = _Endpoint("Add addresses to blacklist", 30000000, "blacklist", at_least=1)
+_REMOVE_BLACKLIST = _Endpoint("Remove addresses from blacklist", 30000000, "removeBlacklist",
+                              at_least=1)
 
 
 class PermissionsHubContract(DEXContractInterface):
@@ -40,66 +51,27 @@ class PermissionsHubContract(DEXContractInterface):
         """Expecting as args:
         - whitelisted_sc_addresses: list[address]
         """
-        function_purpose = "Add addresses to whitelist"
-        logger.info(function_purpose)
+        return self._call_endpoint(_WHITELIST, user, proxy, args)
 
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        
-        gas_limit = 30000000
-        sc_args = args
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "whitelist", sc_args)
-    
     def remove_from_whitelist(self, user: Account, proxy: ProxyNetworkProvider, args: list) -> str:
         """Expecting as args:
         - whitelisted_sc_addresses: list[address]
         """
-        function_purpose = "Remove addresses to whitelist"
-        logger.info(function_purpose)
+        return self._call_endpoint(_REMOVE_WHITELIST, user, proxy, args)
 
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        
-        gas_limit = 30000000
-        sc_args = args
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "removeWhitelist", sc_args)
-    
     def add_to_blacklist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list) -> str:
         """Expecting as args:
         - blacklisted_sc_addresses: list[address]
         """
-        function_purpose = "Add addresses to blacklist"
-        logger.info(function_purpose)
+        return self._call_endpoint(_BLACKLIST, deployer, proxy, args)
 
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        
-        gas_limit = 30000000
-        sc_args = args
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "blacklist", sc_args)
-    
     def remove_from_blacklist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list) -> str:
         """Expecting as args:
         - blacklisted_sc_addresses: list[address]
         """
-        function_purpose = "Remove addresses from blacklist"
-        logger.info(function_purpose)
+        return self._call_endpoint(_REMOVE_BLACKLIST, deployer, proxy, args)
 
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        
-        gas_limit = 30000000
-        sc_args = args
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeBlacklist", sc_args)
-    
+
     def is_whitelisted(self, user: str, address: str, proxy: ProxyNetworkProvider) -> bool:
         return self._query_view(proxy, PermissionsHubContractDataFetcher, 'isWhitelisted',
                                 [

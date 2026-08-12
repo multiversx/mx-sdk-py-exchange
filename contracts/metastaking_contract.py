@@ -1,18 +1,48 @@
 from typing import Any, Dict, List, Tuple, override
-from contracts.contract_identities import DEXContractInterface, MetaStakingContractVersion, _ConfigField
+from contracts.contract_identities import (DEXContractInterface, MetaStakingContractVersion,
+                                           _as_addresses, _ConfigField, _Endpoint)
 from contracts.base_contracts import BaseSCWhitelistContract, BasePermissionsHubContract
 from utils.contract_data_fetchers import MetaStakingContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import deploy, upgrade_call, \
-    endpoint_call, multi_esdt_endpoint_call
+from utils.utils_tx import deploy, upgrade_call
 from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, decode_merged_attributes, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider, Token
-from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
+from utils.utils_generic import log_step_pass, log_substep
 from utils.decoding_structures import FARM_TOKEN_ATTRIBUTES, METASTAKE_TOKEN_ATTRIBUTES, STAKE_V2_TOKEN_ATTRIBUTES, STAKE_V1_TOKEN_ATTRIBUTES
 import config
 
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and what it makes of the arguments it is handed. `_call_endpoint` on
+# `DEXContractInterface` does the rest, so each wrapper below carries only its signature, the debug
+# line naming who signed, and the argument documentation its callers depend on.
+#
+# ⚠️ `_SET_LOCAL_ROLES_DUAL_YIELD_TOKEN` is the only endpoint in `contracts/` addressed to anything
+# but its own contract: `on` names the metastake token, and a token identifier is not a bech32
+# address, so every call to it raises. Preserved as it behaves — see docs/CLEANUP.md.
+_REGISTER_DUAL_YIELD_TOKEN = _Endpoint("Register metastaking token", 100000000,
+                                       "registerDualYieldToken", exactly=2, refuses=False,
+                                       build=lambda args: [args[0], args[1], 18],
+                                       value="50000000000000000")
+_SET_LOCAL_ROLES_DUAL_YIELD_TOKEN = _Endpoint("Set local roles for metastake token", 100000000,
+                                              "setLocalRolesDualYieldToken", on="metastake_token")
+_WHITELIST_CONTRACT = _Endpoint("Whitelist contract in metastaking", 50000000,
+                                "addSCAddressToWhitelist", build=_as_addresses)
+
+# The five that move a user's tokens. Each names itself after the endpoint it calls rather than
+# describing it, which is what makes their purposes camelCase where the three above are prose.
+_ENTER_METASTAKE = _Endpoint("enterMetastaking", 70000000, "stakeFarmTokens", transfers=True)
+_ENTER_METASTAKE_ON_BEHALF = _Endpoint("enterMetastakingOnBehalf", 70000000, "stakeFarmOnBehalf",
+                                       transfers=True)
+_EXIT_METASTAKE = _Endpoint("exitMetastaking", 90000000, "unstakeFarmTokens", transfers=True)
+_CLAIM_REWARDS_METASTAKING = _Endpoint("claimDualYield", 70000000, "claimDualYield", transfers=True)
+_CLAIM_REWARDS_ON_BEHALF_METASTAKING = _Endpoint("claimDualYieldOnBehalf", 70000000,
+                                                 "claimDualYieldOnBehalf", transfers=True)
+
+_SET_ENERGY_FACTORY_ADDRESS = _Endpoint("Set energy factory address in proxy staking contract",
+                                        50000000, "setEnergyFactoryAddress", rejects_empty=True)
 
 
 class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
@@ -114,41 +144,13 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
             type[str]: token display name
             type[str]: token ticker
         """
-        function_purpose = f"Register metastaking token"
-        logger.info(function_purpose)
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            18
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerDualYieldToken", sc_args,
-                             value="50000000000000000")
+        return self._call_endpoint(_REGISTER_DUAL_YIELD_TOKEN, deployer, proxy, args)
 
     def set_local_roles_dual_yield_token(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Set local roles for metastake token"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.metastake_token),
-                             "setLocalRolesDualYieldToken", sc_args)
+        return self._call_endpoint(_SET_LOCAL_ROLES_DUAL_YIELD_TOKEN, deployer, proxy, [])
 
     def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
-        function_purpose = f"Whitelist contract in metastaking"
-        logger.info(function_purpose)
-
-        gas_limit = 50000000
-        sc_args = [
-            Address(contract_to_whitelist)
-        ]
-
-        endpoint_name = "addSCAddressToWhitelist"
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), endpoint_name, sc_args)
+        return self._call_endpoint(_WHITELIST_CONTRACT, deployer, proxy, [contract_to_whitelist])
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass
@@ -166,31 +168,16 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
             type[List[ESDTToken]]: tokens to use
             optional: type[str]: original caller
         """
-        function_purpose = f"enterMetastaking"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
+        return self._call_endpoint(_ENTER_METASTAKE, user, proxy, args)
 
-        metastake_fn = 'stakeFarmTokens'
-        gas_limit = 70000000
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
-                                        user, Address(self.address), metastake_fn, args)
-    
     def enter_metastake_on_behalf(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
         """Expected as args:
             type[List[ESDTToken]]: tokens to use
             type[str]: original caller
         """
-        function_purpose = f"enterMetastakingOnBehalf"  
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
-
-        metastake_fn = 'stakeFarmOnBehalf'
-        gas_limit = 70000000    
-        
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
-                                        user, Address(self.address), metastake_fn, args)
-    
+        return self._call_endpoint(_ENTER_METASTAKE_ON_BEHALF, user, proxy, args)
 
     def exit_metastake(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
         """Expected as args:
@@ -199,57 +186,28 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
             type[int]: second token slippage
             optional: type[str]: original caller
         """
-        function_purpose = f"exitMetastaking"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
-
-        gas_limit = 90000000
-        exit_metastake_fn = 'unstakeFarmTokens'
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
-                                        user, Address(self.address), exit_metastake_fn, args)
+        return self._call_endpoint(_EXIT_METASTAKE, user, proxy, args)
 
     def claim_rewards_metastaking(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
         """Expected as args:
             type[List[ESDTToken]]: tokens to use
             optional: type[str]: original caller
         """
-        function_purpose = f"claimDualYield"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
+        return self._call_endpoint(_CLAIM_REWARDS_METASTAKING, user, proxy, args)
 
-        gas_limit = 70000000
-        claim_fn = 'claimDualYield'
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
-                                        user, Address(self.address), claim_fn, args)
-    
     def claim_rewards_on_behalf_metastaking(self, proxy: ProxyNetworkProvider, user: Account, args: List[Any]):
         """Expected as args:
             type[List[ESDTToken]]: tokens to use
         """
-        function_purpose = f"claimDualYieldOnBehalf"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
+        return self._call_endpoint(_CLAIM_REWARDS_ON_BEHALF_METASTAKING, user, proxy, args)
 
-        gas_limit = 70000000
-        claim_fn = 'claimDualYieldOnBehalf'
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit,
-                                        user, Address(self.address), claim_fn, args)
-    
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
-        function_purpose = "Set energy factory address in proxy staking contract"
-        logger.info(function_purpose)
+        return self._call_endpoint(_SET_ENERGY_FACTORY_ADDRESS, deployer, proxy, [energy_address])
 
-        if energy_address == "":
-            log_unexpected_args(function_purpose, energy_address)
-            return ""
 
-        gas_limit = 50000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
-                             [energy_address])
-    
     def get_energy_factory_address(self, proxy: ProxyNetworkProvider) -> str:
         return self._query_view(proxy, MetaStakingContractDataFetcher, 'getEnergyFactoryAddress',
                                 returns=Address, empty="")

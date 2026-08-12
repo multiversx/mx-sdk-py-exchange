@@ -2,15 +2,42 @@ import sys
 import traceback
 
 import config
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import (DEXContractInterface, _as_addresses, _ConfigField,
+                                           _Endpoint)
 from utils.contract_data_fetchers import LockedAssetContractDataFetcher
-from utils.utils_tx import multi_esdt_endpoint_call, prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call, endpoint_call
-from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
+from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, deploy, upgrade_call
+from utils.utils_generic import log_step_fail, log_step_pass, log_substep
 from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string, log_explorer_transaction
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and what it makes of the arguments it is handed. `_call_endpoint` on
+# `DEXContractInterface` does the rest, so each wrapper below carries only its signature and the
+# argument documentation its callers depend on.
+#
+# Every one of the five address-taking endpoints here converts its argument, which makes this the
+# only contract in the toolkit that agrees with itself about that.
+_UNLOCK_ASSETS = _Endpoint("unlock tokens", 30000000, "unlockAssets", exactly=1, transfers=True)
+_SET_NEW_FACTORY_ADDRESS = _Endpoint("Set new factory address", 50000000, "setNewFactoryAddress",
+                                     build=_as_addresses)
+_REGISTER_LOCKED_ASSET_TOKEN = _Endpoint("Register locked asset token", 100000000,
+                                         "registerLockedAssetToken", exactly=2,
+                                         build=lambda args: [*args, 18],
+                                         value="50000000000000000")
+# The three role numbers are the local roles themselves — mint, burn and NFT-create — and no caller
+# passes them, so this is the only set of roles the token can be given.
+_SET_LOCAL_ROLES_LOCKED_ASSET_TOKEN = _Endpoint("Set locked asset token local roles", 100000000,
+                                                "setLocalRolesLockedAssetToken",
+                                                build=lambda args: [*_as_addresses(args), 3, 4, 5])
+_WHITELIST = _Endpoint("Whitelist contract in locked asset contract", 100000000, "whitelist",
+                       build=_as_addresses)
+_SET_TRANSFER_ROLE_FOR_ADDRESS = _Endpoint("Set transfer role for contract", 100000000,
+                                           "setTransferRoleForAddress", build=_as_addresses)
+_SET_BURN_ROLE_FOR_ADDRESS = _Endpoint("Set burn role for contract", 100000000,
+                                       "setBurnRoleForAddress", build=_as_addresses)
 
 
 class LockedAssetContract(DEXContractInterface):
@@ -82,91 +109,31 @@ class LockedAssetContract(DEXContractInterface):
         """ Expected as args:
             type[List[ESDTToken]]: tokens list
         """
-        function_purpose = "unlock tokens"
-        logger.info(function_purpose)
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
-                                        user, Address(self.address), "unlockAssets", args)
+        return self._call_endpoint(_UNLOCK_ASSETS, user, proxy, args)
 
     def set_new_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, contract_address: str):
-        function_purpose = "Set new factory address"
-        logger.info(function_purpose)
-
-        gas_limit = 50000000
-        sc_args = [
-            Address(contract_address)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setNewFactoryAddress", sc_args)
+        return self._call_endpoint(_SET_NEW_FACTORY_ADDRESS, deployer, proxy, [contract_address])
 
     def register_locked_asset_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: token name
             type[str]: token ticker
         """
-        function_purpose = "Register locked asset token"
-        logger.info(function_purpose)
-
-        tx_hash = ""
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return tx_hash
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            18
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
-                             "registerLockedAssetToken", sc_args, value="50000000000000000")
+        return self._call_endpoint(_REGISTER_LOCKED_ASSET_TOKEN, deployer, proxy, args)
 
     def set_locked_asset_local_roles(self, deployer: Account, proxy: ProxyNetworkProvider, contract: str):
-        function_purpose = "Set locked asset token local roles"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(contract),
-            3, 4, 5,
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
-                             "setLocalRolesLockedAssetToken", sc_args)
+        return self._call_endpoint(_SET_LOCAL_ROLES_LOCKED_ASSET_TOKEN, deployer, proxy, [contract])
 
     def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
-        function_purpose = "Whitelist contract in locked asset contract"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(contract_to_whitelist)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
-                             "whitelist", sc_args)
+        return self._call_endpoint(_WHITELIST, deployer, proxy, [contract_to_whitelist])
 
     def set_transfer_role_for_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
-        function_purpose = "Set transfer role for contract"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(contract_to_whitelist)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
-                             "setTransferRoleForAddress", sc_args)
+        return self._call_endpoint(_SET_TRANSFER_ROLE_FOR_ADDRESS, deployer, proxy,
+                                   [contract_to_whitelist])
 
     def set_burn_role_for_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
-        function_purpose = "Set burn role for contract"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(contract_to_whitelist)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address),
-                             "setBurnRoleForAddress", sc_args)
+        return self._call_endpoint(_SET_BURN_ROLE_FOR_ADDRESS, deployer, proxy,
+                                   [contract_to_whitelist])
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

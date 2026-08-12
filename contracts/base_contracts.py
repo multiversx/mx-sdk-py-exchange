@@ -7,10 +7,8 @@ import requests
 from utils.logger import get_logger
 from multiversx_sdk import ProxyNetworkProvider
 from multiversx_sdk.abi import AddressValue, U64Value
-from contracts.contract_identities import DEXContractInterface
+from contracts.contract_identities import DEXContractInterface, _Endpoint
 from utils.utils_chain import Account, WrapperAddress as Address
-from utils.utils_generic import log_unexpected_args
-from utils.utils_tx import endpoint_call
 from utils.contract_data_fetchers import BaseBoostedContractDataFetcher, BaseContractWhitelistDataFetcher, BaseFarmContractDataFetcher
 from utils import decoding_structures
 from typing import Dict, List, Any
@@ -18,6 +16,17 @@ from abc import abstractmethod, ABC
 
 
 logger = get_logger(__name__)
+
+# The three endpoints no contract declares for itself: they come with a base, and the pair, the
+# router, the metastaking contract and the DEX proxy all inherit at least one. Each sends the bech32
+# text it was handed rather than converting it — the choice their eight opposite numbers on the fees
+# collector and the DEX proxy split down the middle.
+_ADD_SC_ADDRESS_TO_WHITELIST = _Endpoint("Add contract to sc whitelist", 30000000,
+                                         "addSCAddressToWhitelist")
+_REMOVE_SC_ADDRESS_FROM_WHITELIST = _Endpoint("Remove contract from sc whitelist", 30000000,
+                                              "removeSCAddressFromWhitelist")
+_SET_PERMISSIONS_HUB_ADDRESS = _Endpoint("Set permissions hub address", 10000000,
+                                         "setPermissionsHubAddress")
 
 
 class BaseBoostedContract(DEXContractInterface, ABC):
@@ -239,23 +248,13 @@ class BaseFarmContract(DEXContractInterface, ABC):
 class BaseSCWhitelistContract(DEXContractInterface, ABC):
     
     def add_contract_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str) -> str:
-        function_purpose = "Add contract to sc whitelist"
-        logger.info(function_purpose)
-        
-        gas_limit = 30000000
-        sc_args = [whitelisted_sc_address]
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
-    
+        return self._call_endpoint(_ADD_SC_ADDRESS_TO_WHITELIST, deployer, proxy,
+                                   [whitelisted_sc_address])
+
     def remove_contract_from_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str) -> str:
-        function_purpose = "Remove contract from sc whitelist"
-        logger.info(function_purpose)
-        
-        gas_limit = 30000000
-        sc_args = [whitelisted_sc_address]
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeSCAddressFromWhitelist", sc_args)
-    
+        return self._call_endpoint(_REMOVE_SC_ADDRESS_FROM_WHITELIST, deployer, proxy,
+                                   [whitelisted_sc_address])
+
     def is_contract_whitelisted(self, address: str, proxy: ProxyNetworkProvider) -> bool:
         return self._query_view(proxy, BaseContractWhitelistDataFetcher, 'isSCAddressWhitelisted',
                                 [AddressValue.new_from_address(Address(address))],
@@ -267,11 +266,5 @@ class BasePermissionsHubContract(DEXContractInterface, ABC):
     def set_permissions_hub_address(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
         """Only V3.
         """
-        function_purpose = "Set permissions hub address"
-        logger.info(function_purpose)
-
-        gas_limit = 10000000
-        sc_args = [address]
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPermissionsHubAddress", sc_args)
+        return self._call_endpoint(_SET_PERMISSIONS_HUB_ADDRESS, deployer, proxy, [address])
     

@@ -1,12 +1,26 @@
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, ESDTToken, multi_esdt_endpoint_call
+from utils.utils_tx import deploy, ESDTToken
 from utils.utils_generic import log_step_pass
-from utils.utils_chain import Account, WrapperAddress as Address
+from utils.utils_chain import Account
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)
+
+# The contract's four endpoints, one declaration each. This contract exists to relay a call to
+# another one, so none of the four counts or converts what it was handed — everything past the call
+# type is the remote endpoint's business, not this one's. All four cost the same 100M.
+#
+# `_CALL_ENDPOINT` names no `value`: the EGLD it forwards is an argument of the wrapper, so it rides
+# on `_call_endpoint` rather than on the declaration.
+_CALL_ENDPOINT = _Endpoint("Call endpoint", 100000000, "callEndpoint")
+_CALL_INTERNAL_TRANSFER_ENDPOINT = _Endpoint("Call internal transfer endpoint", 100000000,
+                                             "callInternalTransferEndpoint")
+_CALL_TRANSFER_ENDPOINT = _Endpoint("Call transfer endpoint", 100000000, "callTransferEndpoint",
+                                    transfers=True)
+_CALL_HYBRID_TRANSFER_ENDPOINT = _Endpoint("Call hybrid transfer endpoint", 100000000,
+                                           "callHybridTransferEndpoint", transfers=True)
 
 
 class DummyProxyContract(DEXContractInterface):
@@ -44,12 +58,7 @@ class DummyProxyContract(DEXContractInterface):
         type[string]: function name
         type[any..]: function args
         """
-        function_purpose = f"Call endpoint"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "callEndpoint", sc_args, value=str(amount))
+        return self._call_endpoint(_CALL_ENDPOINT, user, proxy, args, value=str(amount))
 
     def call_internal_transfer_endpoint(self, user: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ 
@@ -63,12 +72,9 @@ class DummyProxyContract(DEXContractInterface):
         type[string]: function name
         type[any..]: function args
         """
-        function_purpose = f"Call internal transfer endpoint"
-        logger.info(function_purpose)
+        return self._call_endpoint(_CALL_INTERNAL_TRANSFER_ENDPOINT, user, proxy, args)
 
-        gas_limit = 100000000
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "callInternalTransferEndpoint", args)
-    
+
     def call_transfer_endpoint(self, user: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ 
         Calls the specified endpoint on given contract address while it also transfers specified tokens owned by the dummy proxy with the call.
@@ -79,13 +85,9 @@ class DummyProxyContract(DEXContractInterface):
         type[string]: function name
         type[any..]: function args
         """
-        function_purpose = f"Call transfer endpoint"
-        logger.info(function_purpose)
+        return self._call_endpoint(_CALL_TRANSFER_ENDPOINT, user, proxy, args)
 
-        gas_limit = 100000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
-                                        Address(self.address), "callTransferEndpoint", args)
-    
+
     def call_hybrid_transfer_endpoint(self, user: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ 
         Calls the specified endpoint on given contract address while it also transfers user given tokens and internally owned tokens with the call.
@@ -99,13 +101,7 @@ class DummyProxyContract(DEXContractInterface):
         type[string]: function name
         type[any..]: function args
         """
-        function_purpose = f"Call hybrid transfer endpoint"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
-                                        Address(self.address), "callHybridTransferEndpoint", args)
-
+        return self._call_endpoint(_CALL_HYBRID_TRANSFER_ENDPOINT, user, proxy, args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass

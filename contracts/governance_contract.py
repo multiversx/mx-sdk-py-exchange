@@ -1,7 +1,7 @@
 import config
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call, upgrade_call
+from utils.utils_tx import deploy, upgrade_call
 from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, decode_merged_attributes, hex_to_string
 from utils import decoding_structures
@@ -10,6 +10,26 @@ from typing import List, Dict, Any
 
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and how many arguments it requires. `_call_endpoint` on `DEXContractInterface`
+# does the rest, so each wrapper below carries only its signature and the argument documentation its
+# callers depend on.
+#
+# The most uniform table in `contracts/`: six of the seven take a proposal id or a setting and send
+# it exactly as given, and the five settings all cost 10M. Only `propose` — which pays its fee in
+# tokens — differs in shape at all.
+_PROPOSE = _Endpoint("propose", 30000000, "propose", transfers=True)
+_VOTE = _Endpoint("Vote proposal", 20000000, "vote", exactly=2)
+_CANCEL = _Endpoint("Cancel proposal", 10000000, "cancel", exactly=1)
+_WITHDRAW_DEPOSIT = _Endpoint("Withdraw deposit from proposal", 10000000, "withdrawDeposit",
+                              exactly=1)
+_CHANGE_VOTING_PERIOD = _Endpoint("Change voting period in blocks", 10000000,
+                                  "changeVotingPeriodInBlocks", exactly=1)
+_CHANGE_VOTING_DELAY = _Endpoint("Change voting delay in blocks", 10000000,
+                                 "changeVotingDelayInBlocks", exactly=1)
+_CHANGE_QUORUM_PERCENTAGE = _Endpoint("Change quorum percentage", 10000000,
+                                      "changeQuorumPercentage", exactly=1)
 
 
 class GovernanceContract(DEXContractInterface):
@@ -93,103 +113,44 @@ class GovernanceContract(DEXContractInterface):
             type[List[ESDTToken]]: fee payment
             opt: type[list]: actions ???
         """
-        function_purpose = f"propose"
-        logger.info(function_purpose)
-
-        gas_limit = 30000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user,
-                                        Address(self.address), "propose", args)
+        return self._call_endpoint(_PROPOSE, user, proxy, args)
 
     def vote(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[int]: proposal id
             type[int]: VoteType [0 - yes, 1 - no, 2 - no with veto, 3 - abstain]
         """
-        function_purpose = f"Vote proposal"
-        logger.info(function_purpose)
+        return self._call_endpoint(_VOTE, deployer, proxy, args)
 
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 20000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "vote", sc_args)
-    
     def cancel(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[int]: proposal id
         """
-        function_purpose = f"Cancel proposal"
-        logger.info(function_purpose)
+        return self._call_endpoint(_CANCEL, deployer, proxy, args)
 
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "cancel", sc_args)
-    
     def withdraw_deposit(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[int]: proposal id
         """
-        function_purpose = f"Withdraw deposit from proposal"
-        logger.info(function_purpose)
+        return self._call_endpoint(_WITHDRAW_DEPOSIT, user, proxy, args)
 
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "withdrawDeposit", sc_args)
-    
     def set_voting_period(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[int]: delay in blocks
         """
-        function_purpose = f"Change voting period in blocks"
-        logger.info(function_purpose)
-
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "changeVotingPeriodInBlocks", sc_args)
+        return self._call_endpoint(_CHANGE_VOTING_PERIOD, user, proxy, args)
 
     def set_voting_delay(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[int]: delay in blocks
         """
-        function_purpose = f"Change voting delay in blocks"
-        logger.info(function_purpose)
+        return self._call_endpoint(_CHANGE_VOTING_DELAY, user, proxy, args)
 
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "changeVotingDelayInBlocks", sc_args)
-    
     def set_quorum_percentage(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[int]: new quorum percentage (10000 = 100%)
         """
-        function_purpose = f"Change quorum percentage"
-        logger.info(function_purpose)
-
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "changeQuorumPercentage", sc_args)
+        return self._call_endpoint(_CHANGE_QUORUM_PERCENTAGE, user, proxy, args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

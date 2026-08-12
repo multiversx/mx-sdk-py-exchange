@@ -2,10 +2,10 @@ import sys
 import traceback
 
 import config
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.logger import get_logger
 from utils.utils_tx import prepare_contract_call_tx, send_contract_call_tx, NetworkProviders, ESDTToken, \
-    multi_esdt_endpoint_call, deploy, endpoint_call
+    deploy
 from events.price_discovery_events import (DepositPDLiquidityEvent,
                                            WithdrawPDLiquidityEvent, RedeemPDLPTokensEvent)
 from utils.utils_chain import log_explorer_transaction
@@ -15,6 +15,25 @@ from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, and what the
+# contract calls it. `_call_endpoint` on `DEXContractInterface` does the rest, so each wrapper below
+# carries only its signature, the token it builds out of the event it was handed, and the two debug
+# lines naming who signed and what they moved.
+#
+# The three user-facing endpoints are the flattest family in `contracts/`: the same 10M gas, the
+# same single token, one word apiece.
+_DEPOSIT = _Endpoint("Deposit Price Discovery liquidity", 10000000, "deposit", transfers=True)
+_WITHDRAW = _Endpoint("Withdraw Price Discovery liquidity", 10000000, "withdraw", transfers=True)
+_REDEEM = _Endpoint("Redeem Price Discovery liquidity", 10000000, "redeem", transfers=True)
+
+# The ticker is sent twice — once as the display name, once as the ticker — because the wrapper is
+# handed only one and the endpoint wants both. 18 decimals, as everywhere else in the toolkit.
+_ISSUE_REDEEM_TOKEN = _Endpoint("Issue price discovery redeem token", 100000000, "issueRedeemToken",
+                                build=lambda args: [args[0], args[0], 18],
+                                value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+_CREATE_INITIAL_REDEEM_TOKENS = _Endpoint("Create initial redeem tokens for price discovery contract",
+                                          50000000, "createInitialRedeemTokens")
 
 
 class PriceDiscoveryContract(DEXContractInterface):
@@ -78,40 +97,28 @@ class PriceDiscoveryContract(DEXContractInterface):
         raise NotImplementedError
 
     def deposit_liquidity(self, network_provider: NetworkProviders, user: Account, event: DepositPDLiquidityEvent) -> str:
-        function_purpose = f"Deposit Price Discovery liquidity"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
         logger.debug(f"Token: {event.deposit_token} Amount: {event.amount}")
 
-        gas_limit = 10000000
         tokens = [ESDTToken(event.deposit_token, 0, event.amount)]
-        sc_args = [tokens]
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
-                                        Address(self.address), "deposit", sc_args)
+
+        return self._call_endpoint(_DEPOSIT, user, network_provider.proxy, [tokens])
 
     def withdraw_liquidity(self, network_provider: NetworkProviders, user: Account, event: WithdrawPDLiquidityEvent) -> str:
-        function_purpose = f"Withdraw Price Discovery liquidity"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
         logger.debug(f"Token: {event.deposit_lp_token} Nonce: {event.nonce} Amount: {event.amount}")
 
-        gas_limit = 10000000
         tokens = [ESDTToken(event.deposit_lp_token, event.nonce, event.amount)]
-        sc_args = [tokens]
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
-                                        Address(self.address), "withdraw", sc_args)
+
+        return self._call_endpoint(_WITHDRAW, user, network_provider.proxy, [tokens])
 
     def redeem_liquidity_position(self, network_provider: NetworkProviders, user: Account, event: RedeemPDLPTokensEvent) -> str:
-        function_purpose = f"Redeem Price Discovery liquidity"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
         logger.debug(f"Token: {event.deposit_lp_token} Nonce: {event.nonce} Amount: {event.amount}")
 
-        gas_limit = 10000000
         tokens = [ESDTToken(event.deposit_lp_token, event.nonce, event.amount)]
-        sc_args = [tokens]
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit, user,
-                                        Address(self.address), "redeem", sc_args)
+
+        return self._call_endpoint(_REDEEM, user, network_provider.proxy, [tokens])
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         function_purpose = f"Deploy price discovery contract"
@@ -145,25 +152,10 @@ class PriceDiscoveryContract(DEXContractInterface):
         type[str]: lp token name
         type[str]: lp token ticker
         """
-        function_purpose = f"Issue price discovery redeem token"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            redeem_token_ticker,
-            redeem_token_ticker,
-            18,
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueRedeemToken", sc_args,
-                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+        return self._call_endpoint(_ISSUE_REDEEM_TOKEN, deployer, proxy, [redeem_token_ticker])
 
     def create_initial_redeem_tokens(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Create initial redeem tokens for price discovery contract"
-        logger.info(function_purpose)
-
-        gas_limit = 50000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "createInitialRedeemTokens", sc_args)
+        return self._call_endpoint(_CREATE_INITIAL_REDEEM_TOKENS, deployer, proxy, [])
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

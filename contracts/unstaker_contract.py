@@ -1,9 +1,9 @@
 import sys
 import traceback
 
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.logger import get_logger
-from utils.utils_tx import endpoint_call, deploy, upgrade_call
+from utils.utils_tx import deploy, upgrade_call
 from utils.utils_chain import log_explorer_transaction
 from utils.utils_generic import log_step_fail, log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
@@ -11,6 +11,19 @@ from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, and what the
+# contract calls it. `_call_endpoint` on `DEXContractInterface` does the rest, so each wrapper below
+# carries only its signature and the argument documentation its callers depend on.
+#
+# The two unbond endpoints take nothing and disagree about it: `claim_unlocked_tokens` names `[]`
+# explicitly and discards whatever it was handed, `cancel_unbond` forwards its own default — which
+# is `None`, not a list. Both preserved as they are.
+_SET_ENERGY_FACTORY_ADDRESS = _Endpoint("set energy factory address", 10000000,
+                                        "setEnergyFactoryAddress", at_least=1)
+_CLAIM_UNLOCKED_TOKENS = _Endpoint("claim unlocked tokens", 20000000, "claimUnlockedTokens")
+_CANCEL_UNBOND = _Endpoint("cancel unbond", 20000000, "cancelUnbond")
+_SET_FEES_BURN_PERCENTAGE = _Endpoint("set fees burn percentage", 20000000, "setFeesBurnPercentage")
 
 
 class UnstakerContract(DEXContractInterface):
@@ -71,37 +84,25 @@ class UnstakerContract(DEXContractInterface):
         """ Expected as args:
             type[address]: energy factory address
         """
-        function_purpose = "set energy factory address"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return endpoint_call(proxy, 10000000, deployer, Address(self.address), "setEnergyFactoryAddress", args)
+        return self._call_endpoint(_SET_ENERGY_FACTORY_ADDRESS, deployer, proxy, args)
 
     def claim_unlocked_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ Expected as args:
             empty
         """
-        function_purpose = "claim unlocked tokens"
-        logger.info(function_purpose)
-        return endpoint_call(proxy, 20000000, deployer, Address(self.address), "claimUnlockedTokens", [])
+        return self._call_endpoint(_CLAIM_UNLOCKED_TOKENS, deployer, proxy, [])
 
     def cancel_unbond(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         """ Expected as args:
             empty
         """
-        function_purpose = "cancel unbond"
-        logger.info(function_purpose)
-        return endpoint_call(proxy, 20000000, deployer, Address(self.address), "cancelUnbond", args)
-    
+        return self._call_endpoint(_CANCEL_UNBOND, deployer, proxy, args)
+
     def set_fees_burn_percentage(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[int]: fees burn percentage
         """
-        function_purpose = "set fees burn percentage"
-        logger.info(function_purpose)
-        return endpoint_call(proxy, 20000000, deployer, Address(self.address), "setFeesBurnPercentage", args)
+        return self._call_endpoint(_SET_FEES_BURN_PERCENTAGE, deployer, proxy, args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass

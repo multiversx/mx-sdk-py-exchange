@@ -1,11 +1,23 @@
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
 from utils.utils_chain import Account, WrapperAddress as Address
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call, upgrade_call
+from utils.utils_tx import deploy, upgrade_call
 from utils.utils_generic import log_step_pass, log_unexpected_args
 
 logger = get_logger(__name__)
+
+# The contract's three endpoints, one declaration each: what the call is for, what it costs, what
+# the contract calls it, and the fewest arguments it accepts. `_call_endpoint` on
+# `DEXContractInterface` does the rest, so each wrapper below carries only its signature and the
+# argument documentation its callers depend on.
+#
+# `_WITHDRAW` goes out through the transfer dispatcher while carrying nothing to transfer: its one
+# argument is the sender being withdrawn from, which the dispatcher reads as the token list. Its two
+# neighbours divide the other way — locking sends tokens, cancelling sends none and says so.
+_LOCK_FUNDS = _Endpoint("lock tokens", 60000000, "lockFunds", at_least=2, transfers=True)
+_WITHDRAW = _Endpoint("withdraw tokens", 10000000, "withdraw", at_least=1, transfers=True)
+_CANCEL_TRANSFER = _Endpoint("cancel transfer", 10000000, "cancelTransfer", at_least=2)
 
 
 class EscrowContract(DEXContractInterface):
@@ -66,37 +78,20 @@ class EscrowContract(DEXContractInterface):
             type[List[ESDTToken]]: tokens list
             type[address]: destination address
         """
-        function_purpose = "lock tokens"
-        logger.info(function_purpose)
-        if len(args) < 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 60000000,
-                                        user, Address(self.address), "lockFunds", args)
-    
+        return self._call_endpoint(_LOCK_FUNDS, user, proxy, args)
+
     def withdraw(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[address]: sender address
         """
-        function_purpose = "withdraw tokens"
-        logger.info(function_purpose)
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 10000000,
-                                        user, Address(self.address), "withdraw", args)
-    
+        return self._call_endpoint(_WITHDRAW, user, proxy, args)
+
     def cancel_transfer(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[address]: sender address
             type[address]: receiver address
         """
-        function_purpose = "cancel transfer"
-        logger.info(function_purpose)
-        if len(args) < 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return endpoint_call(proxy, 10000000, user, Address(self.address), "cancelTransfer", args)
+        return self._call_endpoint(_CANCEL_TRANSFER, user, proxy, args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = None):
         pass
