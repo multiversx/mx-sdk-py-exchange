@@ -1,9 +1,9 @@
 from typing import Any
 from contracts.base_contracts import BaseBoostedContract
-from contracts.contract_identities import _ConfigField
+from contracts.contract_identities import _as_addresses, _ConfigField, _Endpoint
 from contracts.pair_contract import PairContract
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, upgrade_call
+from utils.utils_tx import deploy, upgrade_call
 from utils.utils_generic import log_step_pass, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider, SmartContractTransactionsFactory, TransactionComputer
@@ -13,6 +13,66 @@ from utils.contract_data_fetchers import FeeCollectorContractDataFetcher
 
 logger = get_logger(__name__)
 transaction_computer = TransactionComputer()
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and what it makes of the arguments it is handed. `_call_endpoint` on
+# `DEXContractInterface` does the rest, so each wrapper below carries only its signature and the
+# argument documentation its callers depend on.
+#
+# The four list endpoints disagree about gas in a way that reads as an oversight: adding tokens and
+# removing contracts pay 1M per entry on top of their base, while removing tokens and adding
+# contracts — the same work in the other direction — pay a flat 10M. Preserved as declared.
+_ADD_KNOWN_CONTRACTS = _Endpoint("Add known contract in fees collector contract", 10000000,
+                                 "addKnownContracts", at_least=1)
+_ADD_KNOWN_TOKENS = _Endpoint("Add known tokens in fees collector contract", 10000000,
+                              "addKnownTokens", at_least=1, gas_per_argument=1000000)
+_REMOVE_KNOWN_CONTRACTS = _Endpoint("Remove known contract in fees collector contract", 10000000,
+                                    "removeKnownContracts", at_least=1, gas_per_argument=1000000)
+_REMOVE_KNOWN_TOKENS = _Endpoint("Remove known tokens in fees collector contract", 10000000,
+                                 "removeKnownTokens", at_least=1)
+
+_ADD_REWARD_TOKENS = _Endpoint("Add reward tokens in fees collector contract", 10000000,
+                               "addRewardTokens", at_least=1)
+_REMOVE_REWARD_TOKENS = _Endpoint("Remove reward tokens from fees collector contract", 80000000,
+                                  "removeRewardTokens", at_least=1)
+
+_ADD_ADMIN = _Endpoint("Add admin in fees collector contract", 10000000, "addAdmin", at_least=1)
+_REMOVE_ADMIN = _Endpoint("Remove admin in fees collector contract", 10000000, "removeAdmin",
+                          at_least=1)
+_ADD_SC_ADDRESS_TO_WHITELIST = _Endpoint("Add SC address to whitelist in fees collector contract",
+                                         10000000, "addSCAddressToWhitelist", at_least=1)
+_REMOVE_SC_ADDRESS_TO_WHITELIST = _Endpoint(
+    "Remove SC address to whitelist in fees collector contract", 10000000,
+    "removeSCAddressToWhitelist", at_least=1)
+
+# All three collaborator setters convert the bech32 text they are handed, and all three refuse an
+# empty one — where the DEX proxy's seven equivalents do neither.
+_SET_ENERGY_FACTORY_ADDRESS = _Endpoint("Set Energy factory address in fees collector contract",
+                                        30000000, "setEnergyFactoryAddress", rejects_empty=True,
+                                        build=_as_addresses)
+_SET_ROUTER_ADDRESS = _Endpoint("Set router address in fees collector", 30000000,
+                                "setRouterAddress", rejects_empty=True, build=_as_addresses)
+_SET_LOCKING_ADDRESS = _Endpoint("Set locking address in fees collector", 30000000,
+                                 "setLockingScAddress", rejects_empty=True, build=_as_addresses)
+
+_SET_LOCK_EPOCHS = _Endpoint("Set lock epochs in fees collector", 30000000, "setLockEpochs")
+_SET_LOCKED_TOKENS_PER_EPOCH = _Endpoint("Set locked tokens per epoch", 5000000,
+                                         "setLockedTokensPerEpoch")
+_SET_BASE_TOKEN_BURN_PERCENT = _Endpoint("Set base token burn percentage", 30000000,
+                                         "setBaseTokenBurnPercent")
+
+_CLAIM_REWARDS = _Endpoint("Claim rewards from fees collector", 80000000, "claimRewards")
+# Announces the purpose above it word for word, which is what `logs/trace.log` is grepped for.
+_CLAIM_BOOSTED_REWARDS = _Endpoint("Claim rewards from fees collector", 80000000,
+                                   "claimBoostedRewards")
+_REDISTRIBUTE_REWARDS = _Endpoint("Redistribute rewards from fees collector", 80000000,
+                                  "redistributeRewards")
+_DEPOSIT_SWAP_FEES = _Endpoint("Deposit swap fees in fees collector", 80000000, "depositSwapFees")
+# The one endpoint in `contracts/` whose caller hands it an `Abi`, to encode the nested swap
+# operations; the ABI travels as an argument to `_call_endpoint` rather than as an axis here.
+_SWAP_TOKEN_TO_BASE_TOKEN = _Endpoint("Swap tokens to base token in fees collector", 80000000,
+                                      "swapTokenToBaseToken")
+
 
 class FeesCollectorContract(BaseBoostedContract):
     _CONFIG_FIELDS = (
@@ -74,257 +134,99 @@ class FeesCollectorContract(BaseBoostedContract):
         """ Expected as args:
                 type[str..]: addresses
         """
-        function_purpose = f"Add known contract in fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        print(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addKnownContracts", sc_args)
+        # The only Endpoint Wrapper in `contracts/` that echoes its arguments to stdout; every
+        # other one leaves that to the `Args: …` line `endpoint_call` logs at debug.
+        print(f"Arguments: {args}")
+        return self._call_endpoint(_ADD_KNOWN_CONTRACTS, deployer, proxy, args)
 
     def add_known_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: tokens
         """
-        function_purpose = f"Add known tokens in fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000 + len(args) * 1000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addKnownTokens", args)
+        return self._call_endpoint(_ADD_KNOWN_TOKENS, deployer, proxy, args)
 
     def remove_known_contracts(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: addresses
         """
-        function_purpose = f"Remove known contract in fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000 + len(args) * 1000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeKnownContracts", sc_args)
+        return self._call_endpoint(_REMOVE_KNOWN_CONTRACTS, deployer, proxy, args)
 
     def remove_known_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: tokens
         """
-        function_purpose = f"Remove known tokens in fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeKnownTokens", sc_args)
+        return self._call_endpoint(_REMOVE_KNOWN_TOKENS, deployer, proxy, args)
 
     def add_reward_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
-        function_purpose = f"Add reward tokens in fees collector contract"
-        logger.info(function_purpose)
+        return self._call_endpoint(_ADD_REWARD_TOKENS, deployer, proxy, args)
 
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addRewardTokens", args)
-    
     def remove_reward_tokens(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
-        function_purpose = f"Remove reward tokens from fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 80000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeRewardTokens", args)
+        return self._call_endpoint(_REMOVE_REWARD_TOKENS, deployer, proxy, args)
 
     def add_admin(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: addresses
         """
-        function_purpose = f"Add admin in fees collector contract"
-        logger.info(function_purpose)
+        return self._call_endpoint(_ADD_ADMIN, deployer, proxy, args)
 
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addAdmin", sc_args)
-    
     def remove_admin(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                 type[str..]: addresses
         """
-        function_purpose = f"Remove admin in fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeAdmin", sc_args)
+        return self._call_endpoint(_REMOVE_ADMIN, deployer, proxy, args)
 
     def add_sc_address_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: Address):
         """ Expected as args:
                 type[str..]: addresses
         """
-        function_purpose = f"Add SC address to whitelist in fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
+        return self._call_endpoint(_ADD_SC_ADDRESS_TO_WHITELIST, deployer, proxy, args)
 
     def remove_sc_address_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: Address):
         """ Expected as args:
                 type[str..]: addresse
         """
-        function_purpose = f"Remove SC address to whitelist in fees collector contract"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 10000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeSCAddressToWhitelist", sc_args)
+        return self._call_endpoint(_REMOVE_SC_ADDRESS_TO_WHITELIST, deployer, proxy, args)
 
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, factory_address: str):
         """ Expected as args:
                     type[str]: energy factory address
         """
-        function_purpose = f"Set Energy factory address in fees collector contract"
-        logger.info(function_purpose)
-
-        if not factory_address:
-            log_unexpected_args(function_purpose, factory_address)
-            return ""
-
-        gas_limit = 30000000
-        sc_args = [
-            Address(factory_address)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress", sc_args)
+        return self._call_endpoint(_SET_ENERGY_FACTORY_ADDRESS, deployer, proxy, [factory_address])
 
     def set_router_address(self, deployer: Account, proxy: ProxyNetworkProvider, router_address: str):
         """ Expected as args:
             type[str]: router address
         """
-        function_purpose = f"Set router address in fees collector"
-        logger.info(function_purpose)
-
-        if not router_address:
-            log_unexpected_args(function_purpose, router_address)
-            return ""
-
-        gas_limit = 30000000
-        sc_args = [
-            Address(router_address)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setRouterAddress", sc_args)
+        return self._call_endpoint(_SET_ROUTER_ADDRESS, deployer, proxy, [router_address])
 
     def set_locking_address(self, deployer: Account, proxy: ProxyNetworkProvider, locking_address: str):
         """ Expected as args:
             type[str]: locking address
         """
-        function_purpose = f"Set locking address in fees collector"
-        logger.info(function_purpose)
-
-        if not locking_address:
-            log_unexpected_args(function_purpose, locking_address)
-            return ""
-
-        gas_limit = 30000000
-        sc_args = [
-            Address(locking_address)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingScAddress", sc_args)
+        return self._call_endpoint(_SET_LOCKING_ADDRESS, deployer, proxy, [locking_address])
 
     def set_lock_epochs(self, deployer: Account, proxy: ProxyNetworkProvider, lock_epochs: int):
-        function_purpose = f"Set lock epochs in fees collector"
-        logger.info(function_purpose)
-
-        gas_limit = 30000000
-        sc_args = [
-            lock_epochs
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockEpochs", sc_args)
+        return self._call_endpoint(_SET_LOCK_EPOCHS, deployer, proxy, [lock_epochs])
 
     def set_locked_tokens_per_epoch(self, deployer: Account, proxy: ProxyNetworkProvider, locked_tokens_per_epoch: int):
-        function_purpose = f"Set locked tokens per epoch"
-        logger.info(function_purpose)
-
-        gas_limit = 5000000
-        sc_args = [
-            locked_tokens_per_epoch
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockedTokensPerEpoch", sc_args)
+        return self._call_endpoint(_SET_LOCKED_TOKENS_PER_EPOCH, deployer, proxy,
+                                   [locked_tokens_per_epoch])
 
     def set_base_token_burn_percent(self, deployer: Account, proxy: ProxyNetworkProvider, base_token_burn_percentage: int):
-        function_purpose = f"Set base token burn percentage"
-        logger.info(function_purpose)
-
-        gas_limit = 30000000
-        sc_args = [
-            base_token_burn_percentage
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setBaseTokenBurnPercent", sc_args)
+        return self._call_endpoint(_SET_BASE_TOKEN_BURN_PERCENT, deployer, proxy,
+                                   [base_token_burn_percentage])
 
     def claim_rewards(self, user: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Claim rewards from fees collector"
-        logger.info(function_purpose)
+        return self._call_endpoint(_CLAIM_REWARDS, user, proxy, [])
 
-        gas_limit = 80000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimRewards", sc_args)
-    
     def claim_boosted_rewards(self, user: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Claim rewards from fees collector"
-        logger.info(function_purpose)
-
-        gas_limit = 80000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "claimBoostedRewards", sc_args)
+        return self._call_endpoint(_CLAIM_BOOSTED_REWARDS, user, proxy, [])
 
     def redistribute_rewards(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Redistribute rewards from fees collector"
-        logger.info(function_purpose)
+        return self._call_endpoint(_REDISTRIBUTE_REWARDS, deployer, proxy, [])
 
-        gas_limit = 80000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "redistributeRewards", sc_args)
-    
     def deposit_swap_fees(self, user: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Deposit swap fees in fees collector"
-        logger.info(function_purpose)
-
-        gas_limit = 80000000
-        sc_args = [
-        ]
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "depositSwapFees", sc_args)
+        return self._call_endpoint(_DEPOSIT_SWAP_FEES, user, proxy, [])
 
     def swap_to_base_token(self, user: Account, proxy: ProxyNetworkProvider, abi: Abi, sc_args: list):
         """ Expected as args:
@@ -333,13 +235,9 @@ class FeesCollectorContract(BaseBoostedContract):
                 "\"pair function name\" can only be \"swapTokensFixedInput\" or \"swapTokensFixedOutput\\",
                 "\"min amount out\" is a minimum of 1"
         """
+        return self._call_endpoint(_SWAP_TOKEN_TO_BASE_TOKEN, user, proxy, sc_args, abi=abi)
 
-        function_purpose = f"Swap tokens to base token in fees collector"
-        logger.info(function_purpose)   
-        gas_limit = 80000000
 
-        return endpoint_call(proxy, gas_limit, user, Address(self.address), "swapTokenToBaseToken", sc_args, abi = abi)
-    
     def get_reward_tokens(self, proxy: ProxyNetworkProvider) -> list[str]:
         """Query the contract for the list of reward tokens.
         

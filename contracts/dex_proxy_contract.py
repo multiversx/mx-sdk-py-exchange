@@ -1,12 +1,11 @@
 import config
-from contracts.contract_identities import DEXContractInterface, ProxyContractVersion, _ConfigField
+from contracts.contract_identities import DEXContractInterface, ProxyContractVersion, _ConfigField, _Endpoint
 from contracts.farm_contract import FarmContract
 from contracts.pair_contract import PairContract
 from multiversx_sdk import ApiNetworkProvider, ProxyNetworkProvider, CodeMetadata
 from utils.contract_data_fetchers import ProxyContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import deploy, upgrade_call, \
-    endpoint_call, multi_esdt_endpoint_call, ESDTToken
+from utils.utils_tx import deploy, upgrade_call, ESDTToken
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, \
     log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex, dec_to_padded_hex, decode_merged_attributes, hex_to_string
@@ -14,6 +13,77 @@ from utils.utils_chain import Account, WrapperAddress as Address, base64_to_hex,
 from utils.decoding_structures import LKMEX_ATTRIBUTES, XMEX_ATTRIBUTES, XMEXFARM_ATTRIBUTES, XMEXLP_ATTRIBUTES
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and what it makes of the arguments it is handed. `_call_endpoint` on
+# `DEXContractInterface` does the rest, so each wrapper below carries only its signature, the
+# tokens it builds out of the event it was handed, and the argument documentation its callers
+# depend on.
+#
+# The five that take an event are the only Endpoint Wrappers in `contracts/` that never announce
+# their purpose at info: they log themselves, the user and the whole event at debug instead, from
+# their own bodies. The purpose still reaches `multi_esdt_endpoint_call`, which names it if it
+# refuses the call itself.
+_ADD_LIQUIDITY_PROXY = _Endpoint("add liquidity via proxy", 40000000, "addLiquidityProxy",
+                                 transfers=True, announces_purpose=False)
+_REMOVE_LIQUIDITY_PROXY = _Endpoint("remove liquidity via proxy", 40000000, "removeLiquidityProxy",
+                                    transfers=True, announces_purpose=False)
+_ENTER_FARM_PROXY = _Endpoint("enter farm via proxy", 50000000, "enterFarmProxy", transfers=True,
+                              announces_purpose=False)
+_EXIT_FARM_PROXY = _Endpoint("exit farm via proxy", 50000000, "exitFarmProxy", transfers=True,
+                             announces_purpose=False)
+_CLAIM_REWARDS_PROXY = _Endpoint("claim rewards via proxy", 50000000, "claimRewardsProxy",
+                                 transfers=True, announces_purpose=False)
+
+# The five that are handed their token list ready-made, and so can count what they were given.
+_INCREASE_PROXY_LP_TOKEN_ENERGY = _Endpoint("increase proxy pair token energy", 50000000,
+                                            "increaseProxyPairTokenEnergy", exactly=2,
+                                            transfers=True)
+_INCREASE_PROXY_FARM_TOKEN_ENERGY = _Endpoint("increase proxy farm token energy", 50000000,
+                                              "increaseProxyFarmTokenEnergy", exactly=2,
+                                              transfers=True)
+_DESTROY_PROXY_FARM_TOKEN = _Endpoint("destroy proxy farm token", 50000000, "destroyFarmProxy",
+                                      at_least=5, transfers=True)
+_MERGE_PROXY_FARM_TOKENS = _Endpoint("merge proxy farm tokens", 50000000, "mergeWrappedFarmTokens",
+                                     at_least=2, transfers=True)
+_MERGE_PROXY_LP_TOKENS = _Endpoint("merge proxy lp tokens", 50000000, "mergeWrappedLpTokens",
+                                   at_least=1, transfers=True)
+
+_REGISTER_PROXY_FARM_TOKEN = _Endpoint("Register proxy farm token", 100000000, "registerProxyFarm",
+                                       exactly=2, build=lambda args: [*args, 18],
+                                       value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+_REGISTER_PROXY_LP_TOKEN = _Endpoint("Register proxy lp token", 100000000, "registerProxyPair",
+                                     exactly=2, build=lambda args: [*args, 18],
+                                     value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+_SET_LOCAL_ROLES_PROXY_TOKEN = _Endpoint("Set local roles for proxy token", 100000000,
+                                         "setLocalRoles", exactly=2,
+                                         build=lambda args: [*args, 3, 4, 5])
+
+# All seven collaborator setters refuse an empty address and then send the bech32 text as it
+# arrived — where the fees collector's three equivalents convert it first.
+_SET_ENERGY_FACTORY_ADDRESS = _Endpoint("Set energy factory address in proxy contract", 50000000,
+                                        "setEnergyFactoryAddress", rejects_empty=True)
+_ADD_PAIR_TO_INTERMEDIATE = _Endpoint("Add pair to intermediate in proxy contract", 50000000,
+                                      "addPairToIntermediate", rejects_empty=True)
+_ADD_FARM_TO_INTERMEDIATE = _Endpoint("Add farm to intermediate in proxy contract", 50000000,
+                                      "addFarmToIntermediate", rejects_empty=True)
+_SET_TRANSFER_ROLE_LOCKED_LP_TOKEN = _Endpoint(
+    "Set transfer role on address for lp token; legacy endpoint", 100000000,
+    "setTransferRoleLockedLpToken", rejects_empty=True)
+_SET_TRANSFER_ROLE_LOCKED_FARM_TOKEN = _Endpoint(
+    "Set transfer role on address for farm token; legacy endpoint", 100000000,
+    "setTransferRoleLockedFarmToken", rejects_empty=True)
+_SET_TRANSFER_ROLE_WRAPPED_LP_TOKEN = _Endpoint("Set transfer role on address for lp token",
+                                                100000000, "setTransferRoleWrappedLpToken",
+                                                rejects_empty=True)
+_SET_TRANSFER_ROLE_WRAPPED_FARM_TOKEN = _Endpoint("Set transfer role on address for farm token",
+                                                  100000000, "setTransferRoleWrappedFarmToken",
+                                                  rejects_empty=True)
+
+# Alone among the eight address-taking wrappers here, this one guards nothing. It is this
+# contract's own copy of the endpoint `BaseSCWhitelistContract` gives the pair and the router.
+_ADD_CONTRACT_TO_WHITELIST = _Endpoint("Add contract to proxy dex whitelist", 30000000,
+                                       "addSCAddressToWhitelist")
 
 
 class DexProxyAddLiquidityEvent:
@@ -110,117 +180,66 @@ class DexProxyContract(DEXContractInterface):
         return DexProxyContract(locked_tokens, token, version, address, proxy_lp_token, proxy_farm_token)
 
     def add_liquidity_proxy(self, user: Account, proxy: ProxyNetworkProvider, event: DexProxyAddLiquidityEvent):
-        function_purpose = "add liquidity via proxy"
-        logger.debug(f"Executing {function_purpose} for user {user.address} with event {event.__dict__}")
+        logger.debug(f"Executing {_ADD_LIQUIDITY_PROXY.purpose} for user {user.address} with event {event.__dict__}")
 
         tokens = [ESDTToken(event.tokenA, event.nonceA, event.amountA),
                   ESDTToken(event.tokenB, event.nonceB, event.amountB)
                   ]
 
-        sc_args = [
-            tokens,
-            Address(event.pairContract.address),
-            event.amountAmin,
-            event.amountBmin
-        ]
-        gas_limit = 40000000
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
-                                        "addLiquidityProxy", sc_args)
+        return self._call_endpoint(_ADD_LIQUIDITY_PROXY, user, proxy,
+                                   [tokens, Address(event.pairContract.address),
+                                    event.amountAmin, event.amountBmin])
 
     def remove_liquidity_proxy(self, user: Account, proxy: ProxyNetworkProvider, event: DexProxyRemoveLiquidityEvent):
-        function_purpose = "remove liquidity via proxy"
-        logger.debug(f"Executing {function_purpose} for user {user.address} with event {event.__dict__}")
+        logger.debug(f"Executing {_REMOVE_LIQUIDITY_PROXY.purpose} for user {user.address} with event {event.__dict__}")
 
+        # Alone among the five, the token identifier is the contract's rather than the event's.
         tokens = [ESDTToken(self.proxy_lp_token, event.nonce, event.amount)]
 
-        sc_args = [
-            tokens,
-            Address(event.pairContract.address),
-            event.amountA,
-            event.amountB
-        ]
-        gas_limit = 40000000
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
-                                        "removeLiquidityProxy", sc_args)
+        return self._call_endpoint(_REMOVE_LIQUIDITY_PROXY, user, proxy,
+                                   [tokens, Address(event.pairContract.address),
+                                    event.amountA, event.amountB])
 
     def enter_farm_proxy(self, user: Account, proxy: ProxyNetworkProvider, event: DexProxyEnterFarmEvent):
-        function_purpose = "enter farm via proxy"
-        logger.debug(f"Executing {function_purpose} for user {user.address} with event {event.__dict__}")
-
-        gas_limit = 50000000
+        logger.debug(f"Executing {_ENTER_FARM_PROXY.purpose} for user {user.address} with event {event.__dict__}")
 
         tokens = [ESDTToken(event.farming_tk, event.farming_tk_nonce, event.farming_tk_amount)]
         if event.farm_tk != "":
             tokens.append(ESDTToken(event.farm_tk, event.farm_tk_nonce, event.farm_tk_amount))
 
-        sc_args = [
-            tokens,
-            Address(event.farmContract.address)
-        ]
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
-                                        "enterFarmProxy", sc_args)
+        return self._call_endpoint(_ENTER_FARM_PROXY, user, proxy,
+                                   [tokens, Address(event.farmContract.address)])
 
     def exit_farm_proxy(self, user: Account, proxy: ProxyNetworkProvider, event: DexProxyExitFarmEvent):
-        function_purpose = "exit farm via proxy"
-        logger.debug(f"Executing {function_purpose} for user {user.address} with event {event.__dict__}")
-
-        gas_limit = 50000000
+        logger.debug(f"Executing {_EXIT_FARM_PROXY.purpose} for user {user.address} with event {event.__dict__}")
 
         tokens = [ESDTToken(event.token, event.nonce, event.amount)]
 
-        sc_args = [
-            tokens,
-            Address(event.farmContract.address)
-        ]
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
-                                        "exitFarmProxy", sc_args)
+        return self._call_endpoint(_EXIT_FARM_PROXY, user, proxy,
+                                   [tokens, Address(event.farmContract.address)])
 
     def claim_rewards_proxy(self, user: Account, proxy: ProxyNetworkProvider, event: DexProxyClaimRewardsEvent):
-        function_purpose = "claim rewards via proxy"
-        logger.debug(f"Executing {function_purpose} for user {user.address} with event {event.__dict__}")
-
-        gas_limit = 50000000
+        logger.debug(f"Executing {_CLAIM_REWARDS_PROXY.purpose} for user {user.address} with event {event.__dict__}")
 
         tokens = [ESDTToken(event.token, event.nonce, event.amount)]
-        sc_args = [
-            tokens,
-            Address(event.farmContract.address)
-        ]
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address),
-                                        "claimRewardsProxy", sc_args)
-    
+
+        return self._call_endpoint(_CLAIM_REWARDS_PROXY, user, proxy,
+                                   [tokens, Address(event.farmContract.address)])
+
     def increase_proxy_lp_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to increase energy for
             type[int]: lock epochs
         """
-        function_purpose = "increase proxy pair token energy"
-        logger.info(function_purpose)
+        return self._call_endpoint(_INCREASE_PROXY_LP_TOKEN_ENERGY, user, proxy, args)
 
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 50000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "increaseProxyPairTokenEnergy", args)
-    
     def increase_proxy_farm_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to increase energy for
             type[int]: lock epochs
         """
-        function_purpose = "increase proxy farm token energy"
-        logger.info(function_purpose)
+        return self._call_endpoint(_INCREASE_PROXY_FARM_TOKEN_ENERGY, user, proxy, args)
 
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 50000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "increaseProxyFarmTokenEnergy", args)
-    
     def destroy_proxy_farm_token(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to destroy
@@ -230,44 +249,20 @@ class DexProxyContract(DEXContractInterface):
             type[int]: second token slippage
             optional type[str]: original caller
         """
-        function_purpose = "destroy proxy farm token"
-        logger.info(function_purpose)
+        return self._call_endpoint(_DESTROY_PROXY_FARM_TOKEN, user, proxy, args)
 
-        if len(args) < 5:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 50000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "destroyFarmProxy", args)
-    
     def merge_proxy_farm_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to merge
             type[str]: farm address
         """
-        function_purpose = "merge proxy farm tokens"
-        logger.info(function_purpose)
+        return self._call_endpoint(_MERGE_PROXY_FARM_TOKENS, user, proxy, args)
 
-        if len(args) < 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 50000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "mergeWrappedFarmTokens", args)
-    
     def merge_proxy_lp_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to merge
         """
-        function_purpose = "merge proxy lp tokens"
-        logger.info(function_purpose)
-
-        if len(args) < 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 50000000
-        return multi_esdt_endpoint_call(function_purpose, proxy, gas_limit, user, Address(self.address), "mergeWrappedLpTokens", args)
+        return self._call_endpoint(_MERGE_PROXY_LP_TOKENS, user, proxy, args)
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
         """Expecting as args:
@@ -330,152 +325,46 @@ class DexProxyContract(DEXContractInterface):
             type[str]: token display name
             type[str]: token ticker
         """
-        function_purpose = "Register proxy farm token"
-        logger.info(function_purpose)
-        tx_hash = ""
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return tx_hash
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            18
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerProxyFarm", sc_args,
-                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+        return self._call_endpoint(_REGISTER_PROXY_FARM_TOKEN, deployer, proxy, args)
 
     def register_proxy_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """Expecting as args:
             type[str]: token display name
             type[str]: token ticker
         """
-        function_purpose = "Register proxy lp token"
-        logger.info(function_purpose)
-        tx_hash = ""
+        return self._call_endpoint(_REGISTER_PROXY_LP_TOKEN, deployer, proxy, args)
 
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return tx_hash
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            18
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "registerProxyPair", sc_args,
-                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
-
-    """Expecting as args:
-    type[str]: token id
-    type[str]: contract address to assign roles to
-    """
     def set_local_roles_proxy_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
-        function_purpose = "Set local roles for proxy token"
-        logger.info(function_purpose)
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            3, 4, 5
-        ]
-
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLocalRoles", sc_args)
+        """Expecting as args:
+            type[str]: token id
+            type[str]: contract address to assign roles to
+        """
+        return self._call_endpoint(_SET_LOCAL_ROLES_PROXY_TOKEN, deployer, proxy, args)
 
     def set_energy_factory_address(self, deployer: Account, proxy: ProxyNetworkProvider, energy_address: str):
-        function_purpose = "Set energy factory address in proxy contract"
-        logger.info(function_purpose)
-
-        if energy_address == "":
-            log_unexpected_args(function_purpose, energy_address)
-            return ""
-
-        gas_limit = 50000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setEnergyFactoryAddress",
-                             [energy_address])
+        return self._call_endpoint(_SET_ENERGY_FACTORY_ADDRESS, deployer, proxy, [energy_address])
 
     def add_pair_to_intermediate(self, deployer: Account, proxy: ProxyNetworkProvider, pair_address: str):
-        function_purpose = "Add pair to intermediate in proxy contract"
-        logger.info(function_purpose)
-
-        if pair_address == "":
-            log_unexpected_args(function_purpose, pair_address)
-            return ""
-
-        gas_limit = 50000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addPairToIntermediate", [pair_address])
+        return self._call_endpoint(_ADD_PAIR_TO_INTERMEDIATE, deployer, proxy, [pair_address])
 
     def set_transfer_role_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
-        function_purpose = "Set transfer role on address for lp token; legacy endpoint"
-        logger.info(function_purpose)
+        return self._call_endpoint(_SET_TRANSFER_ROLE_LOCKED_LP_TOKEN, deployer, proxy, [address])
 
-        if address == "":
-            log_unexpected_args(function_purpose, address)
-            return ""
-
-        gas_limit = 100000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleLockedLpToken", [address])
-    
     def set_transfer_role_locked_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
-        function_purpose = "Set transfer role on address for farm token; legacy endpoint"
-        logger.info(function_purpose)
+        return self._call_endpoint(_SET_TRANSFER_ROLE_LOCKED_FARM_TOKEN, deployer, proxy, [address])
 
-        if address == "":
-            log_unexpected_args(function_purpose, address)
-            return ""
-
-        gas_limit = 100000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleLockedFarmToken", [address])
-    
     def set_transfer_role_wrapped_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
-        function_purpose = "Set transfer role on address for lp token"
-        logger.info(function_purpose)
+        return self._call_endpoint(_SET_TRANSFER_ROLE_WRAPPED_LP_TOKEN, deployer, proxy, [address])
 
-        if address == "":
-            log_unexpected_args(function_purpose, address)
-            return ""
-
-        gas_limit = 100000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleWrappedLpToken", [address])
-    
     def set_transfer_role_wrapped_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, address: str):
-        function_purpose = "Set transfer role on address for farm token"
-        logger.info(function_purpose)
+        return self._call_endpoint(_SET_TRANSFER_ROLE_WRAPPED_FARM_TOKEN, deployer, proxy, [address])
 
-        if address == "":
-            log_unexpected_args(function_purpose, address)
-            return ""
-
-        gas_limit = 100000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setTransferRoleWrappedFarmToken", [address])
-    
     def add_farm_to_intermediate(self, deployer: Account, proxy: ProxyNetworkProvider, farm_address: str):
-        function_purpose = "Add farm to intermediate in proxy contract"
-        logger.info(function_purpose)
+        return self._call_endpoint(_ADD_FARM_TO_INTERMEDIATE, deployer, proxy, [farm_address])
 
-        if farm_address == "":
-            log_unexpected_args(function_purpose, farm_address)
-            return ""
-
-        gas_limit = 50000000
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addFarmToIntermediate", [farm_address])
-    
     def add_contract_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, whitelisted_sc_address: str):
-        function_purpose = "Add contract to proxy dex whitelist"
-        logger.info(function_purpose)
-        
-        gas_limit = 30000000
-        sc_args = [whitelisted_sc_address]
-        logger.debug(f"Arguments: {sc_args}")
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addSCAddressToWhitelist", sc_args)
+        return self._call_endpoint(_ADD_CONTRACT_TO_WHITELIST, deployer, proxy,
+                                   [whitelisted_sc_address])
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

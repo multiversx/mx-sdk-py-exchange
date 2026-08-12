@@ -112,12 +112,19 @@ class _Endpoint:
     declares none of the three, which is what "this one never checked" looks like — the state seven
     of the hand-written bodies were in, and not something to smooth away into a default check.
 
-    The last three axes exist for the same reason: `value` because the three token issuances are
-    the only endpoints that send EGLD, `transfers` because an endpoint whose first argument is a
-    list of ESDT transfers goes out through a different dispatcher entirely, and
-    `announces_endpoint` because three of the on-behalf wrappers log a second line naming the
-    endpoint they are about to call, which appears in `logs/trace.log` between the purpose and the
-    transaction.
+    `rejects_empty` is the other half of the argument specification, and a different shape: ten
+    wrappers across the fees collector and the DEX proxy guard the single *value* they were handed
+    rather than the length of a list, and hand `log_unexpected_args` that bare value rather than
+    the list around it. It is what tells the two refusals apart in `logs/trace.log`.
+
+    The last four axes exist for the same reason: `value` because the token issuances are the only
+    endpoints that send EGLD, `transfers` because an endpoint whose first argument is a list of
+    ESDT transfers goes out through a different dispatcher entirely, `gas_per_argument` because two
+    of the fees collector's list endpoints pay for the length of the list they are given where
+    their two opposite numbers charge a flat rate, and the two `announces_*` because what a wrapper
+    writes to the trace before dispatching varies: three of the on-behalf wrappers add a line
+    naming the endpoint, and the five DEX proxy wrappers that take an event announce nothing at
+    info at all, naming the user and the event at debug from their own bodies instead.
     """
 
     purpose: str                                 # what the call is for, as logged
@@ -125,22 +132,39 @@ class _Endpoint:
     name: str                                    # the endpoint as the contract spells it
     exactly: int | None = None                   # the number of arguments it requires
     at_least: int | None = None                  # the fewest number it requires
+    rejects_empty: bool = False                  # its one argument must not be empty
     build: Callable[[list], list] | None = None  # the arguments it sends, when not the ones given
     value: int | str = 0                         # the EGLD it sends
     transfers: bool = False                      # its first argument is a list of ESDT transfers
+    gas_per_argument: int = 0                    # what each argument adds to the gas limit
+    announces_purpose: bool = True               # it logs its purpose before dispatching
     announces_endpoint: bool = False             # it logs a second line naming what it is calling
 
     def accepts(self, args: list) -> bool:
-        """Whether `args` satisfies this endpoint's argument count."""
-        if self.exactly is not None:
-            return len(args) == self.exactly
-        if self.at_least is not None:
-            return len(args) >= self.at_least
-        return True
+        """Whether `args` satisfies this endpoint's argument specification.
+
+        The three checks compose rather than shadow one another. No endpoint declares more than one
+        today — the ten that `rejects_empty` all build their own single-element list — but an
+        endpoint that counted its arguments *and* refused an empty first one would otherwise lose
+        the count silently, and reach `args[0]` on a list that has no first element.
+        """
+        if self.exactly is not None and len(args) != self.exactly:
+            return False
+        if self.at_least is not None and len(args) < self.at_least:
+            return False
+        return not self.rejects_empty or bool(args and args[0])
+
+    def refused(self, args: list) -> Any:
+        """What `log_unexpected_args` is told about a refusal — the value, or the whole list."""
+        return args[0] if self.rejects_empty and args else args
 
     def arguments(self, args: list) -> list:
         """The arguments to send, out of the ones the wrapper was handed."""
         return args if self.build is None else self.build(args)
+
+    def gas_for(self, args: list) -> int:
+        """The gas this call costs, which for two endpoints grows with the arguments given."""
+        return self.gas_limit + len(args) * self.gas_per_argument
 
 
 class DEXContractIdentityInterface(ABC):
@@ -220,7 +244,7 @@ class DEXContractInterface(ABC):
         return _decode_view_result(raw_result, returns)
 
     def _call_endpoint(self, endpoint: _Endpoint, caller: Account, proxy: ProxyNetworkProvider,
-                       args: list) -> str:
+                       args: list, *, abi: Any = None) -> str:
         """Send one transaction to `endpoint` on this contract, and answer with its hash.
 
         The one place a change to how contracts dispatch transactions is made. Every step here was
@@ -230,34 +254,43 @@ class DEXContractInterface(ABC):
 
         An endpoint whose argument specification refuses `args` answers `""` without sending
         anything — the same value a dispatcher answers with when the network refuses it, which is
-        what every caller already treats as failure.
+        what every caller already treats as failure. What it tells `log_unexpected_args` differs
+        with the shape of the check: an argument count reports the whole list, an endpoint that
+        `rejects_empty` reports the one value it refused.
 
         An endpoint declaring `transfers` goes out through `multi_esdt_endpoint_call`, which reads
         `args[0]` as the tokens to transfer and the rest as the endpoint's own arguments. It is
         handed the purpose as well, because it names it in its own failure message.
 
+        `abi` is a parameter rather than an axis because it is the caller's, not the endpoint's:
+        `FeesCollectorContract.swap_to_base_token` alone takes one, to encode the nested swap
+        operations no other endpoint here accepts, and it takes a different one per call.
+
         The purpose is announced under the *contract's* module name rather than this one, which is
         what the hand-written bodies did and what `logs/trace.log` prints: it is how an operator
         tells which contract a line came from, and it would otherwise read `contract_identities`
         for all 23 of them. An endpoint declaring `announces_endpoint` follows it with the second
-        line its wrapper wrote by hand, naming what it is about to call.
+        line its wrapper wrote by hand, naming what it is about to call; one declaring
+        `announces_purpose=False` writes neither, and says so in its own body instead.
         """
         announce = logging.getLogger(type(self).__module__)
-        announce.info(endpoint.purpose)
-        if endpoint.announces_endpoint:
-            announce.info(f"Calling {endpoint.name} endpoint...")
+        if endpoint.announces_purpose:
+            announce.info(endpoint.purpose)
+            if endpoint.announces_endpoint:
+                announce.info(f"Calling {endpoint.name} endpoint...")
 
         if not endpoint.accepts(args):
-            log_unexpected_args(endpoint.purpose, args)
+            log_unexpected_args(endpoint.purpose, endpoint.refused(args))
             return ""
 
+        gas_limit = endpoint.gas_for(args)
         sc_args = endpoint.arguments(args)
         if endpoint.transfers:
-            return multi_esdt_endpoint_call(endpoint.purpose, proxy, endpoint.gas_limit, caller,
+            return multi_esdt_endpoint_call(endpoint.purpose, proxy, gas_limit, caller,
                                             Address(self.address), endpoint.name, sc_args,
-                                            value=endpoint.value)
-        return endpoint_call(proxy, endpoint.gas_limit, caller, Address(self.address),
-                             endpoint.name, sc_args, value=endpoint.value)
+                                            value=endpoint.value, abi=abi)
+        return endpoint_call(proxy, gas_limit, caller, Address(self.address),
+                             endpoint.name, sc_args, value=endpoint.value, abi=abi)
 
     def get_config_dict(self) -> dict[str, Any]:
         """This contract as the dict `save_deployed_contracts` writes to `deployed_*.json`.
