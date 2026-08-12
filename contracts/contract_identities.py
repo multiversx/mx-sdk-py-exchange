@@ -44,6 +44,20 @@ def _as_addresses(args: list) -> list:
     return [Address(argument) for argument in args]
 
 
+def _leading_addresses(count: int) -> Callable[[list], list]:
+    """The first `count` arguments as addresses, the rest as they came.
+
+    `_as_addresses` for endpoints whose arguments are not all addresses — a pool followed by its two
+    tokens, a fee receiver followed by the token it is paid in. Seven wrappers across the router,
+    the pair and the simple lock build this way: five convert one leading argument, and the router's
+    two fee endpoints convert two.
+    """
+    def build(args: list) -> list:
+        return [*_as_addresses(args[:count]), *args[count:]]
+
+    return build
+
+
 def _decode_view_result(raw_result: Any, returns: Any) -> Any:
     """Convert one raw view answer into the kind the caller asked for."""
     if isinstance(returns, list):

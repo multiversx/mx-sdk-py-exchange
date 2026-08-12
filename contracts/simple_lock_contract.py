@@ -1,13 +1,57 @@
 import config
-from contracts.contract_identities import DEXContractInterface, _ConfigField
+from contracts.contract_identities import (DEXContractInterface, _ConfigField, _Endpoint,
+                                           _leading_addresses)
 from utils.logger import get_logger
-from utils.utils_tx import deploy, endpoint_call, multi_esdt_endpoint_call, upgrade_call
-from utils.utils_generic import log_step_pass, log_substep, log_unexpected_args
+from utils.utils_tx import deploy, upgrade_call
+from utils.utils_generic import log_step_pass, log_substep
 from utils.utils_chain import Account, WrapperAddress as Address
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and what it makes of the arguments it is handed. `_call_endpoint` on
+# `DEXContractInterface` does the rest, so each wrapper below carries only its signature and the
+# argument documentation its callers depend on.
+#
+# The three issuances are the only calls here that send EGLD, and all three append the 18 decimals
+# none of their callers passes — a fourth argument is refused, so 18 is the only precision a token
+# on this contract can have.
+_ISSUE_LP_PROXY_TOKEN = _Endpoint("Issue locked LP token", 100000000, "issueLpProxyToken",
+                                  exactly=2, build=lambda args: [*args, 18],
+                                  value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+_ISSUE_FARM_PROXY_TOKEN = _Endpoint("Issue locked farm token", 100000000, "issueFarmProxyToken",
+                                    exactly=2, build=lambda args: [*args, 18],
+                                    value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+_ISSUE_LOCKED_TOKEN = _Endpoint("Issue locked token", 100000000, "issueLockedToken", exactly=2,
+                                build=lambda args: [*args, 18],
+                                value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+
+_SET_LOCAL_ROLES_LOCKED_TOKEN = _Endpoint("Set local roles locked token", 100000000,
+                                          "setLocalRolesLockedToken")
+_SET_LOCAL_ROLES_LP_PROXY_TOKEN = _Endpoint("Set local roles locked lp token", 100000000,
+                                            "setLocalRolesLpProxyToken")
+
+_ADD_LP_TO_WHITELIST = _Endpoint("Add LP to Whitelist in simple lock contract", 100000000,
+                                 "addLpToWhitelist", exactly=3, build=_leading_addresses(1))
+_ADD_FARM_TO_WHITELIST = _Endpoint("Add Farm to Whitelist in simple lock contract", 100000000,
+                                   "addFarmToWhitelist", exactly=3, build=_leading_addresses(1))
+
+# The six user-facing ones, each handed its token list ready-made rather than an event.
+_LOCK_TOKENS = _Endpoint("lock tokens", 10000000, "lockTokens", at_least=2, transfers=True)
+_ADD_LIQUIDITY_LOCKED_TOKEN = _Endpoint("add liquidity for locked token", 20000000,
+                                        "addLiquidityLockedToken", exactly=3, transfers=True)
+# Announces the purpose above it, word for word, while calling the opposite endpoint. The purpose
+# is what `logs/trace.log` is grepped for, so it is preserved as declared.
+_REMOVE_LIQUIDITY_LOCKED_TOKEN = _Endpoint("add liquidity for locked token", 20000000,
+                                           "removeLiquidityLockedToken", exactly=3, transfers=True)
+_ENTER_FARM_LOCKED_TOKEN = _Endpoint("enter farm with locked token", 30000000,
+                                     "enterFarmLockedToken", exactly=1, transfers=True)
+_EXIT_FARM_LOCKED_TOKEN = _Endpoint("exit farm with locked token", 30000000, "exitFarmLockedToken",
+                                    exactly=1, transfers=True)
+_CLAIM_FARM_LOCKED_TOKEN = _Endpoint("claim farm with locked token", 30000000,
+                                     "farmClaimRewardsLockedToken", exactly=1, transfers=True)
 
 
 class SimpleLockContract(DEXContractInterface):
@@ -58,79 +102,27 @@ class SimpleLockContract(DEXContractInterface):
             type[str]: token display name
             type[str]: token ticker
         """
-        function_purpose = f"Issue locked LP token"
-        logger.info(function_purpose)
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            18
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueLpProxyToken", sc_args,
-                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+        return self._call_endpoint(_ISSUE_LP_PROXY_TOKEN, deployer, proxy, args)
 
     def issue_locked_farm_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: token display name
             type[str]: token ticker
         """
-        function_purpose = f"Issue locked farm token"
-        logger.info(function_purpose)
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            18
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueFarmProxyToken", sc_args,
-                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+        return self._call_endpoint(_ISSUE_FARM_PROXY_TOKEN, deployer, proxy, args)
 
     def issue_locked_token(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: token display name
             type[str]: token ticker
         """
-        function_purpose = f"Issue locked token"
-        logger.info(function_purpose)
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 100000000
-        sc_args = [
-            args[0],
-            args[1],
-            18
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "issueLockedToken", sc_args,
-                             value=config.DEFAULT_ISSUE_TOKEN_PRICE)
+        return self._call_endpoint(_ISSUE_LOCKED_TOKEN, deployer, proxy, args)
 
     def set_local_roles_locked_token(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Set local roles locked token"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLocalRolesLockedToken", sc_args)
+        return self._call_endpoint(_SET_LOCAL_ROLES_LOCKED_TOKEN, deployer, proxy, [])
 
     def set_local_roles_locked_lp_token(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Set local roles locked lp token"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLocalRolesLpProxyToken", sc_args)
+        return self._call_endpoint(_SET_LOCAL_ROLES_LP_PROXY_TOKEN, deployer, proxy, [])
 
     def add_lp_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -138,20 +130,7 @@ class SimpleLockContract(DEXContractInterface):
             type[str]: first token identifier
             type[str]: second token identifier
         """
-        function_purpose = f"Add LP to Whitelist in simple lock contract"
-        logger.info(function_purpose)
-
-        if len(args) != 3:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(args[0]),
-            args[1],
-            args[2]
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addLpToWhitelist", sc_args)
+        return self._call_endpoint(_ADD_LP_TO_WHITELIST, deployer, proxy, args)
 
     def add_farm_to_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -159,35 +138,14 @@ class SimpleLockContract(DEXContractInterface):
             type[str]: farming token identifier
             type[str]: farm type: 0 - simple, 1 - locked, 2 - boosted
         """
-        function_purpose = f"Add Farm to Whitelist in simple lock contract"
-        logger.info(function_purpose)
-
-        if len(args) != 3:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(args[0]),
-            args[1],
-            args[2]
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addFarmToWhitelist", sc_args)
+        return self._call_endpoint(_ADD_FARM_TO_WHITELIST, deployer, proxy, args)
 
     def lock_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[List[ESDTToken]]: tokens list
             type[int]: lock epochs
         """
-        function_purpose = "lock tokens"
-        logger.info(function_purpose)
-
-        if len(args) < 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, 10000000,
-                                        user, Address(self.address), "lockTokens", args)
+        return self._call_endpoint(_LOCK_TOKENS, user, proxy, args)
 
     def add_liquidity_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -195,14 +153,7 @@ class SimpleLockContract(DEXContractInterface):
                     type[int]: first token amount min
                     type[int]: second token amount min
         """
-        function_purpose = "add liquidity for locked token"
-        logger.info(function_purpose)
-        if len(args) != 3:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        return multi_esdt_endpoint_call(function_purpose, proxy, 20000000,
-                                        user, Address(self.address), "addLiquidityLockedToken", args)
+        return self._call_endpoint(_ADD_LIQUIDITY_LOCKED_TOKEN, user, proxy, args)
 
     def remove_liquidity_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -210,49 +161,25 @@ class SimpleLockContract(DEXContractInterface):
                     type[int]: first token amount min
                     type[int]: second token amount min
         """
-        function_purpose = "add liquidity for locked token"
-        logger.info(function_purpose)
-        if len(args) != 3:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 20000000,
-                                        user, Address(self.address), "removeLiquidityLockedToken", args)
+        return self._call_endpoint(_REMOVE_LIQUIDITY_LOCKED_TOKEN, user, proxy, args)
 
     def enter_farm_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                     type[List[ESDTToken]]: tokens list
         """
-        function_purpose = "enter farm with locked token"
-        logger.info(function_purpose)
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
-                                        user, Address(self.address), "enterFarmLockedToken", args)
+        return self._call_endpoint(_ENTER_FARM_LOCKED_TOKEN, user, proxy, args)
 
     def exit_farm_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                     type[List[ESDTToken]]: tokens list
         """
-        function_purpose = "exit farm with locked token"
-        logger.info(function_purpose)
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
-                                        user, Address(self.address), "exitFarmLockedToken", args)
+        return self._call_endpoint(_EXIT_FARM_LOCKED_TOKEN, user, proxy, args)
 
     def claim_farm_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
                     type[List[ESDTToken]]: tokens list
         """
-        function_purpose = "claim farm with locked token"
-        logger.info(function_purpose)
-        if len(args) != 1:
-            log_unexpected_args(function_purpose, args)
-            return ""
-        return multi_esdt_endpoint_call(function_purpose, proxy, 30000000,
-                                        user, Address(self.address), "farmClaimRewardsLockedToken", args)
+        return self._call_endpoint(_CLAIM_FARM_LOCKED_TOKEN, user, proxy, args)
 
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
         pass

@@ -2,16 +2,58 @@ import sys
 import traceback
 import config
 
-from contracts.contract_identities import (DEXContractInterface, PairContractVersion, _ConfigField)
+from contracts.contract_identities import (DEXContractInterface, PairContractVersion,
+                                           _as_addresses, _ConfigField, _Endpoint,
+                                           _leading_addresses)
 from utils.contract_data_fetchers import PairContractDataFetcher
 from utils.logger import get_logger
-from utils.utils_tx import NetworkProviders, endpoint_call, upgrade_call, deploy, ESDTToken, multi_esdt_endpoint_call
+from utils.utils_tx import NetworkProviders, upgrade_call, deploy, ESDTToken
 from utils.utils_generic import log_step_fail, log_step_pass, log_substep, log_unexpected_args
 from utils.utils_chain import Account, WrapperAddress as Address, hex_to_string
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
 
 
 logger = get_logger(__name__)
+
+# The contract's endpoints, one declaration each: what the call is for, what it costs, what the
+# contract calls it, and what it makes of the arguments it is handed. `_call_endpoint` on
+# `DEXContractInterface` does the rest, so each wrapper below carries only its signature, the
+# tokens it builds out of the event it was handed, and the argument documentation its callers
+# depend on.
+#
+# The five user-facing ones all transfer tokens, and all five name the account they sign with at
+# debug from their own bodies: nothing further down the stack logs who signed.
+_SWAP_TOKENS_FIXED_INPUT = _Endpoint("swapFixedInput", 20000000, "swapTokensFixedInput",
+                                     transfers=True)
+_SWAP_TOKENS_FIXED_OUTPUT = _Endpoint("swap tokens fixed output", 50000000,
+                                      "swapTokensFixedOutput", transfers=True)
+_ADD_LIQUIDITY = _Endpoint("addLiquidity", 20000000, "addLiquidity", transfers=True)
+_ADD_INITIAL_LIQUIDITY = _Endpoint("addInitialLiquidity", 20000000, "addInitialLiquidity",
+                                   transfers=True)
+_REMOVE_LIQUIDITY = _Endpoint("remove liquidity", 20000000, "removeLiquidity", transfers=True)
+
+_WHITELIST = _Endpoint("Whitelist contract in pair", 100000000, "whitelist", build=_as_addresses)
+_REMOVE_WHITELIST = _Endpoint("Remove whitelist contract in pair", 100000000, "removeWhitelist",
+                              build=_as_addresses)
+# Announces the purpose of `whitelist_contract` above it, word for word, while calling a different
+# endpoint. The purpose is what `logs/trace.log` is grepped for, so it is preserved as declared.
+_ADD_TRUSTED_SWAP_PAIR = _Endpoint("Whitelist contract in pair", 100000000, "addTrustedSwapPair",
+                                   exactly=3, build=_leading_addresses(1))
+
+# The two cheapest calls on any contract in the DEX, at a twentieth of what their neighbours spend.
+_SETUP_FEES_COLLECTOR = _Endpoint("Setup fees collector in pair", 5500000, "setupFeesCollector",
+                                  exactly=2, build=_leading_addresses(1))
+_SET_FEE_PERCENTS = _Endpoint("Set fees in pair contract", 5000000, "setFeePercents", exactly=2)
+
+_SET_LOCKING_DEADLINE_EPOCH = _Endpoint("Set locking deadline epoch in pool", 100000000,
+                                        "setLockingDeadlineEpoch")
+_SET_UNLOCK_EPOCH = _Endpoint("Set unlock epoch in pool", 100000000, "setUnlockEpoch")
+_SET_LOCKING_SC_ADDRESS = _Endpoint("Set locking contract address in pool", 100000000,
+                                    "setLockingScAddress", build=_as_addresses)
+
+_RESUME = _Endpoint("Resume swaps in pool", 10000000, "resume")
+_SET_STATE_ACTIVE_NO_SWAPS = _Endpoint("Set pair active no swaps", 10000000,
+                                       "setStateActiveNoSwaps")
 
 
 class SwapFixedInputEvent:
@@ -90,79 +132,50 @@ class PairContract(DEXContractInterface):
         return False
 
     def swap_fixed_input(self, network_provider: NetworkProviders, user: Account, event: SwapFixedInputEvent):
-        function_purpose = f"swapFixedInput"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
         logger.debug(f"{event.amountA} {event.tokenA} for minimum {event.amountBmin} {event.tokenB}")
 
-        gas_limit = 20000000
-
         tokens = [ESDTToken(event.tokenA, 0, event.amountA)]
-        sc_args = [tokens,
-                   event.tokenB,
-                   event.amountBmin]
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), "swapTokensFixedInput", sc_args)
+
+        return self._call_endpoint(_SWAP_TOKENS_FIXED_INPUT, user, network_provider.proxy,
+                                   [tokens, event.tokenB, event.amountBmin])
 
     def swap_fixed_output(self, network_provider: NetworkProviders, user: Account, event: SwapFixedOutputEvent):
-        function_purpose = f"swap tokens fixed output"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
         logger.debug(f"Maximum {event.amountAmax} {event.tokenA} for {event.amountB} {event.tokenB}")
 
-        gas_limit = 50000000
-
         tokens = [ESDTToken(event.tokenA, 0, event.amountAmax)]
-        sc_args = [tokens,
-                   event.tokenB,
-                   event.amountB]
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), "swapTokensFixedOutput", sc_args)
+
+        return self._call_endpoint(_SWAP_TOKENS_FIXED_OUTPUT, user, network_provider.proxy,
+                                   [tokens, event.tokenB, event.amountB])
 
     def add_liquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
-        function_purpose = f"addLiquidity"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
         tokens = [ESDTToken(event.tokenA, 0, event.amountA),
                   ESDTToken(event.tokenB, 0, event.amountB)]
-        sc_args = [
-            tokens,
-            event.amountAmin,
-            event.amountBmin,
-        ]
 
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, 20000000,
-                                        user, Address(self.address), "addLiquidity", sc_args)
+        return self._call_endpoint(_ADD_LIQUIDITY, user, network_provider.proxy,
+                                   [tokens, event.amountAmin, event.amountBmin])
 
     def add_initial_liquidity(self, network_provider: NetworkProviders, user: Account, event: AddLiquidityEvent):
-        function_purpose = f"addInitialLiquidity"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
         tokens = [ESDTToken(event.tokenA, 0, event.amountA),
                   ESDTToken(event.tokenB, 0, event.amountB)]
 
-        sc_args = [tokens]
-
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, 20000000,
-                                        user, Address(self.address), "addInitialLiquidity", sc_args)
+        return self._call_endpoint(_ADD_INITIAL_LIQUIDITY, user, network_provider.proxy, [tokens])
 
     def remove_liquidity(self, network_provider: NetworkProviders, user: Account, event: RemoveLiquidityEvent):
-        function_purpose = f"remove liquidity"
-        logger.info(function_purpose)
         logger.debug(f"Account: {user.address}")
 
-        gas_limit = 20000000
-
+        # Alone among the five, the token identifier is the contract's rather than the event's.
         tokens = [ESDTToken(self.lpToken, 0, event.amount)]
-        sc_args = [tokens,
-                   event.amountA,   # slippage first token
-                   event.amountB    # slippage second token
-                   ]
 
-        return multi_esdt_endpoint_call(function_purpose, network_provider.proxy, gas_limit,
-                                        user, Address(self.address), "removeLiquidity", sc_args)
+        return self._call_endpoint(_REMOVE_LIQUIDITY, user, network_provider.proxy,
+                                   [tokens,
+                                    event.amountA,   # slippage first token
+                                    event.amountB])  # slippage second token
 
     def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list):
         """Expecting as args:
@@ -300,24 +313,10 @@ class PairContract(DEXContractInterface):
         return tx_hash
 
     def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
-        function_purpose = f"Whitelist contract in pair"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(contract_to_whitelist)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "whitelist", sc_args)
+        return self._call_endpoint(_WHITELIST, deployer, proxy, [contract_to_whitelist])
 
     def remove_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_remove: str):
-        function_purpose = f"Remove whitelist contract in pair"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(contract_to_remove)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeWhitelist", sc_args)
+        return self._call_endpoint(_REMOVE_WHITELIST, deployer, proxy, [contract_to_remove])
 
     def add_trusted_swap_pair(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
@@ -325,55 +324,21 @@ class PairContract(DEXContractInterface):
             type[str]: trusted pair first token identifier
             type[str]: trusted pair second token identifier
         """
-        function_purpose = f"Whitelist contract in pair"
-        logger.info(function_purpose)
-
-        if len(args) != 3:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(args[0]),
-            args[1],
-            args[2]
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "addTrustedSwapPair", sc_args)
+        return self._call_endpoint(_ADD_TRUSTED_SWAP_PAIR, deployer, proxy, args)
 
     def add_fees_collector(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: fees collector address
             type[str]: fees cut
         """
-        function_purpose = f"Setup fees collector in pair"
-        logger.info(function_purpose)
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 5500000
-        sc_args = [
-            Address(args[0]),
-            args[1]
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setupFeesCollector", sc_args)
+        return self._call_endpoint(_SETUP_FEES_COLLECTOR, deployer, proxy, args)
 
     def set_fees_percents(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: total fee percent
             type[str]: special fee percent
         """
-        function_purpose = f"Set fees in pair contract"
-        logger.info(function_purpose)
-
-        if len(args) != 2:
-            log_unexpected_args(function_purpose, args)
-            return ""
-
-        gas_limit = 5000000
-        sc_args = args
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setFeePercents", sc_args)
+        return self._call_endpoint(_SET_FEE_PERCENTS, deployer, proxy, args)
 
     def set_lp_token_local_roles_via_router(self, deployer: Account, proxy: ProxyNetworkProvider, router_contract):
         function_purpose = f"Set lp token local roles via router"
@@ -397,51 +362,21 @@ class PairContract(DEXContractInterface):
         return tx_hash
 
     def set_locking_deadline_epoch(self, deployer: Account, proxy: ProxyNetworkProvider, epoch: int):
-        function_purpose = f"Set locking deadline epoch in pool"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            epoch
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingDeadlineEpoch", sc_args)
+        return self._call_endpoint(_SET_LOCKING_DEADLINE_EPOCH, deployer, proxy, [epoch])
 
     def set_unlock_epoch(self, deployer: Account, proxy: ProxyNetworkProvider, epoch: int):
-        function_purpose = f"Set unlock epoch in pool"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            epoch
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setUnlockEpoch", sc_args)
+        return self._call_endpoint(_SET_UNLOCK_EPOCH, deployer, proxy, [epoch])
 
     def set_locking_sc_address(self, deployer: Account, proxy: ProxyNetworkProvider, locking_address: str):
-        function_purpose = f"Set locking contract address in pool"
-        logger.info(function_purpose)
-
-        gas_limit = 100000000
-        sc_args = [
-            Address(locking_address)
-        ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockingScAddress", sc_args)
+        return self._call_endpoint(_SET_LOCKING_SC_ADDRESS, deployer, proxy, [locking_address])
 
     def resume(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Resume swaps in pool"
-        logger.info(function_purpose)
-
-        gas_limit = 10000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "resume", sc_args)
+        return self._call_endpoint(_RESUME, deployer, proxy, [])
 
     def set_active_no_swaps(self, deployer: Account, proxy: ProxyNetworkProvider):
-        function_purpose = f"Set pair active no swaps"
-        logger.info(function_purpose)
+        return self._call_endpoint(_SET_STATE_ACTIVE_NO_SWAPS, deployer, proxy, [])
 
-        gas_limit = 10000000
-        sc_args = []
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setStateActiveNoSwaps", sc_args)
-    
+
     def get_safe_price_round_save_interval(self, proxy: ProxyNetworkProvider):
         return self._query_view(proxy, PairContractDataFetcher, "getSafePriceRoundSaveInterval")
 
