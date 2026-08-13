@@ -138,8 +138,7 @@ class _Endpoint:
     endpoints that send a constant amount of EGLD, `transfers` because an endpoint whose first
     argument is a list of ESDT transfers goes out through a different dispatcher entirely,
     `gas_per_argument` because two of the fees collector's list endpoints pay for the length of the
-    list they are given where their two opposite numbers charge a flat rate, `on` because one
-    endpoint is addressed to a token this contract holds rather than to the contract itself, and the
+    list they are given where their two opposite numbers charge a flat rate, and the
     `announces_*` and `detail*` axes because what a wrapper writes to the trace before dispatching
     varies: three of the on-behalf wrappers add a line naming the endpoint, four describe what they
     are about to do in terms of the arguments themselves, and the five DEX proxy wrappers that take
@@ -158,7 +157,6 @@ class _Endpoint:
     value: int | str = 0                         # the EGLD it sends
     transfers: bool = False                      # its first argument is a list of ESDT transfers
     gas_per_argument: int = 0                    # what each argument adds to the gas limit
-    on: str | None = None                        # the attribute holding its address, when not `address`
     announces_purpose: bool = True               # it logs its purpose before dispatching
     announces_endpoint: bool = False             # it logs a second line naming what it is calling
     detail: Callable[[list], str] | None = None  # a further line, built from the arguments
@@ -278,7 +276,7 @@ class _EndpointCaller:
         if endpoint.detail is not None:
             announce.log(endpoint.detail_level, endpoint.detail(args))
 
-        contract = Address(getattr(self, endpoint.on) if endpoint.on else self.address)
+        contract = Address(self.address)
         gas_limit = endpoint.gas_for(args)
         sc_args = endpoint.arguments(args)
         sent = endpoint.value if value is None else value

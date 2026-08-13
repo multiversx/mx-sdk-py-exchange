@@ -19,15 +19,10 @@ logger = get_logger(__name__)
 # `DEXContractInterface` does the rest, so each wrapper below carries only its signature, the debug
 # line naming who signed, and the argument documentation its callers depend on.
 #
-# ⚠️ `_SET_LOCAL_ROLES_DUAL_YIELD_TOKEN` is the only endpoint in `contracts/` addressed to anything
-# but its own contract: `on` names the metastake token, and a token identifier is not a bech32
-# address, so every call to it raises. Preserved as it behaves — see docs/CLEANUP.md.
 _REGISTER_DUAL_YIELD_TOKEN = _Endpoint("Register metastaking token", 100000000,
                                        "registerDualYieldToken", exactly=2, refuses=False,
                                        build=lambda args: [args[0], args[1], 18],
                                        value="50000000000000000")
-_SET_LOCAL_ROLES_DUAL_YIELD_TOKEN = _Endpoint("Set local roles for metastake token", 100000000,
-                                              "setLocalRolesDualYieldToken", on="metastake_token")
 _WHITELIST_CONTRACT = _Endpoint("Whitelist contract in metastaking", 50000000,
                                 "addSCAddressToWhitelist", build=_as_addresses)
 
@@ -146,9 +141,6 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
             type[str]: token ticker
         """
         return self._call_endpoint(_REGISTER_DUAL_YIELD_TOKEN, deployer, proxy, args)
-
-    def set_local_roles_dual_yield_token(self, deployer: Account, proxy: ProxyNetworkProvider):
-        return self._call_endpoint(_SET_LOCAL_ROLES_DUAL_YIELD_TOKEN, deployer, proxy, [])
 
     def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
         return self._call_endpoint(_WHITELIST_CONTRACT, deployer, proxy, [contract_to_whitelist])
