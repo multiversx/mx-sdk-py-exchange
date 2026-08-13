@@ -209,12 +209,13 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
 
         return self._call_endpoint(_ALLOW_EXTERNAL_CLAIM, user, network_provider.proxy, [])
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
         """Expecting as args:
         type[str]: owner address - only from v2
         type[str]: admin address - only from v2
         self.version has to be initialized to correctly attempt the deploy for that specific type of farm.
         """
+        args = [] if args is None else args
         function_purpose = f"Deploy staking contract"
         logger.info(function_purpose)
 
@@ -235,13 +236,14 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None,
                          no_init: bool = False):
         """Expecting as args:
         type[str]: owner address - only from v2
         type[str]: admin address - only from v2
         self.version has to be initialized to correctly attempt the deploy for that specific type of farm.
         """
+        args = [] if args is None else args
         function_purpose = f"Upgrade staking contract"
         logger.info(function_purpose)
 

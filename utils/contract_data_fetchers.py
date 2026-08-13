@@ -15,14 +15,16 @@ class DataFetcher:
         self.contract_address = contract_address
         self.view_handler_map = {}
 
-    def get_data(self, view_name: str, attrs: List[Any] = []) -> Any:
+    def get_data(self, view_name: str, attrs: List[Any] | None = None) -> Any:
+        attrs = [] if attrs is None else attrs
         if view_name in self.view_handler_map:
             return self.view_handler_map[view_name](view_name, attrs)
         else:
             logger.error(f"View name not registered in {type(self).__name__}")
             raise ValueError(f"View name not registered in {type(self).__name__}")
 
-    def _query_contract(self, view_name: str, attrs: List[Any] = []):
+    def _query_contract(self, view_name: str, attrs: List[Any] | None = None):
+        attrs = [] if attrs is None else attrs
         controller = SmartContractController(self.proxy.get_network_config().chain_id,self.proxy)
         query = controller.create_query(
             contract=self.contract_address,

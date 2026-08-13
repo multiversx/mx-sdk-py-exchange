@@ -75,7 +75,7 @@ class SimpleLockContract(DEXContractInterface):
     def load_contract_by_address(cls, address: str):
         raise NotImplementedError
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
         function_purpose = f"Deploy simple lock contract"
         logger.info(function_purpose)
 
@@ -181,7 +181,7 @@ class SimpleLockContract(DEXContractInterface):
         """
         return self._call_endpoint(_CLAIM_FARM_LOCKED_TOKEN, user, proxy, args)
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

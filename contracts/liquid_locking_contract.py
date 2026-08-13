@@ -45,10 +45,11 @@ class LiquidLockingContract(DEXContractInterface):
     def load_contract_by_address(cls, address: str):
         raise NotImplementedError
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
         """ Expected as args:
             type[int]: unbond period
         """
+        args = [] if args is None else args
         function_purpose = f"Deploy liquid locking contract"
         logger.info(function_purpose)
 
@@ -124,7 +125,7 @@ class LiquidLockingContract(DEXContractInterface):
     def get_unbond_period(self, proxy: ProxyNetworkProvider, user_address: str) -> Dict[str, Any]:
         return self._query_view(proxy, LiquidLockingContractDataFetcher, 'unbondPeriod')
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

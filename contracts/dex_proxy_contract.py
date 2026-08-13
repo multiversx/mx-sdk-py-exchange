@@ -226,21 +226,23 @@ class DexProxyContract(DEXContractInterface):
         return self._call_endpoint(_CLAIM_REWARDS_PROXY, user, proxy,
                                    [tokens, Address(event.farmContract.address)])
 
-    def increase_proxy_lp_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def increase_proxy_lp_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to increase energy for
             type[int]: lock epochs
         """
+        args = [] if args is None else args
         return self._call_endpoint(_INCREASE_PROXY_LP_TOKEN_ENERGY, user, proxy, args)
 
-    def increase_proxy_farm_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def increase_proxy_farm_token_energy(self, user: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to increase energy for
             type[int]: lock epochs
         """
+        args = [] if args is None else args
         return self._call_endpoint(_INCREASE_PROXY_FARM_TOKEN_ENERGY, user, proxy, args)
 
-    def destroy_proxy_farm_token(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def destroy_proxy_farm_token(self, user: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to destroy
             type[str]: farm address
@@ -249,25 +251,29 @@ class DexProxyContract(DEXContractInterface):
             type[int]: second token slippage
             optional type[str]: original caller
         """
+        args = [] if args is None else args
         return self._call_endpoint(_DESTROY_PROXY_FARM_TOKEN, user, proxy, args)
 
-    def merge_proxy_farm_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def merge_proxy_farm_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to merge
             type[str]: farm address
         """
+        args = [] if args is None else args
         return self._call_endpoint(_MERGE_PROXY_FARM_TOKENS, user, proxy, args)
 
-    def merge_proxy_lp_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def merge_proxy_lp_tokens(self, user: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         """Expecting as args:
             type[List[ESDTTokens]]: tokens to merge
         """
+        args = [] if args is None else args
         return self._call_endpoint(_MERGE_PROXY_LP_TOKENS, user, proxy, args)
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
         """Expecting as args:
         type[list]: locked asset factories contract addresses; care for the correct order based on locked tokens list
         """
+        args = [] if args is None else args
         function_purpose = f"deploy {type(self).__name__} contract"
         logger.info(function_purpose)
 
@@ -292,11 +298,12 @@ class DexProxyContract(DEXContractInterface):
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
-                         args: list = [], no_init: bool = False):
+                         args: list | None = None, no_init: bool = False):
         """Expecting as args:
         type[str]: old_locked_token_id
         type[str]: old_factory_address
         """
+        args = [] if args is None else args
         function_purpose = f"upgrade {type(self).__name__} contract"
         logger.info(function_purpose)
 
@@ -366,7 +373,7 @@ class DexProxyContract(DEXContractInterface):
         return self._call_endpoint(_ADD_CONTRACT_TO_WHITELIST, deployer, proxy,
                                    [whitelisted_sc_address])
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

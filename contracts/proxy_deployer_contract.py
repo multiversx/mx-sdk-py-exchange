@@ -97,7 +97,7 @@ class ProxyDeployerContract(DEXContractInterface):
         """
         return self._call_endpoint(_CALL_FARM_ENDPOINT, deployer, proxy, args)
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

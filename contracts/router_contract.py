@@ -259,7 +259,7 @@ class RouterContract(DEXContractInterface):
     def get_default_safe_price_rounds_offset(self, proxy: ProxyNetworkProvider):
         return self._query_view(proxy, RouterContractDataFetcher, "getDefaultSafePriceRoundsOffset")
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

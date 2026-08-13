@@ -261,7 +261,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None,
                          no_init: bool = False):
         """Expecting as args:
         type[str]: pair contract address
@@ -269,6 +269,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         type[str]: admin address (only V2Boosted)
         self.version has to be initialized to correctly attempt the upgrade for that specific type of farm.
         """
+        args = [] if args is None else args
         function_purpose = f"upgrade {type(self).__name__} contract"
         logger.info(function_purpose)
 
@@ -397,7 +398,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         all_stats.update(self.get_all_boosted_global_stats(proxy, week))
         return all_stats
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         _ = self.start_produce_rewards(deployer, proxy)
         _ = self.resume(deployer, proxy)
 

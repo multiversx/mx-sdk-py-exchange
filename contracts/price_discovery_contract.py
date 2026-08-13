@@ -120,7 +120,7 @@ class PriceDiscoveryContract(DEXContractInterface):
 
         return self._call_endpoint(_REDEEM, user, network_provider.proxy, [tokens])
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
         function_purpose = f"Deploy price discovery contract"
         logger.info(function_purpose)
 
@@ -157,7 +157,7 @@ class PriceDiscoveryContract(DEXContractInterface):
     def create_initial_redeem_tokens(self, deployer: Account, proxy: ProxyNetworkProvider):
         return self._call_endpoint(_CREATE_INITIAL_REDEEM_TOKENS, deployer, proxy, [])
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

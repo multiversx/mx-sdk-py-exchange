@@ -380,7 +380,7 @@ class PairContract(DEXContractInterface):
     def get_safe_price_round_save_interval(self, proxy: ProxyNetworkProvider):
         return self._query_view(proxy, PairContractDataFetcher, "getSafePriceRoundSaveInterval")
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         _ = self.resume(deployer, proxy)
 
     def print_contract_info(self):

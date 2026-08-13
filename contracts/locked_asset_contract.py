@@ -61,7 +61,7 @@ class LockedAssetContract(DEXContractInterface):
 
         return LockedAssetContract(base_token, locked_token, address)
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
         function_purpose = f"deploy {type(self).__name__} contract"
         logger.info(function_purpose)
 
@@ -82,7 +82,7 @@ class LockedAssetContract(DEXContractInterface):
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
-                         args: list = [], no_init: bool = False):
+                         args: list | None = None, no_init: bool = False):
         function_purpose = "Upgrade locked asset contract"
         logger.info(function_purpose)
 
@@ -135,7 +135,7 @@ class LockedAssetContract(DEXContractInterface):
         return self._call_endpoint(_SET_BURN_ROLE_FOR_ADDRESS, deployer, proxy,
                                    [contract_to_whitelist])
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

@@ -48,7 +48,7 @@ class GovernanceContract(DEXContractInterface):
     def load_contract_by_address(cls, address: str):
         raise NotImplementedError
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
         """ Expected as args:
             type[int]: min_energy_for_propose
             type[int]: min_fee_for_propose
@@ -59,6 +59,7 @@ class GovernanceContract(DEXContractInterface):
             type[str]: energy_factory_address
             type[str]: fees_collector_address
         """
+        args = [] if args is None else args
         function_purpose = f"Deploy {type(self).__name__} contract"
         logger.info(function_purpose)
 
@@ -74,7 +75,7 @@ class GovernanceContract(DEXContractInterface):
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
 
-    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
+    def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None,
                          no_init: bool = False):
         """ Expected as args:
             type[int]: min_energy_for_propose
@@ -86,6 +87,7 @@ class GovernanceContract(DEXContractInterface):
             type[str]: energy_factory_address
             type[str]: fees_collector_address
         """
+        args = [] if args is None else args
         function_purpose = f"upgrade {type(self).__name__} contract"
         logger.info(function_purpose)
 
@@ -152,7 +154,7 @@ class GovernanceContract(DEXContractInterface):
         """
         return self._call_endpoint(_CHANGE_QUORUM_PERCENTAGE, user, proxy, args)
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):

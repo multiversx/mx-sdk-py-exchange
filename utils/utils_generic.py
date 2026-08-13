@@ -68,7 +68,8 @@ def split_to_chunks(items: Any, chunk_size: int):
         yield items[i:i + chunk_size]
 
 
-def omit_fields(data: Any, fields: List[str] = []):
+def omit_fields(data: Any, fields: List[str] | None = None):
+    fields = [] if fields is None else fields
     if isinstance(data, dict):
         for field in fields:
             data.pop(field, None)

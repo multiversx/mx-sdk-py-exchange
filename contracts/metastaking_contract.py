@@ -100,7 +100,8 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
             address
         )
 
-    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = []):
+    def contract_deploy(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list | None = None):
+        args = [] if args is None else args
         function_purpose = f"Deploy metastaking contract"
         logger.info(function_purpose)
 
@@ -123,7 +124,7 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path,
-                         args: list = [], no_init: bool = False):
+                         args: list | None = None, no_init: bool = False):
         function_purpose = f"Upgrade metastaking contract"
         logger.info(function_purpose)
 
@@ -152,7 +153,7 @@ class MetaStakingContract(BaseSCWhitelistContract, BasePermissionsHubContract):
     def whitelist_contract(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_whitelist: str):
         return self._call_endpoint(_WHITELIST_CONTRACT, deployer, proxy, [contract_to_whitelist])
 
-    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list = []):
+    def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 
     def print_contract_info(self):
