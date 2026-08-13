@@ -255,10 +255,9 @@ class BaseSCWhitelistContract(DEXContractInterface, ABC):
         return self._call_endpoint(_REMOVE_SC_ADDRESS_FROM_WHITELIST, deployer, proxy,
                                    [whitelisted_sc_address])
 
-    def is_contract_whitelisted(self, address: str, proxy: ProxyNetworkProvider) -> bool:
+    def is_contract_whitelisted(self, address: str, proxy: ProxyNetworkProvider) -> int:
         return self._query_view(proxy, BaseContractWhitelistDataFetcher, 'isSCAddressWhitelisted',
-                                [AddressValue.new_from_address(Address(address))],
-                                returns=bool)
+                                [AddressValue.new_from_address(Address(address))])
     
 
 class BasePermissionsHubContract(DEXContractInterface, ABC):

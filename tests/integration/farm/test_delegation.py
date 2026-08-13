@@ -236,7 +236,7 @@ class TestFarmDelegation:
                 alice_bech32, network_providers.proxy
             )
             logger.info(f"Alice whitelisted: {is_whitelisted}")
-            assert is_whitelisted, "Alice should be whitelisted after addSCAddressToWhitelist"
+            assert is_whitelisted == 1, "Alice should be whitelisted after addSCAddressToWhitelist"
 
         finally:
             # Cleanup: remove Alice from whitelist
