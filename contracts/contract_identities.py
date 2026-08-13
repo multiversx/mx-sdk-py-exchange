@@ -88,7 +88,6 @@ class _ConfigField:
     key: str                        # the key it is stored under, and the attribute it reads
     arg: str | None = None          # the constructor keyword it loads into, when not `key`
     enum: type[Enum] | None = None  # the enum it round-trips through, stored as its `.value`
-    attr: str | None = None         # the attribute it reads, when not `key`
     optional: bool = False          # read with `.get`, yielding `None` when the key is absent
 
     @property
@@ -104,7 +103,7 @@ class _ConfigField:
 
     def dump(self, contract: Any) -> Any:
         """This field's value on `contract`, as it is stored."""
-        value = getattr(contract, self.attr or self.key)
+        value = getattr(contract, self.key)
         return value.value if self.enum is not None else value
 
     def load(self, config_dict: dict) -> Any:

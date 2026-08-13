@@ -1,10 +1,12 @@
 from multiversx_sdk import CodeMetadata, ProxyNetworkProvider
-from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
-from utils.utils_chain import Account, WrapperAddress as Address
-from utils.logger import get_logger
-from utils.utils_tx import deploy, upgrade_call
-from utils.utils_generic import log_step_pass, log_unexpected_args
+
 import config
+from contracts.contract_identities import DEXContractInterface, _ConfigField, _Endpoint
+from utils.logger import get_logger
+from utils.utils_chain import Account
+from utils.utils_chain import WrapperAddress as Address
+from utils.utils_generic import log_step_pass, log_unexpected_args
+from utils.utils_tx import deploy, upgrade_call
 
 logger = get_logger(__name__)
 
@@ -32,10 +34,7 @@ _ISSUE_WRAPPED_TOKEN = _Endpoint("Issue wrapped token", 100000000, "issueWrapped
 class LkWrapContract(DEXContractInterface):
     _CONFIG_FIELDS = (
         _ConfigField("address"),
-        # ⚠️ `attr` names an attribute nothing assigns, so `get_config_dict` raises
-        # `AttributeError` for every LkWrapContract and the `lk_wraps` group cannot be saved at
-        # all. Preserved exactly as it behaves today — see docs/CLEANUP.md.
-        _ConfigField("wrapped_token", attr="wrap_lk_token"),
+        _ConfigField("wrapped_token"),
     )
     _CONTRACT_TOKENS = ("wrapped_token",)
 
@@ -64,7 +63,7 @@ class LkWrapContract(DEXContractInterface):
         arguments = args
         tx_hash, address = deploy(type(self).__name__, proxy, gas_limit, deployer, bytecode_path, metadata, arguments)
         return tx_hash, address
-    
+
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = None,
                          no_init: bool = False):
         """ Expected as args: []
@@ -75,15 +74,9 @@ class LkWrapContract(DEXContractInterface):
         metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 200000000
 
-        if no_init:
-            arguments = []
-        else:
-            arguments = []
+        return upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
+                                        bytecode_path, metadata, [])
 
-        tx_hash = upgrade_call(type(self).__name__, proxy, gas_limit, deployer, Address(self.address),
-                                        bytecode_path, metadata, arguments)
-        return tx_hash
-    
     def wrap_locked_token(self, user: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[ESDTToken]: tokens
