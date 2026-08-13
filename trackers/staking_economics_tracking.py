@@ -21,7 +21,7 @@ class StakingEconomics(_RewardsEconomicsBase):
     )
 
     def __init__(self, address: str, network_provider: NetworkProviders):
-        self.contract_address = Address(address, "erd")
+        self.contract_address = Address.new_from_bech32(address)
         self.network_provider = network_provider
         self.data_fetcher = StakingContractDataFetcher(self.contract_address, self.network_provider.proxy.url)
         self.chain_data_fetcher = ChainDataFetcher(self.network_provider.proxy.url)

@@ -18,7 +18,7 @@ from multiversx_sdk.abi import BigUIntValue
 class MetastakingEconomics(Subscriber):
     def __init__(self, contract_address: str, staking_address: str, farm_contract: FarmContract,
                  pair_contract: PairContract, network_provider: NetworkProviders):
-        self.contract_address = Address(contract_address, "erd")
+        self.contract_address = Address.new_from_bech32(contract_address)
         self.farm_contract = farm_contract
         self.pair_contract = pair_contract
         self.network_provider = network_provider

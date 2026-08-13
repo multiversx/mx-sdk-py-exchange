@@ -11,7 +11,7 @@ from contracts.pair_contract import AddLiquidityEvent, RemoveLiquidityEvent, \
 class PairEconomics(Subscriber):
 
     def __init__(self, contract_address: str, first_token: str, second_token: str, network_provider: NetworkProviders):
-        self.contract_address = Address(contract_address, "erd")
+        self.contract_address = Address.new_from_bech32(contract_address)
         self.network_provider = network_provider
         self.pair_data_fetcher = PairContractDataFetcher(self.contract_address, self.network_provider.proxy.url)
         self._get_tokens_reserve_and_total_supply()

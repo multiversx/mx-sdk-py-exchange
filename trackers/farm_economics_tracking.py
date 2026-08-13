@@ -171,7 +171,7 @@ class FarmEconomics(_RewardsEconomicsBase):
     )
 
     def __init__(self, contract_address: str, version: FarmContractVersion, network_provider: NetworkProviders):
-        self.contract_address = Address(contract_address, "erd")
+        self.contract_address = Address.new_from_bech32(contract_address)
         self.version = version
         self.network_provider = network_provider
         self.farm_data_fetcher = FarmContractDataFetcher(self.contract_address, network_provider.proxy.url)
