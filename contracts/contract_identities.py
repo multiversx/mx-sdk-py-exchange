@@ -335,7 +335,8 @@ class DEXContractInterface(_EndpointCaller, ABC):
         A view that answers with nothing yields that kind's empty value — `0`, `""`, `False`, `{}`,
         `[]` — rather than raising, which is the guard every hand-written View Getter carried.
         `empty` overrides it, and is how the getters that disagree keep disagreeing: the permissions
-        views report an empty answer as `-1`, the liquid-locking token lists report theirs as `{}`.
+        views report an empty answer as `-1`, the fees collector's weekly rewards report theirs as
+        `[]`, and the two address getters that guard report `""`.
         `Address` and callable converters have no empty value of their own, so a getter that wants
         one names it and a getter that does not lets the conversion raise, as `get_pair_template_address`
         always has.

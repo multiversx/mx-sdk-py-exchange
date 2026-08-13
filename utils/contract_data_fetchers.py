@@ -317,19 +317,6 @@ class MetaStakingContractDataFetcher(DataFetcher):
         }
 
 
-class LiquidLockingContractDataFetcher(DataFetcher):
-    def __init__(self, contract_address: Address, proxy_url: str):
-        super().__init__(contract_address, proxy_url)
-        self.view_handler_map = {
-            "lockedTokenAmounts": self._get_hex_view,
-            "unlockedTokenAmounts": self._get_hex_view,
-            "lockedTokens": self._get_hex_list_view,
-            "unlockedTokens": self._get_hex_list_view,
-            "whitelistedTokens": self._get_hex_list_view,
-            "unbondPeriod": self._get_int_view
-        }
-
-
 class BaseFarmContractDataFetcher(DataFetcher):
     def __init__(self, contract_address: Address, proxy_url: str):
         super().__init__(contract_address, proxy_url)

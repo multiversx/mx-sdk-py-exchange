@@ -22,21 +22,6 @@ ESDT_TOKEN_PAYMENT = {
     'token_amount': 'biguint'
 }
 
-LIQUID_LOCKING_UNLOCKED_TOKEN = {
-    'token_identifier': 'string',
-    'token_nonce': 'u64',
-    'unbond_epoch': 'biguint',
-    'unbond_epoch': 'u64',
-}
-
-LIQUID_LOCKING_LOCKED_TOKEN_AMOUNTS = {
-    'locked_tokens': ESDT_TOKEN_PAYMENT
-}
-
-LIQUID_LOCKING_UNLOCKED_TOKEN_AMOUNTS = {
-    'unlocked_tokens': LIQUID_LOCKING_UNLOCKED_TOKEN
-}
-
 USER_FARM_POSITION = {
     'total_farm_position': 'biguint',
     'allow_external_claim': 'u8'
