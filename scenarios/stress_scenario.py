@@ -1,17 +1,19 @@
 import logging
 import random
 import time
+
 from context import Context
 from contracts.farm_contract import FarmContract
-from events.event_generators import generate_add_liquidity_event, \
-    generate_add_initial_liquidity_event, generate_random_swap_fixed_input, \
-    generate_random_swap_fixed_output, generate_remove_liquidity_event, \
-    generate_swap_fixed_input, generate_migrate_farm_event, generateAddLiquidityProxyEvent, \
-    generateClaimRewardsEvent, generateEnterFarmEvent, generateEnterFarmv12Event, \
-    generateExitFarmEvent, generateRandomClaimRewardsEvent, generateRandomClaimRewardsProxyEvent, \
-    generateRandomCompoundRewardsEvent, generateRandomCompoundRewardsProxyEvent, \
-    generateRandomEnterFarmEvent, generateRandomEnterFarmProxyEvent, generateRandomExitFarmEvent, \
-    generateRandomExitFarmProxyEvent, generateRemoveLiquidityProxyEvent
+from events.event_generators import (
+    generate_add_initial_liquidity_event,
+    generate_add_liquidity_event,
+    generate_migrate_farm_event,
+    generate_swap_fixed_input,
+    generateClaimRewardsEvent,
+    generateEnterFarmEvent,
+    generateEnterFarmv12Event,
+    generateExitFarmEvent,
+)
 from utils.utils_chain import Account
 
 
@@ -67,7 +69,9 @@ def migration_stress(context: Context):
 
     # migrate some accounts
     account_list = context.accounts.get_all()
-    migrated_accounts = random.sample(account_list, random.randrange(1, len(account_list)))  # random subset of accounts
+    migrated_accounts = random.sample(
+        account_list, random.randrange(1, len(account_list))
+    )  # random subset of accounts
     for account in migrated_accounts:
         generate_migrate_farm_event(context, account, context.get_unlocked_farm_contract(0))
 
@@ -97,27 +101,7 @@ def weighted_random_choice(choices):
         if current > pick:
             return key
 
-
-def generateRandomEvent(context: Context):
-    events = {
-        generate_add_liquidity_event: 2,
-        generate_remove_liquidity_event: 2,
-        generate_random_swap_fixed_input: 6,
-        generate_random_swap_fixed_output: 6,
-        generateRandomEnterFarmEvent: 6,
-        generateRandomExitFarmEvent: 4,
-        generateRandomClaimRewardsEvent: 4,
-        generateRandomCompoundRewardsEvent: 4,
-        generateAddLiquidityProxyEvent: 3,
-        generateRemoveLiquidityProxyEvent: 3,
-        generateRandomEnterFarmProxyEvent: 4,
-        generateRandomExitFarmProxyEvent: 2,
-        generateRandomClaimRewardsProxyEvent: 2,
-        generateRandomCompoundRewardsProxyEvent: 2,
-    }
-
-    eventFunction = weighted_random_choice(events)
-    eventFunction(context)
+    return None
 
 
 def generate_random_farm_event(context: Context, user_account: Account, farm: FarmContract):
@@ -128,7 +112,8 @@ def generate_random_farm_event(context: Context, user_account: Account, farm: Fa
     }
 
     event_function = weighted_random_choice(events)
-    event_function(context, user_account, farm)
+    if event_function is not None:
+        event_function(context, user_account, farm)
 
 
 def generate_random_farm_v12_event(context: Context, user_account: Account, farm: FarmContract):
@@ -139,7 +124,8 @@ def generate_random_farm_v12_event(context: Context, user_account: Account, farm
     }
 
     event_function = weighted_random_choice(events)
-    event_function(context, user_account, farm)
+    if event_function is not None:
+        event_function(context, user_account, farm)
 
 
 if __name__ == "__main__":
