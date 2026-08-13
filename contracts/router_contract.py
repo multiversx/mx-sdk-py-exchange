@@ -253,12 +253,6 @@ class RouterContract(DEXContractInterface):
         return self._query_view(proxy, RouterContractDataFetcher, "getPairTemplateAddress",
                                 returns=Address)
 
-    def get_safe_price_round_save_interval(self, proxy: ProxyNetworkProvider):
-        return self._query_view(proxy, RouterContractDataFetcher, "getSafePriceRoundSaveInterval")
-
-    def get_default_safe_price_rounds_offset(self, proxy: ProxyNetworkProvider):
-        return self._query_view(proxy, RouterContractDataFetcher, "getDefaultSafePriceRoundsOffset")
-
     def contract_start(self, deployer: Account, proxy: ProxyNetworkProvider, args: list | None = None):
         pass
 

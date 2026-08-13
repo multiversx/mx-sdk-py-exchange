@@ -222,7 +222,6 @@ class PairContractDataFetcher(DataFetcher):
             "getReservesAndTotalSupply": self._get_int_list_view,
             "updateAndGetTokensForGivenPositionWithSafePrice": self._get_hex_list_view,
             "getPriceObservation": self._get_hex_list_view,
-            "getSafePriceRoundSaveInterval": self._get_int_view,
             "getSafePriceCurrentIndex": self._get_int_view,
             "getSafePriceByDefaultOffset": self._get_hex_view,
             "getLpTokensSafePriceByDefaultOffset": self._get_hex_list_view,
