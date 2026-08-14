@@ -59,9 +59,7 @@ class SimpleLockContract(DEXContractInterface):
         _ConfigField("address"),
         _ConfigField("locked_token"),
         _ConfigField("lp_proxy_token"),
-        # Committed deploy state predates this field — `deployed_simple_locks.json` carries no
-        # such key — so it loads as `None` rather than raising.
-        _ConfigField("farm_proxy_token", optional=True),
+        _ConfigField("farm_proxy_token", absent=""),
     )
     _CONTRACT_TOKENS = ("locked_token", "lp_proxy_token", "farm_proxy_token")
 

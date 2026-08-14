@@ -88,7 +88,7 @@ class _ConfigField:
     key: str                        # the key it is stored under, and the attribute it reads
     arg: str | None = None          # the constructor keyword it loads into, when not `key`
     enum: type[Enum] | None = None  # the enum it round-trips through, stored as its `.value`
-    optional: bool = False          # read with `.get`, yielding `None` when the key is absent
+    absent: Any = _UNSET            # what a missing key loads as; unset means the key is required
 
     @property
     def keyword(self) -> str:
@@ -108,7 +108,9 @@ class _ConfigField:
 
     def load(self, config_dict: dict) -> Any:
         """This field's value read out of a stored config, as the constructor wants it."""
-        raw = config_dict.get(self.key) if self.optional else config_dict[self.key]
+        raw = config_dict.get(self.key) if self.absent is not _UNSET else config_dict[self.key]
+        if raw is None and self.absent is not _UNSET:
+            raw = self.absent
         return self.enum(raw) if self.enum is not None and raw is not None else raw
 
 
