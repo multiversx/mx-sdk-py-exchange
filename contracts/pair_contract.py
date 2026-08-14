@@ -35,9 +35,7 @@ _REMOVE_LIQUIDITY = _Endpoint("remove liquidity", 20000000, "removeLiquidity", t
 _WHITELIST = _Endpoint("Whitelist contract in pair", 100000000, "whitelist", build=_as_addresses)
 _REMOVE_WHITELIST = _Endpoint("Remove whitelist contract in pair", 100000000, "removeWhitelist",
                               build=_as_addresses)
-# Announces the purpose of `whitelist_contract` above it, word for word, while calling a different
-# endpoint. The purpose is what `logs/trace.log` is grepped for, so it is preserved as declared.
-_ADD_TRUSTED_SWAP_PAIR = _Endpoint("Whitelist contract in pair", 100000000, "addTrustedSwapPair",
+_ADD_TRUSTED_SWAP_PAIR = _Endpoint("Add trusted swap route in pair", 100000000, "addTrustedSwapPair",
                                    exactly=3, build=_leading_addresses(1))
 
 # The two cheapest calls on any contract in the DEX, at a twentieth of what their neighbours spend.

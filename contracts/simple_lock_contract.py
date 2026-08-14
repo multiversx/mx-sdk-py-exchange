@@ -42,9 +42,7 @@ _ADD_FARM_TO_WHITELIST = _Endpoint("Add Farm to Whitelist in simple lock contrac
 _LOCK_TOKENS = _Endpoint("lock tokens", 10000000, "lockTokens", at_least=2, transfers=True)
 _ADD_LIQUIDITY_LOCKED_TOKEN = _Endpoint("add liquidity for locked token", 20000000,
                                         "addLiquidityLockedToken", exactly=3, transfers=True)
-# Announces the purpose above it, word for word, while calling the opposite endpoint. The purpose
-# is what `logs/trace.log` is grepped for, so it is preserved as declared.
-_REMOVE_LIQUIDITY_LOCKED_TOKEN = _Endpoint("add liquidity for locked token", 20000000,
+_REMOVE_LIQUIDITY_LOCKED_TOKEN = _Endpoint("remove liquidity for locked token", 20000000,
                                            "removeLiquidityLockedToken", exactly=3, transfers=True)
 _ENTER_FARM_LOCKED_TOKEN = _Endpoint("enter farm with locked token", 30000000,
                                      "enterFarmLockedToken", exactly=1, transfers=True)

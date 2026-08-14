@@ -62,8 +62,7 @@ _SET_BASE_TOKEN_BURN_PERCENT = _Endpoint("Set base token burn percentage", 30000
                                          "setBaseTokenBurnPercent")
 
 _CLAIM_REWARDS = _Endpoint("Claim rewards from fees collector", 80000000, "claimRewards")
-# Announces the purpose above it word for word, which is what `logs/trace.log` is grepped for.
-_CLAIM_BOOSTED_REWARDS = _Endpoint("Claim rewards from fees collector", 80000000,
+_CLAIM_BOOSTED_REWARDS = _Endpoint("Claim boosted rewards from fees collector", 80000000,
                                    "claimBoostedRewards")
 _REDISTRIBUTE_REWARDS = _Endpoint("Redistribute rewards from fees collector", 80000000,
                                   "redistributeRewards")

@@ -43,9 +43,7 @@ _SET_OLD_LOCKED_ASSET_FACTORY = _Endpoint("set old locked asset factory address"
                                           "setOldLockedAssetFactoryAddress", at_least=1)
 _SET_FEES_COLLECTOR = _Endpoint("set fees collector address", 10000000,
                                 "setFeesCollectorAddress", at_least=1)
-# Announces itself as the fees collector setter. Copied from the declaration above it and preserved:
-# the purpose is what `logs/trace.log` is grepped for, so correcting it is a behaviour change.
-_SET_TOKEN_UNSTAKE = _Endpoint("set fees collector address", 10000000,
+_SET_TOKEN_UNSTAKE = _Endpoint("set token unstake address", 10000000,
                                "setTokenUnstakeAddress", at_least=1)
 
 _ADD_LOCK_OPTIONS = _Endpoint("add lock options", 10000000, "addLockOptions", at_least=1)
@@ -92,8 +90,7 @@ _EXTEND_LOCK = _Endpoint("extend lock period", 10000000, "extendLockingPeriod", 
                          transfers=True)
 _ADD_LIQUIDITY_LOCKED_TOKEN = _Endpoint("add liquidity for locked token", 20000000,
                                         "addLiquidityLockedToken", exactly=3, transfers=True)
-# Announces itself as its add-liquidity neighbour, for the same reason `_SET_TOKEN_UNSTAKE` does.
-_REMOVE_LIQUIDITY_LOCKED_TOKEN = _Endpoint("add liquidity for locked token", 20000000,
+_REMOVE_LIQUIDITY_LOCKED_TOKEN = _Endpoint("remove liquidity for locked token", 20000000,
                                            "removeLiquidityLockedToken", exactly=3, transfers=True)
 _ENTER_FARM_LOCKED_TOKEN = _Endpoint("enter farm with locked token", 30000000,
                                      "enterFarmLockedToken", exactly=1, transfers=True)
@@ -102,8 +99,7 @@ _EXIT_FARM_LOCKED_TOKEN = _Endpoint("exit farm with locked token", 30000000, "ex
 _CLAIM_FARM_LOCKED_TOKEN = _Endpoint("claim farm with locked token", 30000000,
                                      "farmClaimRewardsLockedToken", exactly=1, transfers=True)
 
-# Announces itself as `resume`, for the same reason `_SET_TOKEN_UNSTAKE` does.
-_PAUSE = _Endpoint("Resume simple lock energy contract", 10000000, "pause")
+_PAUSE = _Endpoint("Pause simple lock energy contract", 10000000, "pause")
 _RESUME = _Endpoint("Resume simple lock energy contract", 10000000, "unpause")
 
 
