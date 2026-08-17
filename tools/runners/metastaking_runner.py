@@ -13,7 +13,7 @@ from tools.common import API, OUTPUT_FOLDER, PROXY, \
     fetch_new_and_compare_contract_states, get_owner, \
     get_saved_contract_addresses, get_user_continue, rule_of_three, run_graphql_query
 from tools.runners.common_runner import add_generate_transaction_command, \
-    add_upgrade_all_command, add_upgrade_command, \
+    add_upgrade_command, \
     get_acounts_with_token, read_accounts_from_json, \
     add_verify_command, verify_contracts, fund_shadowfork_accounts, \
     get_default_signature, sync_account_nonce

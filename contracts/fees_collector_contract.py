@@ -281,15 +281,15 @@ class FeesCollectorContract(BaseBoostedContract):
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockEpochs", sc_args)
 
-    def set_locked_tokens_per_block(self, deployer: Account, proxy: ProxyNetworkProvider, locked_tokens_per_block: int):
-        function_purpose = f"Set locked tokens per block"
+    def set_locked_tokens_per_epoch(self, deployer: Account, proxy: ProxyNetworkProvider, locked_tokens_per_epoch: int):
+        function_purpose = f"Set locked tokens per epoch"
         logger.info(function_purpose)
 
-        gas_limit = 30000000
+        gas_limit = 5000000
         sc_args = [
-            locked_tokens_per_block
+            locked_tokens_per_epoch
         ]
-        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockedTokensPerBlock", sc_args)
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setLockedTokensPerEpoch", sc_args)
 
     def set_base_token_burn_percent(self, deployer: Account, proxy: ProxyNetworkProvider, base_token_burn_percentage: int):
         function_purpose = f"Set base token burn percentage"

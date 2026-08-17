@@ -9,7 +9,7 @@ from contracts.position_creator_contract import PositionCreatorContract
 from contracts.farm_contract import FarmContract, FarmContractVersion
 from contracts.staking_contract import StakingContract, StakingContractVersion
 from contracts.metastaking_contract import MetaStakingContract, MetaStakingContractVersion
-from utils.utils_chain import WrapperAddress as Address, get_bytecode_codehash
+from utils.utils_chain import get_bytecode_codehash
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import get_file_from_url_or_path
 from tools.runners.farm_runner import get_farm_addresses_from_chain

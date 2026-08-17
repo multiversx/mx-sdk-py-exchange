@@ -1,4 +1,3 @@
-from itertools import chain
 from time import sleep
 from typing import Any, List
 import json

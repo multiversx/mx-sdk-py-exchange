@@ -107,7 +107,7 @@ class PairContract(DEXContractInterface):
         logger.debug(f"Account: {user.address}")
         logger.debug(f"{event.amountA} {event.tokenA} for minimum {event.amountBmin} {event.tokenB}")
 
-        gas_limit = 50000000
+        gas_limit = 20000000
 
         tokens = [ESDTToken(event.tokenA, 0, event.amountA)]
         sc_args = [tokens,
@@ -321,6 +321,16 @@ class PairContract(DEXContractInterface):
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "whitelist", sc_args)
 
+    def remove_whitelist(self, deployer: Account, proxy: ProxyNetworkProvider, contract_to_remove: str):
+        function_purpose = f"Remove whitelist contract in pair"
+        logger.info(function_purpose)
+
+        gas_limit = 100000000
+        sc_args = [
+            Address(contract_to_remove)
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "removeWhitelist", sc_args)
+
     def add_trusted_swap_pair(self, deployer: Account, proxy: ProxyNetworkProvider, args: list):
         """ Expected as args:
             type[str]: trusted swap pair address
@@ -354,7 +364,7 @@ class PairContract(DEXContractInterface):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 50000000
+        gas_limit = 5500000
         sc_args = [
             Address(args[0]),
             args[1]
@@ -373,7 +383,7 @@ class PairContract(DEXContractInterface):
             log_unexpected_args(function_purpose, args)
             return ""
 
-        gas_limit = 50000000
+        gas_limit = 5000000
         sc_args = args
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setFeePercents", sc_args)
 
