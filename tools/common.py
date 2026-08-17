@@ -6,7 +6,7 @@ from typing import List
 from multiversx_sdk import Address, ProxyNetworkProvider
 import requests
 from tools.runners.account_state_runner import get_account_keys_online, report_key_files_compare
-from utils.utils_chain import Account, base64_to_hex
+from utils.utils_chain import Account
 import config
 from utils.utils_tx import NetworkProviders
 from utils.utils_generic import ensure_folder

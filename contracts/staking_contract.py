@@ -109,7 +109,7 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         gas_limit = 50000000
 
         tokens = [ESDTToken(event.farming_tk, event.farming_tk_nonce, event.farming_tk_amount)]
-        if event.farm_tk:
+        if event.farm_tk and event.farm_tk_amount > 0:
             tokens.append(ESDTToken(event.farm_tk, event.farm_tk_nonce, event.farm_tk_amount))
 
         sc_args = [tokens,
@@ -302,6 +302,16 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
         ]
         return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPerBlockRewardAmount", sc_args)
 
+    def set_rewards_per_second(self, deployer: Account, proxy: ProxyNetworkProvider, rewards_amount: int):
+        function_purpose = f"Set rewards per second in stake contract"
+        logger.info(function_purpose)
+
+        gas_limit = 50000000
+        sc_args = [
+            rewards_amount
+        ]
+        return endpoint_call(proxy, gas_limit, deployer, Address(self.address), "setPerSecondRewardAmount", sc_args)
+
     def topup_rewards(self, deployer: Account, proxy: ProxyNetworkProvider, rewards_amount: int):
         function_purpose = f"Topup rewards in stake contract"
         logger.info(function_purpose)
@@ -473,6 +483,13 @@ class StakingContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistCont
     def get_max_apr(self, proxy: ProxyNetworkProvider) -> int:
         data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
         raw_results = data_fetcher.get_data('getAnnualPercentageRewards')
+        if not raw_results:
+            return 0
+        return int(raw_results)
+
+    def get_min_unbond_epochs(self, proxy: ProxyNetworkProvider) -> int:
+        data_fetcher = StakingContractDataFetcher(Address(self.address), proxy.url)
+        raw_results = data_fetcher.get_data('getMinUnbondEpochs')
         if not raw_results:
             return 0
         return int(raw_results)

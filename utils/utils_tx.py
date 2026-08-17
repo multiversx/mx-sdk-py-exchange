@@ -19,7 +19,7 @@ from multiversx_sdk.abi import Abi
 from multiversx_sdk.network_providers.errors import TransactionFetchingError
 from utils.logger import get_logger
 from utils.errors import GenericError
-from utils.utils_chain import Account, WrapperAddress, log_explorer_transaction, get_bytecode_codehash
+from utils.utils_chain import Account, log_explorer_transaction, get_bytecode_codehash
 from utils.utils_generic import (get_continue_confirmation, log_step_fail,
                                  log_unexpected_args, split_to_chunks, get_file_from_url_or_path)
 
@@ -255,7 +255,7 @@ class NetworkProviders:
     def wait_for_epoch(self, target_epoch: int, idle_time: int = 30):
         status = self.proxy.get_network_status()
         while status.current_epoch < target_epoch:
-            status = self.proxy.get_network_status
+            status = self.proxy.get_network_status()
             time.sleep(idle_time)
 
     def wait_for_nonce_in_shard(self, shard_id: int, target_nonce: int, idle_time: int = 6):
@@ -600,7 +600,8 @@ def get_event_from_tx(event_id: str, tx_hash: str, proxy: ProxyNetworkProvider) 
 
 def get_deployed_address_from_tx(tx_hash: str, proxy: ProxyNetworkProvider) -> str:
     if "localhost" in proxy.url:
-        proxy.do_post_generic(f"simulator/generate-blocks/1", {})
+        # Use generate-blocks-until-transaction-processed for cross-shard deploy finalization
+        proxy.do_post_generic(f"simulator/generate-blocks-until-transaction-processed/{tx_hash}", {})
     event = get_event_from_tx("SCDeploy", tx_hash, proxy)
     if event is None:
         return ""
