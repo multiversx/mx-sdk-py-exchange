@@ -33,6 +33,11 @@ CONTRACT_FETCH_WORKERS = 8
 # Separate connect and read budgets, so one stalled response can't hold a worker for long.
 CONTRACT_FETCH_TIMEOUT = (10, 30)
 CONTRACT_FETCH_PROGRESS_EVERY = 50
+CONTRACT_FETCH_RETRIES = 4
+# urllib3 doubles the wait each time and caps at 120s by default, which can turn a flaky
+# connection into minutes of invisible sleeping. Keep the worst case per request small.
+CONTRACT_FETCH_BACKOFF_FACTOR = 0.5
+CONTRACT_FETCH_BACKOFF_MAX = 5
 
 
 class RequestRateLimiter:
@@ -72,6 +77,20 @@ def run_with_progress(work, items: list, label: str) -> list:
     return results
 
 
+class LoggingRetry(Retry):
+    """Retry policy that says why it is backing off, so a slow run doesn't look like a hang."""
+
+    def increment(self, method=None, url=None, response=None, error=None, _pool=None, _stacktrace=None):
+        if response is not None:
+            reason = f"HTTP {response.status}"
+        elif error is not None:
+            reason = f"{type(error).__name__}: {error}"
+        else:
+            reason = "unknown"
+        print(f"  retrying after {reason}", flush=True)
+        return super().increment(method, url, response, error, _pool, _stacktrace)
+
+
 def build_pooled_session(pool_size: int) -> requests.Session:
     """Build a session that reuses connections and backs off on rate limits.
 
@@ -80,9 +99,11 @@ def build_pooled_session(pool_size: int) -> requests.Session:
     retry list: the SDK's default retry policy does not cover rate limiting.
     """
 
-    retry_strategy = Retry(total=4, backoff_factor=1,
-                           status_forcelist=[429, 500, 502, 503, 504],
-                           allowed_methods=["GET"], respect_retry_after_header=True)
+    retry_strategy = LoggingRetry(total=CONTRACT_FETCH_RETRIES,
+                                  backoff_factor=CONTRACT_FETCH_BACKOFF_FACTOR,
+                                  backoff_max=CONTRACT_FETCH_BACKOFF_MAX,
+                                  status_forcelist=[429, 500, 502, 503, 504],
+                                  allowed_methods=["GET", "POST"], respect_retry_after_header=True)
     adapter = HTTPAdapter(max_retries=retry_strategy,
                           pool_connections=pool_size, pool_maxsize=pool_size)
     session = requests.Session()
