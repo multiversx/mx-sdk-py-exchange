@@ -26,7 +26,8 @@ PAIRS_LABEL = "pairs"
 OUTPUT_PAIR_CONTRACTS_FILE = OUTPUT_FOLDER / "pairs_data.json"
 
 UPGRADE_PAIR_GAS_LIMIT = 30000000
-UPGRADE_CHUNK_SIZE = 100
+SET_ACTIVE_NO_SWAPS_GAS_LIMIT = 10000000
+TX_CHUNK_SIZE = 100
 CONTRACT_FETCH_THREADS = 8
 STATE_FETCH_PROCESSES = 4
 
@@ -125,47 +126,92 @@ def resume_pair_contracts(_):
     if not os.path.exists(OUTPUT_PAUSE_STATES):
         print("Contract initial states not found!"
               "Cannot proceed safely without altering initial state.")
+        return
 
     with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
         contract_states = json.load(reader)
 
+    network_config = network_providers.proxy.get_network_config()
     pair_addresses = get_all_pair_addresses()
     router_contract = RouterContract.load_contract_by_address(router_address)
 
-    # resume all the pairs
+    # sort the pairs by the state they have to be restored to, before sending anything
     resume_addresses = []
-    count = 1
-    for pair_address in pair_addresses:
+    no_swaps_addresses = []
+    for count, pair_address in enumerate(pair_addresses, 1):
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         if pair_address not in contract_states:
             print(f"Contract {pair_address} wasn't touched or no available initial state!")
             continue
-        # resume only if the pool was active
+
         if contract_states[pair_address] == 1:
             resume_addresses.append(Address.new_from_bech32(pair_address))
         elif contract_states[pair_address] == 2:
-            pair_contract = PairContract("", "", PairContractVersion.V2, address=pair_address)
-            tx_hash = pair_contract.set_active_no_swaps(dex_owner, network_providers.proxy)
-            if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
-                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                    return
+            no_swaps_addresses.append(pair_address)
         else:
             print(f"Contract {pair_address} wasn't touched" \
                   f" because of initial state: {contract_states[pair_address]}")
 
-        count += 1
+    if not set_pairs_active_no_swaps(network_providers, network_config, dex_owner, no_swaps_addresses):
+        return
 
-    chunk_size = 100
-    chunks = [resume_addresses[i:i + chunk_size] for i in range(0, len(resume_addresses), chunk_size)]
-    for chunk in chunks:
+    # the batch above assigned nonces locally, so resync before the router calls take over
+    dex_owner.sync_nonce(network_providers.proxy)
+
+    chunks = [resume_addresses[i:i + TX_CHUNK_SIZE] for i in range(0, len(resume_addresses), TX_CHUNK_SIZE)]
+    for count, chunk in enumerate(chunks, 1):
+        print(f"Resuming chunk {count} / {len(chunks)}: {len(chunk)} pairs")
         tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, chunk)
         if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contracts: {len(chunk)}"):
             if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
                 return
 
 
+def set_pairs_active_no_swaps(network_providers: NetworkProviders, network_config,
+                              dex_owner, pair_addresses: list) -> bool:
+    """Set every given pair to active-no-swaps. Returns False if the caller should stop.
 
-        count += 1
+    No router endpoint takes a list for this state, so each pair needs its own transaction.
+    They are broadcast together and verified afterwards instead of being confirmed one by one.
+    """
+
+    if not pair_addresses:
+        return True
+
+    print(f"Setting {len(pair_addresses)} pair contracts to active no swaps")
+
+    transactions = []
+    for pair_address in pair_addresses:
+        tx = prepare_contract_call_tx(Address.new_from_bech32(pair_address), dex_owner, network_config,
+                                      SET_ACTIVE_NO_SWAPS_GAS_LIMIT, 'setStateActiveNoSwaps', [])
+        dex_owner.nonce += 1
+        transactions.append(tx)
+
+    chunks = [transactions[i:i + TX_CHUNK_SIZE] for i in range(0, len(transactions), TX_CHUNK_SIZE)]
+
+    updated = 0
+    for count, chunk in enumerate(chunks, 1):
+        print(f"Sending chunk {count} / {len(chunks)}: {len(chunk)} txs")
+        sent_txs, tx_hashes = network_providers.proxy.send_transactions(chunk)
+
+        if sent_txs != len(chunk):
+            print(f"Only {sent_txs}/{len(chunk)} transactions were accepted in chunk {count}. "
+                  f"Aborting to avoid a nonce gap.")
+            return False
+
+        if not network_providers.check_complex_tx_status(tx_hashes[-1].hex(), "set active no swaps"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return False
+
+        updated += count_successful_transactions(network_providers, tx_hashes, "setStateActiveNoSwaps")
+
+    print(f"Set {updated}/{len(pair_addresses)} pair contracts to active no swaps")
+
+    if updated != len(pair_addresses):
+        print(f"WARNING: {len(pair_addresses) - updated} pair contracts were NOT set to active no swaps.")
+        return get_user_continue(config.FORCE_CONTINUE_PROMPT)
+
+    return True
 
 
 def upgrade_pair_contracts(args: Any):
@@ -192,7 +238,7 @@ def upgrade_pair_contracts(args: Any):
 
     pair_addresses = get_all_pair_addresses()
 
-    chunk_size = UPGRADE_CHUNK_SIZE
+    chunk_size = TX_CHUNK_SIZE
     pairs_chunks = [pair_addresses[i:i + chunk_size] for i in range(0, len(pair_addresses), chunk_size)]
 
     if compare_states:
@@ -270,7 +316,7 @@ def upgrade_pair_contracts(args: Any):
                 aborted = True
                 break
 
-        upgraded_pairs += count_successful_upgrades(network_providers, tx_hashes)
+        upgraded_pairs += count_successful_transactions(network_providers, tx_hashes, "upgradePair")
         count += 1
 
     print(f"Upgraded {upgraded_pairs}/{len(pair_addresses)} pair contracts")
@@ -292,8 +338,8 @@ def upgrade_pair_contracts(args: Any):
         sys.exit(1)
 
 
-def count_successful_upgrades(network_providers: NetworkProviders, tx_hashes: list) -> int:
-    """Check each upgrade transaction and report how many actually succeeded on chain.
+def count_successful_transactions(network_providers: NetworkProviders, tx_hashes: list, label: str) -> int:
+    """Check each transaction and report how many actually succeeded on chain.
 
     send_transactions only reports mempool acceptance; an accepted transaction can still fail
     on chain (out of gas, signalError), so every hash has to be inspected individually.
@@ -302,7 +348,7 @@ def count_successful_upgrades(network_providers: NetworkProviders, tx_hashes: li
     successful = 0
     with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_THREADS) as executor:
         futures = {
-            executor.submit(network_providers.check_simple_tx_status, tx_hash.hex(), "upgradePair"): tx_hash
+            executor.submit(network_providers.check_simple_tx_status, tx_hash.hex(), label): tx_hash
             for tx_hash in tx_hashes
         }
         for future in as_completed(futures):
@@ -311,9 +357,9 @@ def count_successful_upgrades(network_providers: NetworkProviders, tx_hashes: li
                 if future.result():
                     successful += 1
                 else:
-                    print(f"Failed upgrade tx: {tx_hash.hex()}")
+                    print(f"Failed {label} tx: {tx_hash.hex()}")
             except Exception as e:
-                print(f"Couldn't check upgrade tx {tx_hash.hex()}: {e}")
+                print(f"Couldn't check {label} tx {tx_hash.hex()}: {e}")
 
     return successful
 
