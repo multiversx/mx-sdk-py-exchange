@@ -28,8 +28,9 @@ OUTPUT_PAUSE_STATES = OUTPUT_FOLDER / "contract_pause_states.json"
 
 # The public gateway allows 50 requests / IP / second. Stay under it with headroom, since
 # other calls may be running against the same IP at the same time.
-CONTRACT_FETCH_MAX_RPS = 40
-CONTRACT_FETCH_WORKERS = 8
+# Overridable per environment: a shadowfork or a proxied network may not take mainnet's settings.
+CONTRACT_FETCH_MAX_RPS = int(os.environ.get("MX_DEX_FETCH_MAX_RPS", 40))
+CONTRACT_FETCH_WORKERS = int(os.environ.get("MX_DEX_FETCH_WORKERS", 8))
 # Separate connect and read budgets, so one stalled response can't hold a worker for long.
 CONTRACT_FETCH_TIMEOUT = (10, 30)
 CONTRACT_FETCH_PROGRESS_EVERY = 50
@@ -71,23 +72,35 @@ def run_with_progress(work, items: list, label: str) -> list:
             results[futures[future]] = future.result()
             completed += 1
             if completed % CONTRACT_FETCH_PROGRESS_EVERY == 0 or completed == len(items):
-                print(f"  {label}: {completed}/{len(items)} "
-                      f"({time.monotonic() - started:.0f}s elapsed)", flush=True)
+                log_line(f"  {label}: {completed}/{len(items)} "
+                         f"({time.monotonic() - started:.0f}s elapsed)")
 
     return results
 
 
+PRINT_LOCK = threading.Lock()
+
+
+def log_line(message: str):
+    """Print one whole line, so parallel workers don't interleave mid-message."""
+
+    with PRINT_LOCK:
+        print(message, flush=True)
+
+
 class LoggingRetry(Retry):
-    """Retry policy that says why it is backing off, so a slow run doesn't look like a hang."""
+    """Retry policy that says what failed and where, so a slow run doesn't look like a hang."""
 
     def increment(self, method=None, url=None, response=None, error=None, _pool=None, _stacktrace=None):
         if response is not None:
-            reason = f"HTTP {response.status}"
+            reason = f"HTTP {response.status} {getattr(response, 'reason', '') or ''}".strip()
         elif error is not None:
             reason = f"{type(error).__name__}: {error}"
         else:
             reason = "unknown"
-        print(f"  retrying after {reason}", flush=True)
+
+        host = getattr(_pool, "host", "?")
+        log_line(f"  retrying https://{host}{url or ''} after {reason}")
         return super().increment(method, url, response, error, _pool, _stacktrace)
 
 
