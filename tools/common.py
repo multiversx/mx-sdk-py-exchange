@@ -177,7 +177,7 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
                 "code": code
             }
             save_wasm(code, code_hash)
-        pairs_data[code_hash][contract_label].append(Address.new_from_bech32(address).to_bech32())
+        pairs_data[code_hash][contract_label].append(address)
 
     print(f"Fetched {len(contract_addresses) - len(failed)}/{len(contract_addresses)} "
           f"{contract_label} contracts in {time.monotonic() - started:.1f}s")
