@@ -1,41 +1,7 @@
-import json
 import os
 import sys
 
-class ExportedToken:
-    def __init__(self, token_name: str, token_nonce_hex: str, supply: str, attributes: str):
-        self.token_name = token_name
-        self.token_nonce_hex = token_nonce_hex
-        self.supply = supply
-        self.attributes = attributes
-
-
-class ExportedAccount:
-    def __init__(self, address: str, nonce: int, value: int, account_tokens_supply: list[ExportedToken]):
-        self.address = address
-        self.nonce = nonce
-        self.value = value
-        self.account_tokens_supply = account_tokens_supply
-
-
-def read_accounts_from_json(json_path: str) -> list[ExportedAccount]:
-    """Read accounts from json file"""
-
-    with open(json_path, 'r') as file:
-        accounts = json.load(file)
-
-    exported_accounts = []
-    for account in accounts:
-        if account['address'] == "":
-            continue
-        exported_tokens = []
-        for token in account['accountTokensSupply']:
-            exported_token = ExportedToken(token['tokenName'], token['tokenNonceHex'], token['supply'], token['attributes'])
-            exported_tokens.append(exported_token)
-        account['accountTokensSupply'] = exported_tokens
-        exported_accounts.append(ExportedAccount(account['address'], account['nonce'], account['value'], exported_tokens))
-
-    return exported_accounts
+from tools.runners.common_runner import ExportedAccount, read_accounts_from_json
 
 
 class SupplyCounter:
@@ -51,7 +17,7 @@ class SupplyCounter:
                         'supply': 0,
                         'holders': set()
                     }
-                
+
                 # Add the token supply (converting from string to int)
                 self.token_data[token.token_name]['supply'] += int(token.supply)
                 # Add holder address to set
@@ -78,13 +44,13 @@ def main(args: list[str]):
     if len(args) == 0:
         print("Usage: python supply_counter.py <file1> <file2> ...")
         sys.exit(1)
-    
+
     # Check if all files exist before processing
     for file in args:
         if not os.path.exists(file):
             print(f"Error: File '{file}' does not exist")
             sys.exit(1)
-    
+
     supply_counter = SupplyCounter()
     for file in args:
         exported_accounts = read_accounts_from_json(file)

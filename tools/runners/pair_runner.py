@@ -4,7 +4,7 @@ import multiprocessing
 from typing import Any
 from multiversx_sdk import Address
 from context import Context
-from contracts.contract_identities import PairContractVersion, RouterContractVersion
+from contracts.contract_identities import PairContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract
 from contracts.router_contract import RouterContract
@@ -19,10 +19,16 @@ from utils.utils_tx import NetworkProviders, prepare_contract_call_tx
 import config
 import json
 import os
+import sys
 
 
 PAIRS_LABEL = "pairs"
 OUTPUT_PAIR_CONTRACTS_FILE = OUTPUT_FOLDER / "pairs_data.json"
+
+UPGRADE_PAIR_GAS_LIMIT = 30000000
+UPGRADE_CHUNK_SIZE = 100
+CONTRACT_FETCH_THREADS = 8
+STATE_FETCH_PROCESSES = 4
 
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
@@ -165,6 +171,15 @@ def resume_pair_contracts(_):
 def upgrade_pair_contracts(args: Any):
     """Upgrade pair contracts"""
 
+    if getattr(args, 'bytecode', None):
+        raise ValueError(
+            "--bytecode is not supported for pair upgrades. Pairs are owned by the router and are "
+            "upgraded through its upgradePair endpoint, which clones the router's stored pair "
+            "template - the bytecode is never taken from the caller. To roll out new pair code, "
+            "upgrade the template contract (router getPairTemplateAddress) with the new bytecode "
+            "first via 'router contract upgrade-template', then run this command."
+        )
+
     compare_states = args.compare_states
 
     print(f"Upgrading pair contracts with compare states: {compare_states}")
@@ -175,22 +190,20 @@ def upgrade_pair_contracts(args: Any):
     context = Context()
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
-    router_contract = RouterContract.load_contract_by_address(router_address)
-    router_contract.version = RouterContractVersion.V2
     pair_addresses = get_all_pair_addresses()
 
-    chunk_size = 100
+    chunk_size = UPGRADE_CHUNK_SIZE
     pairs_chunks = [pair_addresses[i:i + chunk_size] for i in range(0, len(pair_addresses), chunk_size)]
 
     if compare_states:
         print("Fetching contract state before upgrade...")
-        with multiprocessing.Pool(4) as pool:
+        with multiprocessing.Pool(STATE_FETCH_PROCESSES) as pool:
             pool.map(batch_fetch_pre_pairs_states, pairs_chunks)
 
     pair_contracts = []
     failed_addresses = []
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_THREADS) as executor:
         futures = {
             executor.submit(PairContract.load_contract_by_address, addr): addr
             for addr in pair_addresses
@@ -202,57 +215,107 @@ def upgrade_pair_contracts(args: Any):
 
                 if pair_contract is not None:
                     pair_contracts.append(pair_contract)
+                    print(f"Fetched {i} / {len(pair_addresses)}: {addr}")
                 else:
                     failed_addresses.append(addr)
                     print(f"Failed {i} / {len(pair_addresses)}: {addr}")
-
-                print(f"Fetched {i} / {len(pair_addresses)}: {addr}")
             except Exception as e:
                 failed_addresses.append(addr)
                 print(f"Failed {i} / {len(pair_addresses)}: {addr} - {e}")
 
     for addr in failed_addresses:
-        contract = PairContract.load_contract_by_address(addr)
-        if contract is not None:
-            pair_contracts.append(contract)
+        try:
+            contract = PairContract.load_contract_by_address(addr)
+            if contract is not None:
+                pair_contracts.append(contract)
+        except Exception as e:
+            print(f"Retry failed: {addr} - {e}")
 
     if len(pair_contracts) != len(pair_addresses):
         print(f"Failed to fetch all pairs: {len(pair_contracts)}/{len(pair_addresses)}")
-        return
+        sys.exit(1)
 
     count = 1
     upgrade_transactions = []
     for pair_contract in pair_contracts:
         print(f"Processing contract {count} / {len(pair_contracts)}")
         endpoint_args = [pair_contract.firstToken, pair_contract.secondToken]
-        tx = prepare_contract_call_tx(Address.new_from_bech32(router_address), dex_owner, network_config, 25000000, 'upgradePair', endpoint_args)
+        tx = prepare_contract_call_tx(Address.new_from_bech32(router_address), dex_owner, network_config, UPGRADE_PAIR_GAS_LIMIT, 'upgradePair', endpoint_args)
         dex_owner.nonce += 1
         upgrade_transactions.append(tx)
         count += 1
 
     transactions_chunks = [upgrade_transactions[i:i + chunk_size] for i in range(0, len(upgrade_transactions), chunk_size)]
 
+    print(f"Prepared {len(upgrade_transactions)} upgrade transactions for {len(pair_addresses)} pairs, "
+          f"in {len(transactions_chunks)} chunk(s) of up to {chunk_size}.")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
     count = 1
     upgraded_pairs = 0
+    aborted = False
     for chunk in transactions_chunks:
         print(f"Sending chunk {count} / {len(transactions_chunks)}: {len(chunk)} txs")
         sent_txs, tx_hashes = network_providers.proxy.send_transactions(chunk)
-        last_tx_hash = tx_hashes[-1]
-        network_providers.check_complex_tx_status(last_tx_hash.hex(), "Upgrade pair contract")
-        upgraded_pairs += sent_txs
+
+        if sent_txs != len(chunk):
+            print(f"Only {sent_txs}/{len(chunk)} transactions were accepted in chunk {count}. "
+                  f"Aborting to avoid a nonce gap.")
+            aborted = True
+            break
+
+        if not network_providers.check_complex_tx_status(tx_hashes[-1].hex(), "upgrade pair contracts"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                aborted = True
+                break
+
+        upgraded_pairs += count_successful_upgrades(network_providers, tx_hashes)
         count += 1
 
     print(f"Upgraded {upgraded_pairs}/{len(pair_addresses)} pair contracts")
 
-    if compare_states:
+    if compare_states and aborted:
+        print("Skipping state comparison: the upgrade was aborted, so the post state would not "
+              "describe a completed upgrade.")
+    elif compare_states:
         print("Fetching contract state after upgrade...")
-        with multiprocessing.Pool(4) as pool:
+        with multiprocessing.Pool(STATE_FETCH_PROCESSES) as pool:
             pool.map(batch_fetch_mid_pairs_states, pairs_chunks)
 
-        for pair_address in pair_addresses:
-            old_state_filename = get_contract_save_name("pairs", pair_address, "pre")
-            new_state_filename = get_contract_save_name("pairs", pair_address, "mid")
-            report_key_files_compare(str(OUTPUT_FOLDER), old_state_filename, new_state_filename, True)
+        old_state_prefix = get_contract_save_name(PAIRS_LABEL, "", "pre")
+        new_state_prefix = get_contract_save_name(PAIRS_LABEL, "", "mid")
+        report_key_files_compare(str(OUTPUT_FOLDER), old_state_prefix, new_state_prefix, True)
+
+    if aborted or upgraded_pairs != len(pair_addresses):
+        print(f"FAILED: {len(pair_addresses) - upgraded_pairs} pair contracts were NOT upgraded.")
+        sys.exit(1)
+
+
+def count_successful_upgrades(network_providers: NetworkProviders, tx_hashes: list) -> int:
+    """Check each upgrade transaction and report how many actually succeeded on chain.
+
+    send_transactions only reports mempool acceptance; an accepted transaction can still fail
+    on chain (out of gas, signalError), so every hash has to be inspected individually.
+    """
+
+    successful = 0
+    with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_THREADS) as executor:
+        futures = {
+            executor.submit(network_providers.check_simple_tx_status, tx_hash.hex(), "upgradePair"): tx_hash
+            for tx_hash in tx_hashes
+        }
+        for future in as_completed(futures):
+            tx_hash = futures[future]
+            try:
+                if future.result():
+                    successful += 1
+                else:
+                    print(f"Failed upgrade tx: {tx_hash.hex()}")
+            except Exception as e:
+                print(f"Couldn't check upgrade tx {tx_hash.hex()}: {e}")
+
+    return successful
 
 
 def batch_fetch_pre_pairs_states(pairs_addresses: list):
