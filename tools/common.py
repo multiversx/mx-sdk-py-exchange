@@ -143,6 +143,66 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
         print(f"Dumped {contract_label} data in {save_path}")
 
 
+def query_contract_pause_state(session: requests.Session, limiter: RequestRateLimiter, address: str) -> tuple:
+    """Read one contract's getState view. Returns (state, error).
+
+    Queries the VM endpoint directly instead of going through DataFetcher, which rebuilds a
+    SmartContractController per call and so refetches the network config on every contract.
+    """
+
+    try:
+        limiter.acquire()
+        response = session.post(f"{PROXY.rstrip('/')}/vm-values/query",
+                                json={"scAddress": address, "funcName": "getState", "args": []},
+                                timeout=CONTRACT_FETCH_TIMEOUT)
+        response.raise_for_status()
+        data = response.json().get("data", {}).get("data", {})
+
+        if data.get("returnCode") != "ok":
+            return None, f"{data.get('returnCode')}: {data.get('returnMessage')}"
+
+        return_data = data.get("returnData") or []
+        if not return_data or not return_data[0]:
+            return 0, ""
+
+        return int(base64.b64decode(return_data[0]).hex(), 16), ""
+    except Exception as e:
+        return None, str(e)
+
+
+def fetch_contract_pause_states(contract_addresses: List[str]) -> tuple:
+    """Read the pause state of many contracts in parallel. Returns (states, failures).
+
+    A failed query is reported as a failure rather than folded into the states, because the
+    view helpers answer -1 on error and consumers read that as a real state.
+    """
+
+    print(f"Fetching pause state of {len(contract_addresses)} contracts "
+          f"with {CONTRACT_FETCH_WORKERS} workers at up to {CONTRACT_FETCH_MAX_RPS} req/s...")
+
+    limiter = RequestRateLimiter(CONTRACT_FETCH_MAX_RPS)
+    session = build_pooled_session(CONTRACT_FETCH_WORKERS)
+    started = time.monotonic()
+    try:
+        with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_WORKERS) as executor:
+            results = list(executor.map(
+                lambda address: query_contract_pause_state(session, limiter, address), contract_addresses))
+    finally:
+        session.close()
+
+    states = {}
+    failures = []
+    for address, (state, error) in zip(contract_addresses, results):
+        if error:
+            failures.append((address, error))
+        else:
+            states[address] = state
+
+    print(f"Fetched {len(states)}/{len(contract_addresses)} pause states "
+          f"in {time.monotonic() - started:.1f}s")
+    return states, failures
+
+
 def fetch_contracts_states(prefix: str, network_providers: NetworkProviders, contract_addresses: List[str], label: str):
     """Fetch contracts states"""
 

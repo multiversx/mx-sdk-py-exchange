@@ -6,14 +6,15 @@ from argparse import ArgumentParser
 from multiversx_sdk import Address
 from context import Context
 from tools.runners.account_state_runner import get_account_keys_online
-from tools.common import API, OUTPUT_FOLDER, PROXY, fetch_contracts_states, get_contract_save_name
+from tools.common import API, OUTPUT_FOLDER, PROXY, fetch_contract_pause_states, \
+    fetch_contracts_states, get_contract_save_name
 from tools.runners import pair_runner, farm_runner, \
     staking_runner, metastaking_runner, router_runner, \
     proxy_runner, locked_asset_runner, fees_collector_runner, \
     energy_factory_runner, position_creator_runner, \
     locked_token_position_creator_runner, simple_lock_runner, generic_runner
-from utils.contract_data_fetchers import FarmContractDataFetcher, PairContractDataFetcher, RouterContractDataFetcher, StakingContractDataFetcher
-from utils.utils_generic import log_step_fail
+from utils.contract_data_fetchers import RouterContractDataFetcher
+from utils.utils_generic import ensure_folder, log_step_fail
 from utils.utils_tx import NetworkProviders
 
 
@@ -66,27 +67,22 @@ def setup_parser():
 def fetch_and_save_pause_state(_):
     """Fetch and save pause state of all contracts"""
 
-    pair_addresses = pair_runner.get_all_pair_addresses()
-    staking_addresses = staking_runner.get_all_staking_addresses()
-    farm_addresses = farm_runner.get_all_farm_v2_addresses()
+    # All three contract types answer the same getState view, so they go in one pass.
+    contract_addresses = pair_runner.get_all_pair_addresses() \
+        + staking_runner.get_all_staking_addresses() \
+        + farm_runner.get_all_farm_v2_addresses()
     output_pause_states = OUTPUT_FOLDER / "contract_pause_states.json"
-    network_providers = NetworkProviders(API, PROXY)
 
-    contract_states = {}
-    for pair_address in pair_addresses:
-        data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address), network_providers.proxy.url)
-        contract_state = data_fetcher.get_data("getState")
-        contract_states[pair_address] = contract_state
+    contract_states, failures = fetch_contract_pause_states(contract_addresses)
 
-    for staking_address in staking_addresses:
-        data_fetcher = StakingContractDataFetcher(Address.new_from_bech32(staking_address), network_providers.proxy.url)
-        contract_state = data_fetcher.get_data("getState")
-        contract_states[staking_address] = contract_state
+    if failures:
+        # Saving a failed query as a state would make resume skip the contract and leave it paused.
+        for address, error in failures[:10]:
+            print(f"Failed to fetch state for {address}: {error}")
+        raise RuntimeError(f"could not fetch {len(failures)}/{len(contract_addresses)} "
+                           f"contract states; refusing to save partial data")
 
-    for farm_address in farm_addresses:
-        data_fetcher = FarmContractDataFetcher(Address.new_from_bech32(farm_address), network_providers.proxy.url)
-        contract_state = data_fetcher.get_data("getState")
-        contract_states[farm_address] = contract_state
+    ensure_folder(output_pause_states.parent)
 
     with open(output_pause_states, 'w', encoding="UTF-8") as writer:
         json.dump(contract_states, writer, indent=4)
