@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import base64
 import binascii
@@ -30,7 +30,9 @@ OUTPUT_PAUSE_STATES = OUTPUT_FOLDER / "contract_pause_states.json"
 # other calls may be running against the same IP at the same time.
 CONTRACT_FETCH_MAX_RPS = 40
 CONTRACT_FETCH_WORKERS = 8
-CONTRACT_FETCH_TIMEOUT = 30
+# Separate connect and read budgets, so one stalled response can't hold a worker for long.
+CONTRACT_FETCH_TIMEOUT = (10, 30)
+CONTRACT_FETCH_PROGRESS_EVERY = 50
 
 
 class RequestRateLimiter:
@@ -49,6 +51,25 @@ class RequestRateLimiter:
         delay = slot - time.monotonic()
         if delay > 0:
             time.sleep(delay)
+
+
+def run_with_progress(work, items: list, label: str) -> list:
+    """Run work(item) over items in parallel, reporting progress. Results keep the input order."""
+
+    results = [None] * len(items)
+    started = time.monotonic()
+    completed = 0
+
+    with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_WORKERS) as executor:
+        futures = {executor.submit(work, item): index for index, item in enumerate(items)}
+        for future in as_completed(futures):
+            results[futures[future]] = future.result()
+            completed += 1
+            if completed % CONTRACT_FETCH_PROGRESS_EVERY == 0 or completed == len(items):
+                print(f"  {label}: {completed}/{len(items)} "
+                      f"({time.monotonic() - started:.0f}s elapsed)", flush=True)
+
+    return results
 
 
 def build_pooled_session(pool_size: int) -> requests.Session:
@@ -97,16 +118,14 @@ def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save
     """Fetch and save contracts data in a json file"""
 
     print(f"Fetching {len(contract_addresses)} {contract_label} contracts "
-          f"with {CONTRACT_FETCH_WORKERS} workers at up to {CONTRACT_FETCH_MAX_RPS} req/s...")
+          f"with {CONTRACT_FETCH_WORKERS} workers at up to {CONTRACT_FETCH_MAX_RPS} req/s...", flush=True)
 
     limiter = RequestRateLimiter(CONTRACT_FETCH_MAX_RPS)
     session = build_pooled_session(CONTRACT_FETCH_WORKERS)
     started = time.monotonic()
     try:
-        with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_WORKERS) as executor:
-            # map keeps the results in input order, so the saved file stays stable between runs
-            results = list(executor.map(
-                lambda address: fetch_contract_code(session, limiter, address), contract_addresses))
+        results = run_with_progress(
+            lambda address: fetch_contract_code(session, limiter, address), contract_addresses, contract_label)
     finally:
         session.close()
 
@@ -178,15 +197,14 @@ def fetch_contract_pause_states(contract_addresses: List[str]) -> tuple:
     """
 
     print(f"Fetching pause state of {len(contract_addresses)} contracts "
-          f"with {CONTRACT_FETCH_WORKERS} workers at up to {CONTRACT_FETCH_MAX_RPS} req/s...")
+          f"with {CONTRACT_FETCH_WORKERS} workers at up to {CONTRACT_FETCH_MAX_RPS} req/s...", flush=True)
 
     limiter = RequestRateLimiter(CONTRACT_FETCH_MAX_RPS)
     session = build_pooled_session(CONTRACT_FETCH_WORKERS)
     started = time.monotonic()
     try:
-        with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_WORKERS) as executor:
-            results = list(executor.map(
-                lambda address: query_contract_pause_state(session, limiter, address), contract_addresses))
+        results = run_with_progress(
+            lambda address: query_contract_pause_state(session, limiter, address), contract_addresses, "pause states")
     finally:
         session.close()
 
