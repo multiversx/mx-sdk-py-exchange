@@ -1,10 +1,16 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import base64
 import binascii
 import os
 import json
+import threading
+import time
 from typing import List
-from multiversx_sdk import Address, ProxyNetworkProvider
+from multiversx_sdk import Address
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from tools.runners.account_state_runner import get_account_keys_online, report_key_files_compare
 from utils.utils_chain import Account
 import config
@@ -20,28 +26,115 @@ API = config.DEFAULT_API
 
 OUTPUT_PAUSE_STATES = OUTPUT_FOLDER / "contract_pause_states.json"
 
+# The public gateway allows 50 requests / IP / second. Stay under it with headroom, since
+# other calls may be running against the same IP at the same time.
+CONTRACT_FETCH_MAX_RPS = 40
+CONTRACT_FETCH_WORKERS = 8
+CONTRACT_FETCH_TIMEOUT = 30
+
+
+class RequestRateLimiter:
+    """Hands out evenly spaced request slots so concurrent workers stay under a rate ceiling."""
+
+    def __init__(self, max_requests_per_second: float):
+        self._min_interval = 1 / max_requests_per_second
+        self._lock = threading.Lock()
+        self._next_slot = 0.0
+
+    def acquire(self):
+        with self._lock:
+            slot = max(time.monotonic(), self._next_slot)
+            self._next_slot = slot + self._min_interval
+
+        delay = slot - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+
+
+def build_pooled_session(pool_size: int) -> requests.Session:
+    """Build a session that reuses connections and backs off on rate limits.
+
+    The SDK opens a new session per request, so every call pays for a fresh TLS handshake.
+    Reusing connections roughly halves the wall time of a bulk fetch. Note 429 is in the
+    retry list: the SDK's default retry policy does not cover rate limiting.
+    """
+
+    retry_strategy = Retry(total=4, backoff_factor=1,
+                           status_forcelist=[429, 500, 502, 503, 504],
+                           allowed_methods=["GET"], respect_retry_after_header=True)
+    adapter = HTTPAdapter(max_retries=retry_strategy,
+                          pool_connections=pool_size, pool_maxsize=pool_size)
+    session = requests.Session()
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def fetch_contract_code(session: requests.Session, limiter: RequestRateLimiter, address: str) -> tuple:
+    """Read one contract's code hash and code. Returns (code_hash, code, error).
+
+    Goes straight at the address endpoint rather than through the SDK's get_account, which
+    also fetches guardian data on a second request - unused here, and double the rate budget.
+    """
+
+    try:
+        limiter.acquire()
+        response = session.get(f"{PROXY.rstrip('/')}/address/{address}", timeout=CONTRACT_FETCH_TIMEOUT)
+        response.raise_for_status()
+        account = response.json().get("data", {}).get("account", {})
+
+        raw_code_hash = account.get("codeHash") or ""
+        if not raw_code_hash:
+            return "", "", "no contract code hash"
+
+        # The gateway sends the code hash base64 encoded and the code already hex encoded.
+        return base64.b64decode(raw_code_hash).hex(), account.get("code", ""), ""
+    except Exception as e:
+        return "", "", str(e)
+
 
 def fetch_and_save_contracts(contract_addresses: list, contract_label: str, save_path: Path):
     """Fetch and save contracts data in a json file"""
 
-    proxy = ProxyNetworkProvider(config.DEFAULT_PROXY)
-    pairs_data = {}
+    print(f"Fetching {len(contract_addresses)} {contract_label} contracts "
+          f"with {CONTRACT_FETCH_WORKERS} workers at up to {CONTRACT_FETCH_MAX_RPS} req/s...")
 
-    for address in contract_addresses:
-        contract_addr = Address.new_from_bech32(address)
-        account_data = proxy.get_account(contract_addr)
-        if not account_data.contract_code_hash:
-            print(f"Account data not found for {contract_label} {address}")
+    limiter = RequestRateLimiter(CONTRACT_FETCH_MAX_RPS)
+    session = build_pooled_session(CONTRACT_FETCH_WORKERS)
+    started = time.monotonic()
+    try:
+        with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_WORKERS) as executor:
+            # map keeps the results in input order, so the saved file stays stable between runs
+            results = list(executor.map(
+                lambda address: fetch_contract_code(session, limiter, address), contract_addresses))
+    finally:
+        session.close()
+
+    pairs_data = {}
+    failed = []
+
+    for address, (code_hash, code, error) in zip(contract_addresses, results):
+        if error:
+            failed.append((address, error))
             continue
-        code_hash = account_data.contract_code_hash.hex()
 
         if code_hash not in pairs_data:
             pairs_data[code_hash] = {
                 contract_label: [],
-                "code": account_data.contract_code.hex()
+                "code": code
             }
-            save_wasm(account_data.contract_code.hex(), code_hash)
-        pairs_data[code_hash][contract_label].append(contract_addr.bech32())
+            save_wasm(code, code_hash)
+        pairs_data[code_hash][contract_label].append(Address.new_from_bech32(address).to_bech32())
+
+    print(f"Fetched {len(contract_addresses) - len(failed)}/{len(contract_addresses)} "
+          f"{contract_label} contracts in {time.monotonic() - started:.1f}s")
+
+    if failed:
+        # Saving a partial file would silently drop contracts from every command that reads it.
+        for address, error in failed[:10]:
+            print(f"Failed to fetch {contract_label} {address}: {error}")
+        raise RuntimeError(f"could not fetch {len(failed)}/{len(contract_addresses)} "
+                           f"{contract_label} contracts; refusing to save partial data")
 
     ensure_folder(save_path.parent)
 
