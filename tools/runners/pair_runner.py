@@ -159,7 +159,8 @@ def resume_pair_contracts(_):
     # the batch above assigned nonces locally, so resync before the router calls take over
     dex_owner.sync_nonce(network_providers.proxy)
 
-    chunks = [resume_addresses[i:i + TX_CHUNK_SIZE] for i in range(0, len(resume_addresses), TX_CHUNK_SIZE)]
+    chunk_size = 90
+    chunks = [resume_addresses[i:i + chunk_size] for i in range(0, len(resume_addresses), chunk_size)]
     for count, chunk in enumerate(chunks, 1):
         print(f"Resuming chunk {count} / {len(chunks)}: {len(chunk)} pairs")
         tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, chunk)
