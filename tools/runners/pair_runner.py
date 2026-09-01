@@ -1,25 +1,35 @@
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 from typing import Any
 from multiversx_sdk import Address
 from context import Context
-from contracts.contract_identities import PairContractVersion, RouterContractVersion
+from contracts.contract_identities import PairContractVersion
 from contracts.fees_collector_contract import FeesCollectorContract
 from contracts.pair_contract import PairContract
 from contracts.router_contract import RouterContract
 from tools.common import API, OUTPUT_FOLDER, OUTPUT_PAUSE_STATES, PROXY, \
-    fetch_contracts_states, fetch_new_and_compare_contract_states, get_owner, \
+    fetch_contracts_states, fetch_new_and_compare_contract_states, get_contract_save_name, get_owner, \
     get_user_continue, run_graphql_query, fetch_and_save_contracts, get_saved_contract_addresses
+from tools.runners.account_state_runner import report_key_files_compare
 from tools.runners.common_runner import add_upgrade_all_command
 from utils.contract_data_fetchers import PairContractDataFetcher, RouterContractDataFetcher
-from utils.utils_tx import NetworkProviders
+from utils.utils_tx import NetworkProviders, prepare_contract_call_tx
 
 import config
 import json
 import os
+import sys
 
 
 PAIRS_LABEL = "pairs"
 OUTPUT_PAIR_CONTRACTS_FILE = OUTPUT_FOLDER / "pairs_data.json"
+
+UPGRADE_PAIR_GAS_LIMIT = 30000000
+SET_ACTIVE_NO_SWAPS_GAS_LIMIT = 10000000
+TX_CHUNK_SIZE = 100
+CONTRACT_FETCH_THREADS = 8
+STATE_FETCH_PROCESSES = 4
 
 
 def setup_parser(subparsers: ArgumentParser) -> ArgumentParser:
@@ -63,6 +73,7 @@ def fetch_and_save_pairs_from_chain(_):
     print(f"Router address: {router_address}")
     router_data_fetcher = RouterContractDataFetcher(Address.new_from_bech32(router_address), PROXY)
     registered_pairs = router_data_fetcher.get_data("getAllPairsManagedAddresses")
+    registered_pairs = [Address.new_from_hex(address, "erd").to_bech32() for address in registered_pairs]
     fetch_and_save_contracts(registered_pairs, PAIRS_LABEL, OUTPUT_PAIR_CONTRACTS_FILE)
 
 
@@ -81,19 +92,26 @@ def pause_pair_contracts(_):
 
     # pause all the pairs
     count = 1
+    pause_addresses = []
+
     for pair_address in pair_addresses:
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address), network_providers.proxy.url)
         contract_state = data_fetcher.get_data("getState")
         if contract_state != 0:
-            tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, pair_address)
-            if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contract: {pair_address}"):
-                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                    return
+            pause_addresses.append(Address.new_from_bech32(pair_address))
         else:
             print(f"Contract {pair_address} already inactive. Current state: {contract_state}")
 
         count += 1
+
+    chunk_size = 100
+    chunks = [pause_addresses[i:i + chunk_size] for i in range(0, len(pause_addresses), chunk_size)]
+    for chunk in chunks:
+        tx_hash = router_contract.pair_contract_pause(dex_owner, network_providers.proxy, chunk)
+        if not network_providers.check_simple_tx_status(tx_hash, f"pause pair contracts: {len(chunk)}"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
 
 
 def resume_pair_contracts(_):
@@ -109,93 +127,257 @@ def resume_pair_contracts(_):
     if not os.path.exists(OUTPUT_PAUSE_STATES):
         print("Contract initial states not found!"
               "Cannot proceed safely without altering initial state.")
+        return
 
     with open(OUTPUT_PAUSE_STATES, encoding="UTF-8") as reader:
         contract_states = json.load(reader)
 
+    network_config = network_providers.proxy.get_network_config()
     pair_addresses = get_all_pair_addresses()
     router_contract = RouterContract.load_contract_by_address(router_address)
 
-    # pause all the pairs
-    count = 1
-    for pair_address in pair_addresses:
+    # sort the pairs by the state they have to be restored to, before sending anything
+    resume_addresses = []
+    no_swaps_addresses = []
+    for count, pair_address in enumerate(pair_addresses, 1):
         print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
         if pair_address not in contract_states:
-            print(f"Contract {pair_address} wasn't touched for no available initial state!")
+            print(f"Contract {pair_address} wasn't touched or no available initial state!")
             continue
-        # resume only if the pool was active
+
         if contract_states[pair_address] == 1:
-            tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, pair_address)
-            if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contract: {pair_address}"):
-                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                    return
+            resume_addresses.append(Address.new_from_bech32(pair_address))
         elif contract_states[pair_address] == 2:
-            pair_contract = PairContract("", "", PairContractVersion.V2, address=pair_address)
-            tx_hash = pair_contract.set_active_no_swaps(dex_owner, network_providers.proxy)
-            if not network_providers.check_simple_tx_status(tx_hash, f"set active no swaps on pair contract: {pair_address}"):
-                if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                    return
+            no_swaps_addresses.append(pair_address)
         else:
             print(f"Contract {pair_address} wasn't touched" \
-                  " because of initial state: {contract_states[pair_address]}")
+                  f" because of initial state: {contract_states[pair_address]}")
 
-        count += 1
+    if not set_pairs_active_no_swaps(network_providers, network_config, dex_owner, no_swaps_addresses):
+        return
+
+    # the batch above assigned nonces locally, so resync before the router calls take over
+    dex_owner.sync_nonce(network_providers.proxy)
+
+    chunk_size = 90
+    chunks = [resume_addresses[i:i + chunk_size] for i in range(0, len(resume_addresses), chunk_size)]
+    for count, chunk in enumerate(chunks, 1):
+        print(f"Resuming chunk {count} / {len(chunks)}: {len(chunk)} pairs")
+        tx_hash = router_contract.pair_contract_resume(dex_owner, network_providers.proxy, chunk)
+        if not network_providers.check_simple_tx_status(tx_hash, f"resume pair contracts: {len(chunk)}"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
+
+
+def set_pairs_active_no_swaps(network_providers: NetworkProviders, network_config,
+                              dex_owner, pair_addresses: list) -> bool:
+    """Set every given pair to active-no-swaps. Returns False if the caller should stop.
+
+    No router endpoint takes a list for this state, so each pair needs its own transaction.
+    They are broadcast together and verified afterwards instead of being confirmed one by one.
+    """
+
+    if not pair_addresses:
+        return True
+
+    print(f"Setting {len(pair_addresses)} pair contracts to active no swaps")
+
+    transactions = []
+    for pair_address in pair_addresses:
+        tx = prepare_contract_call_tx(Address.new_from_bech32(pair_address), dex_owner, network_config,
+                                      SET_ACTIVE_NO_SWAPS_GAS_LIMIT, 'setStateActiveNoSwaps', [])
+        dex_owner.nonce += 1
+        transactions.append(tx)
+
+    chunks = [transactions[i:i + TX_CHUNK_SIZE] for i in range(0, len(transactions), TX_CHUNK_SIZE)]
+
+    updated = 0
+    for count, chunk in enumerate(chunks, 1):
+        print(f"Sending chunk {count} / {len(chunks)}: {len(chunk)} txs")
+        sent_txs, tx_hashes = network_providers.proxy.send_transactions(chunk)
+
+        if sent_txs != len(chunk):
+            print(f"Only {sent_txs}/{len(chunk)} transactions were accepted in chunk {count}. "
+                  f"Aborting to avoid a nonce gap.")
+            return False
+
+        if not network_providers.check_complex_tx_status(tx_hashes[-1].hex(), "set active no swaps"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return False
+
+        updated += count_successful_transactions(network_providers, tx_hashes, "setStateActiveNoSwaps")
+
+    print(f"Set {updated}/{len(pair_addresses)} pair contracts to active no swaps")
+
+    if updated != len(pair_addresses):
+        print(f"WARNING: {len(pair_addresses) - updated} pair contracts were NOT set to active no swaps.")
+        return get_user_continue(config.FORCE_CONTINUE_PROMPT)
+
+    return True
 
 
 def upgrade_pair_contracts(args: Any):
     """Upgrade pair contracts"""
+
+    if getattr(args, 'bytecode', None):
+        raise ValueError(
+            "--bytecode is not supported for pair upgrades. Pairs are owned by the router and are "
+            "upgraded through its upgradePair endpoint, which clones the router's stored pair "
+            "template - the bytecode is never taken from the caller. To roll out new pair code, "
+            "upgrade the template contract (router getPairTemplateAddress) with the new bytecode "
+            "first via 'router contract upgrade-template', then run this command."
+        )
 
     compare_states = args.compare_states
 
     print(f"Upgrading pair contracts with compare states: {compare_states}")
 
     network_providers = NetworkProviders(API, PROXY)
+    network_config = network_providers.proxy.get_network_config()
     dex_owner = get_owner(network_providers.proxy)
     context = Context()
     router_address = context.get_contracts(config.ROUTER_V2)[0].address
 
-    router_contract = RouterContract.load_contract_by_address(router_contract)
-    router_contract.version = RouterContractVersion.V2
     pair_addresses = get_all_pair_addresses()
 
+    chunk_size = TX_CHUNK_SIZE
+    pairs_chunks = [pair_addresses[i:i + chunk_size] for i in range(0, len(pair_addresses), chunk_size)]
+
+    if compare_states:
+        print("Fetching contract state before upgrade...")
+        with multiprocessing.Pool(STATE_FETCH_PROCESSES) as pool:
+            pool.map(batch_fetch_pre_pairs_states, pairs_chunks)
+
+    pair_contracts = []
+    failed_addresses = []
+
+    with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_THREADS) as executor:
+        futures = {
+            executor.submit(PairContract.load_contract_by_address, addr): addr
+            for addr in pair_addresses
+        }
+        for i, future in enumerate(as_completed(futures)):
+            addr = futures[future]
+            try:
+                pair_contract = future.result()
+
+                if pair_contract is not None:
+                    pair_contracts.append(pair_contract)
+                    print(f"Fetched {i} / {len(pair_addresses)}: {addr}")
+                else:
+                    failed_addresses.append(addr)
+                    print(f"Failed {i} / {len(pair_addresses)}: {addr}")
+            except Exception as e:
+                failed_addresses.append(addr)
+                print(f"Failed {i} / {len(pair_addresses)}: {addr} - {e}")
+
+    for addr in failed_addresses:
+        try:
+            contract = PairContract.load_contract_by_address(addr)
+            if contract is not None:
+                pair_contracts.append(contract)
+        except Exception as e:
+            print(f"Retry failed: {addr} - {e}")
+
+    if len(pair_contracts) != len(pair_addresses):
+        print(f"Failed to fetch all pairs: {len(pair_contracts)}/{len(pair_addresses)}")
+        sys.exit(1)
+
     count = 1
-    for pair_address in pair_addresses:
-        print(f"Processing contract {count} / {len(pair_addresses)}: {pair_address}")
-        pair_contract = PairContract.load_contract_by_address(pair_address)
-        pair_data_fetcher = PairContractDataFetcher(Address.new_from_bech32(pair_address),
-                                                    network_providers.proxy.url)
-        total_fee_percentage = pair_data_fetcher.get_data("getTotalFeePercent")
-        special_fee_percentage = pair_data_fetcher.get_data("getSpecialFee")
-        existent_initial_liquidity_adder = pair_data_fetcher.get_data("getInitialLiquidtyAdder")
-        initial_liquidity_adder = \
-            Address.new_from_bech32(existent_initial_liquidity_adder[2:]).to_bech32() \
-            if existent_initial_liquidity_adder else config.ZERO_CONTRACT_ADDRESS
-        print(f"Initial liquidity adder: {initial_liquidity_adder}")
-
-        if compare_states:
-            print("Fetching contract state before upgrade...")
-            fetch_contracts_states("pre", network_providers, [pair_address], PAIRS_LABEL)
-
-            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                return
-
-        pair_contract.version = PairContractVersion.V2
-        tx_hash = pair_contract.contract_upgrade_via_router(dex_owner, network_providers.proxy, router_contract,
-                                                            [total_fee_percentage, special_fee_percentage,
-                                                             initial_liquidity_adder])
-
-        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade pair contract: {pair_address}"):
-            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-                return
-
-        if compare_states:
-            fetch_new_and_compare_contract_states(PAIRS_LABEL, pair_address, network_providers)
-
-        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
-            return
-
+    upgrade_transactions = []
+    for pair_contract in pair_contracts:
+        print(f"Processing contract {count} / {len(pair_contracts)}")
+        endpoint_args = [pair_contract.firstToken, pair_contract.secondToken]
+        tx = prepare_contract_call_tx(Address.new_from_bech32(router_address), dex_owner, network_config, UPGRADE_PAIR_GAS_LIMIT, 'upgradePair', endpoint_args)
+        dex_owner.nonce += 1
+        upgrade_transactions.append(tx)
         count += 1
 
+    transactions_chunks = [upgrade_transactions[i:i + chunk_size] for i in range(0, len(upgrade_transactions), chunk_size)]
+
+    print(f"Prepared {len(upgrade_transactions)} upgrade transactions for {len(pair_addresses)} pairs, "
+          f"in {len(transactions_chunks)} chunk(s) of up to {chunk_size}.")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    count = 1
+    upgraded_pairs = 0
+    aborted = False
+    for chunk in transactions_chunks:
+        print(f"Sending chunk {count} / {len(transactions_chunks)}: {len(chunk)} txs")
+        sent_txs, tx_hashes = network_providers.proxy.send_transactions(chunk)
+
+        if sent_txs != len(chunk):
+            print(f"Only {sent_txs}/{len(chunk)} transactions were accepted in chunk {count}. "
+                  f"Aborting to avoid a nonce gap.")
+            aborted = True
+            break
+
+        if not network_providers.check_complex_tx_status(tx_hashes[-1].hex(), "upgrade pair contracts"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                aborted = True
+                break
+
+        upgraded_pairs += count_successful_transactions(network_providers, tx_hashes, "upgradePair")
+        count += 1
+
+    print(f"Upgraded {upgraded_pairs}/{len(pair_addresses)} pair contracts")
+
+    if compare_states and aborted:
+        print("Skipping state comparison: the upgrade was aborted, so the post state would not "
+              "describe a completed upgrade.")
+    elif compare_states:
+        print("Fetching contract state after upgrade...")
+        with multiprocessing.Pool(STATE_FETCH_PROCESSES) as pool:
+            pool.map(batch_fetch_mid_pairs_states, pairs_chunks)
+
+        old_state_prefix = get_contract_save_name(PAIRS_LABEL, "", "pre")
+        new_state_prefix = get_contract_save_name(PAIRS_LABEL, "", "mid")
+        report_key_files_compare(str(OUTPUT_FOLDER), old_state_prefix, new_state_prefix, True)
+
+    if aborted or upgraded_pairs != len(pair_addresses):
+        print(f"FAILED: {len(pair_addresses) - upgraded_pairs} pair contracts were NOT upgraded.")
+        sys.exit(1)
+
+
+def count_successful_transactions(network_providers: NetworkProviders, tx_hashes: list, label: str) -> int:
+    """Check each transaction and report how many actually succeeded on chain.
+
+    send_transactions only reports mempool acceptance; an accepted transaction can still fail
+    on chain (out of gas, signalError), so every hash has to be inspected individually.
+    """
+
+    successful = 0
+    with ThreadPoolExecutor(max_workers=CONTRACT_FETCH_THREADS) as executor:
+        futures = {
+            executor.submit(network_providers.check_simple_tx_status, tx_hash.hex(), label): tx_hash
+            for tx_hash in tx_hashes
+        }
+        for future in as_completed(futures):
+            tx_hash = futures[future]
+            try:
+                if future.result():
+                    successful += 1
+                else:
+                    print(f"Failed {label} tx: {tx_hash.hex()}")
+            except Exception as e:
+                print(f"Couldn't check {label} tx {tx_hash.hex()}: {e}")
+
+    return successful
+
+
+def batch_fetch_pre_pairs_states(pairs_addresses: list):
+    """Fetch pairs states in batches"""
+
+    network_providers = NetworkProviders(API, PROXY)
+    fetch_contracts_states("pre", network_providers, pairs_addresses, PAIRS_LABEL)
+
+
+def batch_fetch_mid_pairs_states(pairs_addresses: list):
+    """Fetch pairs states in batches"""
+
+    network_providers = NetworkProviders(API, PROXY)
+    fetch_contracts_states("mid", network_providers, pairs_addresses, PAIRS_LABEL)
 
 def set_fees_collector_in_pairs(_):
     """Set fees collector in pairs"""
