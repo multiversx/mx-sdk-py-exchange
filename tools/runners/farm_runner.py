@@ -94,7 +94,25 @@ def pause_farm_contracts(_):
     network_providers = NetworkProviders(API, PROXY)
     dex_owner = get_owner(network_providers.proxy)
 
-    farm_addresses = get_all_farm_v2_addresses()
+    farm_addresses = [
+        "erd1qqqqqqqqqqqqqpgqnqvjnn4haygsw2hls2k9zjjadnjf9w7g2jpsmc60a4",
+        "erd1qqqqqqqqqqqqqpgqutddd7dva0x4xmehyljp7wh7ecynag0u2jpskxx6xt",
+        "erd1qqqqqqqqqqqqqpgqe9v45fnpkv053fj0tk7wvnkred9pms892jps9lkqrn",
+        "erd1qqqqqqqqqqqqqpgqs2puacesqywt84jawqenmmree20uj80d2jpsefuka9",
+        "erd1qqqqqqqqqqqqqpgq6xp2uvdk22frgqkwm9pwa564gqg2gxfm2jpszggzgw",
+        "erd1qqqqqqqqqqqqqpgqmaj6qc4c6f9ldkuwllqh7pyd8e9yu3m82jpscc6f9s",
+        "erd1qqqqqqqqqqqqqpgqc3p5xkj656h2ts649h4f447se4clns662jpsccq7rx",
+        "erd1qqqqqqqqqqqqqpgqzy0qwv0jf0yk8tysll0y6ea0fhpfqlp32jpsder9ne"
+        "erd1qqqqqqqqqqqqqpgqyawg3d9r4l27zue7e9sz7djf7p9aj3sz2jpsm070jf",
+        "erd1qqqqqqqqqqqqqpgqwtzqckt793q8ggufxxlsv3za336674qq2jpszzgqra",
+        "erd1qqqqqqqqqqqqqpgq7qhsw8kffad85jtt79t9ym0a4ycvan9a2jps0zkpen",
+        "erd1qqqqqqqqqqqqqpgqs2mmvzpu6wz83z3vthajl4ncpwz67ctu2jpsrcl0ct",
+        "erd1qqqqqqqqqqqqqpgqdt892e0aflgm0xwryhhegsjhw0zru60m2jps959w5z",
+        "erd1qqqqqqqqqqqqqpgq3f8jfeg34ujzy0muhe9dvn5yngwgud022jpsscjxgl",
+        "erd1qqqqqqqqqqqqqpgqcejzfjfmmgvq7yjch2tqnhhsngr7hqyw2jpshce5u2",
+        "erd1qqqqqqqqqqqqqpgqlu6vrtkgfjh68nycf5sdw4nyzudncns42jpsr7szch"
+        "erd1qqqqqqqqqqqqqpgq5e2m9df5yxxkmr86rusejc979arzayjk2jpsz2q43s"
+    ]
 
     print(f"Pausing {len(farm_addresses)} farm contracts...")
     if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
