@@ -4,7 +4,7 @@ import json
 import os
 from time import sleep
 from typing import Any
-from multiversx_sdk import SmartContractTransactionsFactory, TransactionsFactoryConfig
+from multiversx_sdk import CodeMetadata, SmartContractTransactionsFactory, TransactionsFactoryConfig
 from multiversx_sdk import Address
 from config import GRAPHQL
 from context import Context
@@ -29,6 +29,7 @@ FARMSV12_LABEL = "farmsv12"
 FARMSV2_LABEL = "farmsv2"
 OUTPUT_FARMV13_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv13_data.json"
 OUTPUT_FARMV13LOCKED_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv13locked_data.json"
+OUTPUT_FARMV13UNLOCKED_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv13unlocked_data.json"
 OUTPUT_FARMV12_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv12_data.json"
 OUTPUT_FARMV2_CONTRACTS_FILE = OUTPUT_FOLDER / "farmv2_data.json"
 
@@ -74,16 +75,19 @@ def fetch_and_save_farms_from_chain(_):
 
     farmsv13 = get_farm_addresses_from_chain("v1.3")
     farmsv13locked = get_farm_addresses_locked_from_chain()
+    farmsv13unlocked = get_farm_addresses_unlocked_from_chain()
     farmsv12 = get_farm_addresses_from_chain("v1.2")
     farmsv2 = get_farm_addresses_from_chain("v2")
 
     print(f"Retrieved {len(farmsv12)} farms v1.2 contracts.")
     print(f"Retrieved {len(farmsv13)} farms v1.3 contracts.")
     print(f"Retrieved {len(farmsv13locked)} farms v1.3 locked contracts.")
+    print(f"Retrieved {len(farmsv13unlocked)} farms v1.3 unlocked contracts.")
     print(f"Retrieved {len(farmsv2)} farms v2 contracts.")
 
     fetch_and_save_contracts(farmsv13, FARMSV13_LABEL, OUTPUT_FARMV13_CONTRACTS_FILE)
     fetch_and_save_contracts(farmsv13locked, FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE)
+    fetch_and_save_contracts(farmsv13unlocked, FARMSV13_LABEL, OUTPUT_FARMV13UNLOCKED_CONTRACTS_FILE)
     fetch_and_save_contracts(farmsv12, FARMSV12_LABEL, OUTPUT_FARMV12_CONTRACTS_FILE)
     fetch_and_save_contracts(farmsv2, FARMSV2_LABEL, OUTPUT_FARMV2_CONTRACTS_FILE)
 
@@ -228,6 +232,30 @@ def resume_farm_contract(args: Any):
               f"{contract_states[farm_address]}")
 
 
+def resume_farmv13unlocked_contracts(_):
+    """Resume all v1.3 farms with unlocked rewards"""
+
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    farm_addresses = get_all_farm_v13unlocked_addresses()
+
+    print(f"Resuming {len(farm_addresses)} v1.3 farm contracts with unlocked rewards...")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    count = 1
+    for farm_address in farm_addresses:
+        print(f"Processing contract {count} / {len(farm_addresses)}: {farm_address}")
+        contract = FarmContract("", "", "", farm_address, FarmContractVersion.V14Unlocked)
+        tx_hash = contract.resume(dex_owner, network_providers.proxy)
+        if not network_providers.check_simple_tx_status(tx_hash, f"resume farm v13 unlocked contract: {farm_address}"):
+            if not get_user_continue():
+                return
+
+        count += 1
+
+
 def upgrade_farmv12_contracts():
     """Upgrade all v1.2 farms"""
 
@@ -285,6 +313,52 @@ def upgrade_farmv13_contracts():
         fetch_new_and_compare_contract_states(FARMSV13_LABEL, address, network_providers)
 
         if not get_user_continue():
+            return
+
+        count += 1
+
+
+def upgrade_farmv13unlocked_contracts(args: Any):
+    """Upgrade all v1.3 farms with unlocked rewards"""
+
+    compare_states = args.compare_states
+    network_providers = NetworkProviders(API, PROXY)
+    dex_owner = get_owner(network_providers.proxy)
+
+    all_addresses = get_all_farm_v13unlocked_addresses()
+    bytecode_path = get_file_from_url_or_path(args.bytecode)
+
+    print(f"Upgrading {len(all_addresses)} v1.3 farm contracts with unlocked rewards...")
+    print(f"New bytecode codehash: {get_bytecode_codehash(bytecode_path)}")
+    if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+        return
+
+    if compare_states:
+        print("Fetching contracts states before upgrade...")
+        fetch_contracts_states("pre", network_providers, all_addresses, FARMSV13_LABEL)
+
+        if not get_user_continue():
+            return
+
+    count = 1
+    for address in all_addresses:
+        print(f"Processing contract {count} / {len(all_addresses)}: {address}")
+        contract = FarmContract("", "", "", address, FarmContractVersion.V14Unlocked)
+
+        # the legacy contract upgrade endpoint takes no arguments
+        tx_hash = contract.contract_upgrade(dex_owner, network_providers.proxy,
+                                            bytecode_path, [], no_init=True,
+                                            metadata=CodeMetadata(upgradeable=True, readable=True,
+                                                                  payable=True, payable_by_contract=False))
+
+        if not network_providers.check_simple_tx_status(tx_hash, f"upgrade farm v13 unlocked contract: {address}"):
+            if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
+                return
+
+        if compare_states:
+            fetch_new_and_compare_contract_states(FARMSV13_LABEL, address, network_providers)
+
+        if not get_user_continue(config.FORCE_CONTINUE_PROMPT):
             return
 
         count += 1
@@ -720,6 +794,20 @@ def get_farm_addresses_from_chain(version: str) -> list:
 def get_farm_addresses_locked_from_chain() -> list:
     """Get farms with locked rewards"""
 
+    return get_farm_v13_addresses_by_reward_type_from_chain('lockedRewards')
+
+
+def get_farm_addresses_unlocked_from_chain() -> list:
+    """Get farms with unlocked rewards"""
+
+    return get_farm_v13_addresses_by_reward_type_from_chain('unlockedRewards')
+
+
+def get_farm_v13_addresses_by_reward_type_from_chain(reward_type: str) -> list:
+    """
+    reward_type: lockedRewards | unlockedRewards | customRewards
+    """
+
     query = """
             { farms {
              ... on FarmModelV1_3 { 
@@ -733,7 +821,7 @@ def get_farm_addresses_locked_from_chain() -> list:
 
     address_list = []
     for entry in result['data']['farms']:
-        if entry.get('version') == 'v1.3' and entry.get('rewardType') == 'lockedRewards':
+        if entry.get('version') == 'v1.3' and entry.get('rewardType') == reward_type:
             address_list.append(entry['address'])
 
     return address_list
@@ -749,6 +837,12 @@ def get_all_farm_v13locked_addresses() -> list:
     """Get all v1.3 farms addresses with locked rewards"""
 
     return get_saved_contract_addresses(FARMSV13_LABEL, OUTPUT_FARMV13LOCKED_CONTRACTS_FILE)
+
+
+def get_all_farm_v13unlocked_addresses() -> list:
+    """Get all v1.3 farms addresses with unlocked rewards"""
+
+    return get_saved_contract_addresses(FARMSV13_LABEL, OUTPUT_FARMV13UNLOCKED_CONTRACTS_FILE)
 
 
 def get_all_farm_v2_addresses() -> list:

@@ -280,7 +280,7 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         return tx_hash, address
 
     def contract_upgrade(self, deployer: Account, proxy: ProxyNetworkProvider, bytecode_path, args: list = [],
-                         no_init: bool = False):
+                         no_init: bool = False, metadata: CodeMetadata = None):
         """Expecting as args:
         type[str]: pair contract address
         type[str]: locked asset factory address (only V14Locked)
@@ -290,7 +290,8 @@ class FarmContract(BaseFarmContract, BaseBoostedContract, BaseSCWhitelistContrac
         function_purpose = f"upgrade {type(self).__name__} contract"
         logger.info(function_purpose)
 
-        metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
+        if metadata is None:
+            metadata = CodeMetadata(upgradeable=True, payable_by_contract=True, readable=True)
         gas_limit = 350000000
         tx_hash = ""
 
